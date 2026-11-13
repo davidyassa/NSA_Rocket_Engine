@@ -14,6 +14,7 @@ This morning Maya says she feels fine. She does her three-minute check-in, and S
 
 - her sleep and her mood have both been below **her own usual** on four of the last five sols;
 - her heart rate variability has dropped well below her own usual (the laptop camera can measure it, with no extra hardware);
+- her voice has less pitch movement, a slower pace and more pauses than her own usual;
 - she has eaten too little on most recent sols, while exercise stayed short;
 - her headaches came on the sols when cabin CO2 passed NASA's limit.
 
@@ -80,7 +81,7 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
    - **Reference IDs**: `SC-…` codes are Sol Check's own internal references. NASA does not publish risk codes in that form, so each hazard also names the current NASA HRP research element (Space Radiation; Human Factors and Behavioral Performance; Exploration Medical Capability; Human Health Countermeasures).
    - **Deep-Space Hazard Taxonomy**: Directly correlates crew vitals and behavioral observations to NASA's official Five Hazards of Human Spaceflight:
      1. **Space Radiation** (`#/hazards/radiation`, `SC-RAD-01`, HRP element: Space Radiation): Deep-space transit specification per NASA-STD-3001 (600 mSv universal career ceiling). Continuous CARN (Cosmic & Ambient Radiation Node) sensor streams per compartment, personalized room access and dynamic lockdown matrix based on individual permissible dose budgets, directional solar storm localization, automated turn-by-turn lowest-dose evacuation routing, 6-hour hysteresis recovery, and post-event lymphocyte assays. [Hazard 1 Specification](docs/hazard-1-space-radiation.md)
-     2. **Isolation & Confinement** (`SC-BHP-01`, HRP element: HFBP): Compare sleep, mood, and vigilance, plan countermeasures, and open a later simulated sol at `#/hazards/isolation`. [Hazard 2 workflow](docs/hazard-2-isolation-and-confinement.md)
+     2. **Isolation & Confinement** (`SC-BHP-01`, HRP element: HFBP). Compare sleep, mood, vigilance and optional voice check readings with the crew member’s own history. Plan countermeasures and open a later simulated sol at `#/hazards/isolation`. [Hazard 2 workflow](docs/hazard-2-isolation-and-confinement.md)
      3. **Distance from Earth** (`#/hazards/distance`, `SC-EXMC-01`, HRP element: ExMC): Explains the offline seven-reading, eight-symptom check-in, personal baselines and the simulated 20-minute one-way delay. Assessment provides a local draft for the Ground Flight Surgeon when the onboard officer requests ground review. [Hazard 3 & Contract v1 Specification](docs/hazard-3-distance-from-earth.md) · [Arabic Reference Contract](docs/مرجع-البعد-عن-الأرض-والمراقبة-الصحية-Sol-Check-Contract-v1.md)
      4. **Altered Gravity Fields** (`SC-HHC-01`, HRP element: HHC): Monitors orthostatic blood pressure variations, cardiovascular deconditioning, and vestibular changes.
      5. **Hostile Closed Environments** (`SC-ENV-01`, HRP element: HFBP habitability): Tracks habitat environmental stressors, air quality, acoustic fatigue, and sleep disruptions.
@@ -91,11 +92,11 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
    - **Cryptographic Traceability**: Generates a deterministic SHA checksum verifying package integrity across interplanetary transmission.
    - **Evidence-to-Action Chain**: Provides full explainability: Observation → Signal Quality → Baseline Comparison → HRP Decision Rule → Clinical Recommendation → Flight Surgeon Burst Uplink.
 
-4. **3D Crew Digital Twin Host & 2D Body Map (F14)**:
+4. **3D Crew Digital Twin (F14)**:
    - **Team Blender astronaut**: a lazily loaded, self-hosted three.js viewport (separate chunk, precached offline) renders `assets/astronaut/astronaut_sol_check.glb`, imported directly with no copies, manifest or placeholder. Export checklist: [docs/3d-model-integration.md](docs/3d-model-integration.md).
    - **Orbit and framing**: mouse, touch and pen orbit with damping, pitch limits, no scroll hijacking, idle auto-rotation (off under reduced motion), double-click / **Reset view** easing, keyboard **Rotate left/right**, and camera framing computed from the model bounds.
    - **Six projected hotspots**: Head → Mood, Visor → Sleep, Chest → Heart rate (pulses at the latest heart rate), Torso → Temperature, Abdomen → Blood glucose, Limbs → Symptoms. Anchors come from Blender empties named `hotspot_<domain>`, with bounding-box fallbacks. The markers are real focusable `.figure-region-target` buttons that show status by icon, colour and label. A HUD pill shows the reading. Suit parts tagged `solcheck_domain` highlight and are clickable.
-   - **Accessible fallbacks**: a `[ ✦ 3D model | ☷ 2D view ]` segmented toggle. The 2D SVG body map and the `.crew-figure-link` list provide the same six routes. The view switches to 2D automatically if WebGL is unavailable.
+   - **Health links**: the six keyboard-accessible links open the same readings as the model’s hotspots and remain available if WebGL is unavailable.
 
 5. **Closed-Loop Mission Health Action Center (`#/assessment` & `#/cmo`)**:
    - An autonomous clinical task engine (`src/features/followups/followUpEngine.ts`) transforms findings and sensor warnings into structured, actionable crew follow-up tasks with state machine tracking (`open` → `acknowledged` → `in_progress` → `awaiting_measurement` → `awaiting_medical_review` → `resolved` / `escalated`) and a complete audit trail recording crew member actions, timestamps, and rationales.
@@ -119,7 +120,15 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
    - Retrieval-only (no language model): BM25 ranking over Sol Check's own sources, rules, measurement guides, action cards, glossary, five-hazard content, NASA datasets and supplies, plus the crew member's own readings and findings. Every answer lists its sources; anything outside that content gets "I only answer from…".
    - Safety rules run first: crisis words → talk to the crew medical officer or a crewmate now; emergency symptoms → tell the medical officer now; medicine, dose and diagnosis requests are declined.
    - A six-question mood conversation (the check-in's mood questions) with a plain summary and routing.
-   - **Voice mode (hands-free):** tap **Talk to Sol**, allow the microphone, and just speak. A voice-activity detector notices when you start and stop talking; OpenAI's Whisper tiny model turns speech into text **on the device** (WebAssembly, in a background worker, loaded only from the app's own files); Sol answers out loud and listens again. A Mars globe drops in and spins while it listens. The ~60 MB voice model downloads once when voice is first used, then works offline. Say "stop" to finish; **Type instead** is always available. Code: `src/features/assistant/`, with tests.
+   - **Conversation layer** (`dialogue.ts`): cleans real speech (repeats, two voices), answers small talk warmly, treats habitat emergencies (low oxygen, smoke, alarms) as urgent, responds to symptoms with empathy plus cited steps and when to get the crew medical officer, and remembers the topic for "why?" and "what should I do?".
+   - **We tested on-device language models and chose not to use them:** SmolLM2-360M and Qwen2.5-0.5B invented health facts on 6 of 6 test answers; a verifier caught every one. See [docs/validation/local-llm-evaluation.md](docs/validation/local-llm-evaluation.md).
+   - **Voice mode:** tap **Talk to Sol**, allow microphone access, and speak. Whisper tiny transcribes speech on the device using the app's bundled files. The browser loads the roughly 60 MB model on first use, and voice recognition works offline once the files are cached. Say “stop” to finish, or select **Type instead**.
+   - **Hey Sol on every tab:** Sol Check requests microphone access on launch when wake listening is enabled, which is the default. Once the dock shows **Listening for “Hey Sol”**, say “Hey Sol” or “Hey Soul” with your question. Wake detection runs locally and the speaking model loads when Sol has a reply. After 25 seconds of silence or “bye”, the dock returns to wake listening. The **Listen for “Hey Sol”** switch turns automatic listening off. The dock releases the microphone when the app goes into the background or full-screen voice mode opens.
+   - **Voice settings:** Sol speaks with the bundled Kokoro neural voice (Heart, US English). The phone apps include the roughly 93 MB voice model. The web app caches it on first use. Speech synthesis stays on the device and uses an installed local voice if the model is unavailable. Use **Test voice** to hear Sol. Tap the Sol bubble during a reply to interrupt it and keep talking.
+   - **Voice check-in:** say “Hey Sol, log my check-in. My pulse was 82, my blood pressure was 118 over 76, I slept six and a half hours, and I had a headache.” Sol opens **Review & save**. Say “uncheck headache”, “set my pulse to 84”, or “add a note” followed by your note. “I’m feeling very bad” suggests mood 1 out of 5. Check the draft and save it yourself.
+   - **Hands-free controls:** try “scroll down”, “open supplies”, “select Sol 41”, or “check checklist resting pulse”. The thin beige bar marks actions Sol makes in the app. Sol rejects out-of-range voice entries and states the accepted range. “Summarize this page” reads the applicable saved data or selected view, including the open check-in draft, Timeline sol, trend indicator, or CMO tab.
+   - **Mission review:** ask about your saved readings, symptoms, follow-ups, cognitive checks, cabin air, radiation replay, or supplies. Try “Review this mission. I’m planning a two-hour EVA.” Sol uses the available evidence to flag concerns and list what needs checking with mission operations and the crew medical officer. A survival probability requires a validated mission risk model and vehicle reliability data.
+   - **Urgent replies:** the first safety instruction plays from bundled audio as soon as the alert is recognized. For longer replies, Sol generates the next section while the current one plays.
 
 11. **Real astronaut data (NASA OSDR OSD-569)**:
    - **Demo and data → Tested on real astronaut data** runs Sol Check's personal-baseline method on the Inspiration4 crew blood counts, with a data-quality gate, reference change values from published biological variation (Coskun et al. 2019), the untouched source CSV and its SHA-256. Re-import or verify with `node scripts/nasa/import-osdr-cbc.mjs --verify`.
@@ -142,7 +151,15 @@ Added after a teammate's review against NASA's human-spaceflight risks. Every ru
 | Kidney stones | A report of side or lower-back pain or blood in urine prompts onboard review and includes recent fluid logs. The optional exercise rule shows when short sessions coincide with lower food or fluid intake. [Pietrzyk et al. 2007](https://pubmed.ncbi.nlm.nih.gov/17511294/) | Urine/blood chemistry and ultrasound |
 | Behavioral crisis far from Earth | "Feeling hopeless or unable to cope" routes straight to the Crew Medical Officer with a talk-now card, since a 40-minute round trip rules out live ground support ([NASA behavioral health risk](https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders)) | Validated psychological assessment by a clinician |
 
-The Hazards page lists, for each hazard, what Sol Check tracks and what needs flight hardware. Engine version 1.6.0.
+The Hazards page lists, for each hazard, what Sol Check tracks and what needs flight hardware. Engine version 1.7.0.
+
+## Optional offline microphone checks
+
+- **Heart sounds.** Hold a phone microphone against your chest for 20 seconds to estimate heart rate. You can cross-check a saved estimate by counting your wrist pulse.
+- **Breath sounds.** Hold the microphone just below your nose and breathe normally for 40 seconds. Sol Check shows a rate when two methods agree.
+- **Voice.** On the Mood page, read the same short passage aloud. Sol Check tracks pitch movement, speaking pace and pauses against your own 14-sol median once at least five prior sols are available.
+
+Each check withholds the estimate when the signal is too weak or inconsistent. Audio stays in device memory during the check. If you choose to save a reading, the app keeps only the measurements and their capture details. [Microphone validation](docs/validation/README.md#microphone-checks)
 
 ## Flight-console design system
 
@@ -177,6 +194,7 @@ An optional on-device optical pulse estimation tool is integrated beside manual 
 - **Google LiteRT**: Copyright (c) 2024 Google LLC. Licensed under the Apache License 2.0.
 - **OpenAI Whisper (tiny.en)**: speech recognition model, MIT License ([openai/whisper](https://github.com/openai/whisper)). Used through the ONNX conversion **Xenova/whisper-tiny.en**, Apache License 2.0 ([Hugging Face](https://huggingface.co/Xenova/whisper-tiny.en)), bundled under `public/vendor/whisper/` so voice works offline.
 - **Transformers.js** (`@huggingface/transformers` 3.7.6): Apache License 2.0. **ONNX Runtime Web** (WebAssembly build bundled under `public/vendor/ort/`): MIT License.
+- **Kokoro-82M v1.0** (quantized ONNX model and Heart voice, Apache 2.0) reads Sol’s existing replies aloud. [Model and voice](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/tree/1939ad2a8e416c0acfeecc08a694d14ef25f2231)
 
 ## Rehearse the Sol 43 demo
 

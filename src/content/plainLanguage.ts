@@ -40,10 +40,13 @@ export const FIELD_HINTS: Record<MetricId, string> = {
   bp_diastolic_standing: 'Bottom number after 3 minutes standing.',
   fluid_intake: 'Water and drinks since your last check-in, in litres.',
   exercise_minutes: 'Minutes of actual exercise today (not set-up time).',
-  respiratory_rate: 'Breaths per minute at rest. The camera can measure this.',
+  respiratory_rate: 'Breaths per minute at rest. You can count them or use the camera.',
   hrv_rmssd: 'Heart rate variability in milliseconds. The camera can measure this.',
   calorie_intake: 'Food energy you ate today, in kcal (add up the labels).',
   body_mass: 'Your weight from the body-mass device, in kg.',
+  voice_pitch_variability: 'How much your pitch moves while reading the passage. The voice check measures this.',
+  voice_articulation_rate: 'Syllables per second while speaking (pauses left out). The voice check measures this.',
+  voice_pause_ratio: 'Share of the reading spent in pauses of a quarter-second or longer. The voice check measures this.',
 };
 
 /** Field labels in everyday words (the technical name stays in brackets). */
@@ -60,6 +63,9 @@ export const PLAIN_FIELD_LABEL: Partial<Record<MetricId, string>> = {
   hrv_rmssd: 'Heart rate variability (HRV)',
   calorie_intake: 'Food eaten today',
   body_mass: 'Body weight (mass)',
+  voice_pitch_variability: 'Voice pitch movement',
+  voice_articulation_rate: 'Speaking pace',
+  voice_pause_ratio: 'Time in pauses',
 };
 
 const METRIC_WORDS: Record<MetricId, string> = {
@@ -79,6 +85,9 @@ const METRIC_WORDS: Record<MetricId, string> = {
   hrv_rmssd: 'heart rate variability',
   calorie_intake: 'food energy',
   body_mass: 'body weight',
+  voice_pitch_variability: 'voice pitch movement',
+  voice_articulation_rate: 'speaking pace',
+  voice_pause_ratio: 'time in pauses',
 };
 
 function direction(summary: string): 'lower' | 'higher' | null {
@@ -123,7 +132,12 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
     case 'co2-headache-context':
       return 'Your headaches came on days when the habitat air had more carbon dioxide than NASA’s limit. Report it to the life-support crew. CO2 may be part of the cause, but the timing alone does not prove it.';
     case 'breathing-rate-range':
+      if (finding.baselineUsed.length > 0) {
+        return `Your breathing rate was ${dir === 'lower' ? 'lower' : 'higher'} than your usual at rest. Rest for 5 minutes and measure again.`;
+      }
       return `You are breathing ${dir === 'lower' ? 'more slowly' : 'faster'} than the usual 12–20 breaths a minute at rest. Rest for 5 minutes and measure again.`;
+    case 'voice-change-from-usual':
+      return 'Reading the passage today, your voice was flatter, slower or had more pauses than your usual. This can happen with tiredness, stress or low mood. Rest if you can, check in with a crewmate, and talk to your crew medical officer if you feel low.';
     case 'hrv-below-usual':
       return 'Your heart rate variability is well below your usual. This often happens with poor sleep, stress or getting ill. Take it easier today and measure again tomorrow.';
     case 'energy-intake-low':
@@ -181,6 +195,7 @@ export const GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'CO2 (mmHg)', meaning: 'Carbon dioxide in the habitat air. NASA keeps the 1-hour average at or below 3 mmHg because higher levels cause headaches and tiredness.' },
   { term: 'Breathing rate', meaning: 'How many breaths you take in one minute. Adults at rest usually take 12–20.' },
   { term: 'HRV (heart rate variability)', meaning: 'How much the time between heartbeats changes from beat to beat. Higher is usually a sign of being well rested. It is very personal, so Sol Check compares it only with your own usual.' },
+  { term: 'Voice check', meaning: 'You read the same short passage aloud each sol. Sol Check measures how much your pitch moves, your speaking pace and your pauses, and compares them only with your own usual. It does not diagnose anything.' },
   { term: 'Menu fatigue', meaning: 'Getting tired of the same space food for months, so you eat less without noticing.' },
   { term: 'Body mass', meaning: 'Your weight. In weightlessness it is measured with a special device, not a normal scale.' },
   { term: 'Kidney stone', meaning: 'A small hard lump that forms in the kidney. Bone calcium lost in low gravity and too little water make stones more likely.' },

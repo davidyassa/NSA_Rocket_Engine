@@ -16,7 +16,7 @@ export function InteractiveStation({
   describedBy: string;
   anchors?: readonly StationAnchor[];
   incident?: StationIncident | null;
-  renderOverlay?: (points: StationProjection[]) => ReactNode;
+  renderOverlay?: (points: StationProjection[], focusAnchor: (id: string) => void) => ReactNode;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const viewport = useRef<StationViewport>(null);
@@ -88,7 +88,7 @@ export function InteractiveStation({
           {status === 'error' ? 'Interactive 3D is unavailable on this device.' : 'Loading NASA’s 3D model…'}
         </p>
       )}
-      {ready && renderOverlay?.(points)}
+      {ready && renderOverlay?.(points, (id) => viewport.current?.focusAnchor(id))}
     </>
   );
 }

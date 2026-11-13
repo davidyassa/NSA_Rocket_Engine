@@ -13,6 +13,7 @@ import {
 } from '../../contracts';
 import { MEASUREMENT_GUIDES, SOURCES } from '../../content';
 import { CameraPulseCheck, type CameraVitalsEstimate } from './CameraPulseCheck';
+import { MicCheck, type MicReading } from './audio/MicCheck';
 import type { CameraPulseEstimate } from './pulseQuality';
 import { FIELD_HINTS, PLAIN_FIELD_LABEL } from '../../content/plainLanguage';
 import {
@@ -22,23 +23,27 @@ import {
   type MoodEvaluationContext,
 } from './moodAssessment';
 import './checkin.css';
+import type { CheckinPatch } from '../assistant/checkinCommands';
+import type { MissionEvidence } from '../assistant/missionAnswers';
 
 interface CheckinProps {
   sol: number;
   profile: AstronautProfile;
   demoPrefill?: CheckinEntry['values'];
   initialEntry?: CheckinEntry;
+  voiceDraft?: readonly CheckinPatch[];
+  onAssistantDraft?: (draft: MissionEvidence['checkinDraft']) => void;
   onSubmit: (entry: CheckinEntry) => void;
 }
 
 /** 8 sequential pages: Heart Rate (Pulse), Breathing & HRV, Blood Pressure, Temperature & Sugar, Sleep, Mood, Symptoms & Activity, Review & Save */
 const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: string }[] = [
-  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Page 1 of 8: Type your resting pulse, or start the camera to read it automatically.' },
+  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Page 1 of 8: Type your resting pulse or read it with the camera.' },
   { id: 'breath', title: 'Breathing & HRV', metrics: ['respiratory_rate', 'hrv_rmssd'], intro: 'Page 2 of 8: Camera-derived breathing rate and heart rate variability (HRV), or enter breath count manually.' },
   { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic', 'bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Page 3 of 8: Use the arm cuff to record seated blood pressure (mmHg). Includes optional stand-up test.' },
   { id: 'temp_sugar', title: 'Temperature & Sugar', metrics: ['body_temp', 'blood_glucose'], intro: 'Page 4 of 8: Core body temperature (°C) with thermometer and blood glucose (mg/dL) with finger-prick meter.' },
   { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'Page 5 of 8: How many hours did you actually sleep last night?' },
-  { id: 'mood', title: 'Mood', metrics: ['mood'], intro: 'Page 6 of 8: Complete the 6-question psychological assessment. Score and clinical adjustments are computed live.' },
+  { id: 'mood', title: 'Mood', metrics: ['mood', 'voice_pitch_variability', 'voice_articulation_rate', 'voice_pause_ratio'], intro: 'Page 6 of 8: Complete the 6-question psychological assessment. Score and clinical adjustments are computed live. Optional: a 40-second voice check.' },
   { id: 'feel', title: 'How you feel & Activity', metrics: ['fluid_intake', 'exercise_minutes', 'calorie_intake', 'body_mass'], intro: 'Page 7 of 8: Tick any symptoms noticed today, log your daily countermeasures (water, exercise, food, weight), and any notes.' },
   { id: 'review', title: 'Review & save', metrics: [], intro: 'Page 8 of 8: Review all answers from Pages 1–7. Tap Edit to change anything, then save your check-in.' },
 ];
@@ -99,7 +104,7 @@ function MeasurementGuide({ metric, label }: { metric: MetricId; label: string }
   );
 }
 
-export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: CheckinProps) {
+export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, onAssistantDraft, onSubmit }: CheckinProps) {
   const [draft, setDraft] = useState(() => readingDraft(initialEntry?.values ?? {}));
   const [prefilled, setPrefilled] = useState(
     () => METRIC_IDS.filter(metric => initialEntry?.provenance[metric] === 'synthetic_demo'),
@@ -131,6 +136,12 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     return {};
   });
   const [isManualMoodOverride, setIsManualMoodOverride] = useState(false);
+  const [voiceMoodSuggested, setVoiceMoodSuggested] = useState(false);
+  const appliedVoiceDraft = useRef<number>(0);
+  useEffect(() => {
+    onAssistantDraft?.({ page: STEPS[step].title, readings: draft, symptoms: SYMPTOM_OPTIONS.filter(option => symptomIds.includes(option.id)).map(option => option.label), note });
+  }, [onAssistantDraft, step, draft, symptomIds, note]);
+  useEffect(() => () => onAssistantDraft?.(undefined), [onAssistantDraft]);
 
   // Cross-metric context evaluation
   const sitSys = Number(draft.bp_systolic);
@@ -174,6 +185,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   }, [moodAssessment.finalIntegerScore, mcqAnswers, isManualMoodOverride, draft.mood]);
 
   function handleSelectMcq(questionId: keyof MoodMcqAnswers, score: number) {
+    setVoiceMoodSuggested(false);
     setIsManualMoodOverride(false);
     const updated = { ...mcqAnswers, [questionId]: score };
     setMcqAnswers(updated);
@@ -198,6 +210,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   }, [step, focusTarget]);
 
   function edit(metric: MetricId, value: string) {
+    if (metric === 'mood') setVoiceMoodSuggested(false);
     setDraft(previous => ({ ...previous, [metric]: value }));
     setPrefilled(previous => previous.filter(id => id !== metric));
     // Manual typing replaces the estimate; camera provenance must not survive an edit.
@@ -217,6 +230,37 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
       return next;
     });
   }
+
+  useEffect(() => {
+    if (!voiceDraft || appliedVoiceDraft.current === voiceDraft.length) return;
+    const pending = voiceDraft.slice(appliedVoiceDraft.current);
+    appliedVoiceDraft.current = voiceDraft.length;
+    let updatedNote = note;
+    setSaveError('');
+    for (const { readings, symptoms, note: voiceNote, moodSuggested } of pending) {
+      for (const metric of METRIC_IDS) {
+        const value = readings[metric];
+        if (value !== undefined) edit(metric, String(value));
+      }
+      const mood = readings.mood;
+      if (mood !== undefined) {
+        setIsManualMoodOverride(true);
+        if (moodSuggested) setMcqAnswers(previous => ({ ...previous, q1_emotional_state: mood }));
+        setVoiceMoodSuggested(Boolean(moodSuggested));
+      }
+      setSymptomIds(previous => [...new Set([
+        ...previous.filter(id => symptoms[id] !== false),
+        ...Object.keys(symptoms).filter(id => symptoms[id]),
+      ])]);
+      if (voiceNote) {
+        const next = voiceNote.append && updatedNote.trim() ? `${updatedNote.trim()}\n${voiceNote.text}` : voiceNote.text;
+        if (next.length <= 500) updatedNote = next;
+        else setSaveError('The voice note would exceed 500 characters. Shorten the existing note and try again.');
+      }
+    }
+    if (updatedNote !== note) setNote(updatedNote);
+    goTo(REVIEW_STEP);
+  }, [voiceDraft, note]);
 
   function fillDemo() {
     if (!demoPrefill) return;
@@ -293,6 +337,29 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     window.setTimeout(() => goTo(breathStep + 1), 700);
   }
 
+  function acceptMicReading(reading: MicReading) {
+    const accepted = Object.entries(reading.values) as [MetricId, number][];
+    setDraft(previous => ({ ...previous, ...Object.fromEntries(accepted.map(([metric, value]) => [metric, String(value)])) }));
+    setPrefilled(previous => previous.filter(id => !accepted.some(([metric]) => metric === id)));
+    setCapture(previous => ({
+      ...previous,
+      ...Object.fromEntries(accepted.map(([metric]) => [metric, {
+        capturedAtUtc: reading.capturedAtUtc,
+        source: 'microphone_estimate',
+        status: 'accepted',
+        signalQuality: reading.quality,
+        algorithm: reading.algorithm,
+        device: 'device microphone · on-device analysis',
+        synthetic: false,
+      } satisfies MeasurementCapture])),
+    }));
+    setErrors(previous => {
+      const next = { ...previous };
+      for (const [metric] of accepted) delete next[metric];
+      return next;
+    });
+  }
+
   /** Parse and check every reading; returns values plus any problems. */
   function validate() {
     const values: CheckinEntry['values'] = {};
@@ -351,6 +418,20 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     goTo(step + 1);
   }
 
+  function clearForm() {
+    setDraft({});
+    setPrefilled([]);
+    setSymptomIds([]);
+    setNote('');
+    setErrors({});
+    setSaveError('');
+    setCapture({});
+    setMcqAnswers({});
+    setIsManualMoodOverride(false);
+    setVoiceMoodSuggested(false);
+    setStep(0);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
@@ -379,8 +460,8 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
         capturedAtUtc: new Date().toISOString(),
         source: 'self_report',
         status: 'accepted',
-        signalQuality: moodAssessment.isComplete ? 1.0 : 0.6,
-        algorithm: 'NASA CHRA-M-04 standardized 6-question MCQ scoring engine',
+        ...(!isManualMoodOverride ? { signalQuality: moodAssessment.isComplete ? 1.0 : 0.6 } : {}),
+        algorithm: voiceMoodSuggested ? 'Crew-reviewed mood suggestion from self-report' : isManualMoodOverride ? 'Manual self-report' : 'NASA CHRA-M-04 standardized 6-question MCQ scoring engine',
         device: 'crew terminal',
         synthetic: false,
       };
@@ -392,6 +473,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
         values, symptomIds, note: note.trim(), provenance, capture: captureForSubmit,
         assessmentScope: hasExtras ? 'extended' : 'core',
       });
+      clearForm();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save this check-in. Try again.');
     }
@@ -402,7 +484,8 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     const id = `reading-${metric}`;
     const label = PLAIN_FIELD_LABEL[metric] ?? metadata.label;
     const isSynthetic = prefilled.includes(metric);
-    const cameraCapture = capture[metric]?.source === 'camera_estimate' ? capture[metric] : undefined;
+    const cameraCapture = capture[metric]?.source === 'camera_estimate' || capture[metric]?.source === 'microphone_estimate' ? capture[metric] : undefined;
+    const captureName = capture[metric]?.source === 'microphone_estimate' ? 'Microphone estimate' : 'Camera estimate';
     const descriptions = [`${id}-hint`, `${id}-unit`];
     if (isSynthetic) descriptions.push(`${id}-origin`);
     if (cameraCapture) descriptions.push(`${id}-origin`);
@@ -449,9 +532,9 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
           <span
             className="badge reading-origin reading-origin--camera"
             id={`${id}-origin`}
-            title={`${cameraCapture.algorithm ?? 'Camera estimate'} · captured ${cameraCapture.capturedAtUtc ?? 'during this session'}`}
+            title={`${cameraCapture.algorithm ?? captureName} · captured ${cameraCapture.capturedAtUtc ?? 'during this session'}`}
           >
-            Camera estimate · SQI {Math.round((cameraCapture.signalQuality ?? 0) * 100)}%
+            {captureName} · quality {Math.round((cameraCapture.signalQuality ?? 0) * 100)}%
           </span>
         )}
         {errors[metric] && (
@@ -786,6 +869,27 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
                   </details>
 
                   <MeasurementGuide metric="mood" label="Mood" />
+
+                  <fieldset className="checkin-metric mic-voice-section">
+                    <legend>Optional: voice check</legend>
+                    <p className="wizard-intro">
+                      Read the same short passage aloud each sol. Sol Check compares your pitch movement, speaking pace and pauses with your own usual.
+                    </p>
+                    {index === step && (
+                      <MicCheck mode="voice" onAccept={reading => acceptMicReading(reading)} />
+                    )}
+                    {capture.voice_pitch_variability?.source === 'microphone_estimate' && (
+                      <p className="checkin-capture-note">
+                        ✓ Voice markers captured. Typing a new number replaces it with manual entry.
+                      </p>
+                    )}
+                    <div className="pressure-grid">
+                      {readingField('voice_pitch_variability')}
+                      {readingField('voice_articulation_rate')}
+                      {readingField('voice_pause_ratio')}
+                    </div>
+                    <MeasurementGuide metric="voice_pitch_variability" label="Voice check" />
+                  </fieldset>
                 </div>
               </div>
             )}
@@ -819,6 +923,9 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
             {/* Page 8: Review & save */}
             {item.id === 'review' && (
               <dl className="review-list">
+                {voiceMoodSuggested && (
+                  <div><dt>Mood suggestion</dt><dd>Sol suggested this rating from what you said. Confirm it before saving.</dd></div>
+                )}
                 {STEPS.filter(page => page.metrics.length > 0).map(page => (
                   <div key={page.id} className={page.metrics.some(metric => errors[metric]) ? 'has-error' : undefined}>
                     <dt>{page.title}</dt>

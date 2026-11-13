@@ -16,8 +16,8 @@ function frames(seconds: number, amplitude: number, freq = 220): Float32Array[] 
   }
   return out;
 }
-function run(seg: SpeechSegmenter, input: Float32Array[]): SegmenterEvent[] {
-  return input.map((f) => seg.push(f)).filter((e): e is SegmenterEvent => e !== null);
+function run(seg: SpeechSegmenter, input: Float32Array[], forWakePhrase = false): SegmenterEvent[] {
+  return input.map((f) => seg.push(f, forWakePhrase)).filter((e): e is SegmenterEvent => e !== null);
 }
 
 describe('hands-free voice detection', () => {
@@ -32,12 +32,19 @@ describe('hands-free voice detection', () => {
     const end = events[1] as Extract<SegmenterEvent, { type: 'speech_end' }>;
     expect(end.durationMs).toBeGreaterThan(1300);
     expect(end.audio.length / RATE).toBeGreaterThan(1.5); // speech + pre-roll + trailing pause
+    expect(end.audio.length / RATE - end.durationMs / 1000).toBeCloseTo(0.36, 1);
   });
 
   it('discards a short click or cough', () => {
     const seg = new SpeechSegmenter(RATE);
     const events = run(seg, [...frames(1, 0.003), ...frames(0.15, 0.3), ...frames(1.2, 0.003)]);
     expect(events.map((e) => e.type)).toEqual(['speech_start', 'discarded']);
+  });
+
+  it('captures a wake phrase with two short syllables', () => {
+    const syllables = [...frames(0.11, 0.2), ...frames(0.065, 0.003), ...frames(0.11, 0.2), ...frames(1.2, 0.003)];
+    expect(run(new SpeechSegmenter(RATE), syllables, true).map((event) => event.type)).toEqual(['speech_start', 'speech_end']);
+    expect(run(new SpeechSegmenter(RATE), syllables)).toEqual([]);
   });
 
   it('adapts to a noisier room instead of treating the noise as speech', () => {

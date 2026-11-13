@@ -108,12 +108,16 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: 'Circadian Disruption, Sleep Restriction & Sensory Monotony',
     spaceflightMechanism:
       'Limited contact outside the crew and long periods in a shared habitat can reduce social contact and sensory variety. Irregular schedules, workload, and light exposure can also disrupt sleep and circadian timing.',
-    solCheckMetrics: ['sleep_duration', 'mood', 'pvt_reaction_time', 'lapses_count', 'hrv_rmssd', 'behavioral_crisis'],
+    solCheckMetrics: [
+      'sleep_duration', 'mood', 'pvt_reaction_time', 'lapses_count', 'hrv_rmssd', 'behavioral_crisis',
+      'voice_pitch_variability', 'voice_articulation_rate', 'voice_pause_ratio',
+    ],
     measuredBy: [
       'Sleep hours and mood compared with your own 14-sol baseline, with a combined sleep-and-mood trend rule',
       'Saved vigilance checks for reaction time and attention lapses, with a personal baseline when enough comparable sessions are available',
       'Fatigue reported in the daily check-in',
       'Camera heart rate variability (HRV) compared with your own usual, as a recovery and stress cue',
+      'Optional read-aloud check for changes in pitch movement, speaking pace and pauses compared with your own usual',
       '“Feeling hopeless or unable to cope” goes straight to the Crew Medical Officer: with a 40-minute round trip, a crisis is handled onboard',
     ],
     needsHardware: ['Wearable sleep tracker (actigraphy) and ECG chest strap for clinical-grade HRV', 'Camera-based drowsiness and eye-closure monitoring'],

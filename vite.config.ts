@@ -110,15 +110,14 @@ export default defineConfig({
         importScripts: ['sw-esm-mime.js'],
         maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         globPatterns: [
-          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb}',
+          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb,mp3}',
           '**/+esm',
         ],
-        // The on-device voice model (~63 MB) is not part of the first load. It is
-        // downloaded when someone turns voice on, then cached for offline use.
-        globIgnores: ['**/vendor/whisper/**', '**/vendor/ort/**', '**/assets/ort-wasm*'],
+        // The voice models load on first use and are cached for later offline use.
+        globIgnores: ['**/vendor/whisper/**', '**/vendor/kokoro/onnx-community/**', '**/vendor/ort/**', '**/assets/ort-wasm*'],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => /\/vendor\/(whisper|ort)\//.test(url.pathname),
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/vendor\/(whisper|kokoro\/onnx-community|ort)\//.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'sol-check-voice-model', cacheableResponse: { statuses: [0, 200] } },
           },

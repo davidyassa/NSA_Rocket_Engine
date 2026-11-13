@@ -11,7 +11,7 @@ const exportMeasurementSchema = z.object({
   observedAtUtc: z.string(),
   capturedAtUtc: z.string().optional(),
   provenance: z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']),
-  source: z.enum(['manual', 'validated_hardware', 'camera_estimate', 'self_report', 'research_import', 'synthetic']).optional(),
+  source: z.enum(['manual', 'validated_hardware', 'camera_estimate', 'microphone_estimate', 'self_report', 'research_import', 'synthetic']).optional(),
   status: z.enum(['accepted', 'rejected_low_quality', 'missing', 'corrected']).optional(),
   signalQuality: z.number().min(0).max(1).nullable().optional(),
   algorithm: z.string().optional(),

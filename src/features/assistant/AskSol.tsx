@@ -1,12 +1,15 @@
 import { ExternalLink, Keyboard, MessagesSquare, Mic, SendHorizontal, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import type { DailyCheckin, DemoScenario, RiskAssessment } from '../../contracts';
+import { Link, useLocation } from 'react-router-dom';
 import type { MoodMcqAnswers } from '../checkin/moodAssessment';
 import { KnowledgeIndex } from './knowledge';
 import { MOOD_QUESTIONS, moodReply } from './mood';
-import { respond, type AssistantContext, type AssistantReply } from './respond';
+import { type AssistantContext, type AssistantReply } from './respond';
+import { converse, newDialogue, type DialogueAction } from './dialogue';
+import { SolBubble } from './SolBubble';
 import { VoiceMode } from './VoiceMode';
+import { VoiceSettings } from './VoiceSettings';
+import { enableVoiceAudio, speak } from './voiceOutput';
 import './askSol.css';
 
 type Message =
@@ -15,49 +18,61 @@ type Message =
 
 const STARTERS = ['How am I doing today?', 'What happened on Sol 41?', 'Why does CO2 cause headaches?', 'Start a mood check'];
 
-export function AskSol({ scenario, records, latest, assessment }: {
-  scenario: DemoScenario; records: readonly DailyCheckin[]; latest: DailyCheckin | null; assessment: RiskAssessment | null;
+export function AskSol({ ctx, onAction }: {
+  ctx: AssistantContext; onAction: (action: DialogueAction) => void;
 }) {
+  const { hash, pathname, search } = useLocation();
   const index = useMemo(() => new KnowledgeIndex(), []);
-  const ctx: AssistantContext = useMemo(() => ({
-    crewName: scenario.profile.displayName,
-    sol: latest?.sol ?? scenario.startSol,
-    oneWayDelayMinutes: scenario.missionContext.oneWayDelayMinutes,
-    latest, assessment, history: records,
-  }), [scenario, latest, assessment, records]);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState('');
-  const [speak, setSpeak] = useState(false);
+  const [readAloud, setReadAloud] = useState(false);
+  const playback = useRef<AbortController | null>(null);
   const [mood, setMood] = useState<{ step: number; answers: MoodMcqAnswers } | null>(null);
   const nextId = useRef(1);
-  const logEnd = useRef<HTMLDivElement>(null);
+  /** conversation memory, shared by typing and voice */
+  const dialogue = useRef(newDialogue());
+  const logEnd = useRef<HTMLLIElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => { logEnd.current?.scrollIntoView({ block: 'end' }); }, [messages, mood]);
   useEffect(() => { if (typing) input.current?.focus(); }, [typing]);
-  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+  useEffect(() => () => playback.current?.abort(), []);
+  useEffect(() => {
+    if (hash === '#voice-settings') {
+      const settings = document.getElementById('voice-settings');
+      settings?.focus({ preventScroll: true });
+      settings?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [hash]);
 
   function addExchange(question: string, reply: AssistantReply) {
     setMessages((list) => [...list, { id: nextId.current++, role: 'user', text: question }, { id: nextId.current++, role: 'assistant', reply }]);
   }
 
   function say(text: string) {
-    if (!speak || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    window.speechSynthesis.speak(utterance);
+    if (!readAloud) return;
+    playback.current?.abort();
+    const speech = new AbortController();
+    playback.current = speech;
+    void speak(text, speech.signal);
   }
 
   function ask(question: string) {
     const text = question.trim();
     if (!text) return;
     setDraft('');
-    const reply = respond(text, ctx, index);
+    const turn = converse(text, dialogue.current, ctx, index, pathname, search);
+    dialogue.current = turn.state;
+    const reply = turn.reply;
     addExchange(text, reply);
+    if (turn.action?.navigate && turn.action.navigate !== pathname) {
+      onAction(turn.action);
+      return;
+    }
+    if (turn.action) onAction(turn.action);
     say(reply.text);
     if (reply.kind === 'mood_start') setMood({ step: 0, answers: {} });
     else if (reply.kind === 'crisis') setMood(null);
@@ -95,8 +110,8 @@ export function AskSol({ scenario, records, latest, assessment }: {
       </header>
 
       <section className="panel ask-sol-talk" aria-labelledby="ask-talk-title">
-        <button type="button" className="ask-talk-button" onClick={() => setVoiceOpen(true)} aria-describedby="ask-talk-hint">
-          <span className="ask-talk-orb" aria-hidden="true"><Mic size={34} /></span>
+        <button type="button" className="ask-talk-button" onClick={() => { enableVoiceAudio(); setVoiceOpen(true); }} aria-describedby="ask-talk-hint">
+          <span className="ask-talk-orb"><SolBubble><Mic size={34} /></SolBubble></span>
           <span id="ask-talk-title" className="ask-talk-label">Talk to Sol</span>
         </button>
         <p id="ask-talk-hint" className="ask-talk-hint">Hands-free: just speak, Sol answers out loud. Your browser will ask to use the microphone. Speech is turned into text on this device; the first time, a voice model (about 60 MB) downloads once.</p>
@@ -136,7 +151,7 @@ export function AskSol({ scenario, records, latest, assessment }: {
                   <button type="button" className="text-link" onClick={() => setMood(null)}>Stop the mood check</button>
                 </li>
               )}
-              <div ref={logEnd} />
+              <li ref={logEnd} className="ask-log-end" aria-hidden="true" />
             </ol>
           )}
 
@@ -150,9 +165,9 @@ export function AskSol({ scenario, records, latest, assessment }: {
             <form className="ask-input" onSubmit={submit}>
               <label htmlFor="ask-draft" className="sr-only">Your question</label>
               <input id="ask-draft" ref={input} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about your health or the mission" autoComplete="off" disabled={Boolean(mood)} />
-              <button type="button" className="button button-secondary ask-icon-btn" onClick={() => { setSpeak((v) => !v); window.speechSynthesis?.cancel(); }}
-                aria-pressed={speak} aria-label={speak ? 'Stop reading answers aloud' : 'Read answers aloud'} title={speak ? 'Reading answers aloud' : 'Read answers aloud'}>
-                {speak ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
+              <button type="button" className="button button-secondary ask-icon-btn" onClick={() => { setReadAloud((v) => !v); playback.current?.abort(); }}
+                aria-pressed={readAloud} aria-label={readAloud ? 'Stop reading answers aloud' : 'Read answers aloud'} title={readAloud ? 'Reading answers aloud' : 'Read answers aloud'}>
+                {readAloud ? <Volume2 size={18} aria-hidden="true" /> : <VolumeX size={18} aria-hidden="true" />}
               </button>
               <button type="submit" className="button button-primary" disabled={!draft.trim() || Boolean(mood)}><SendHorizontal size={18} aria-hidden="true" /> Ask</button>
             </form>
@@ -160,11 +175,14 @@ export function AskSol({ scenario, records, latest, assessment }: {
         </section>
       )}
 
+      <VoiceSettings />
+
       {voiceOpen && (
         <VoiceMode
           ctx={ctx}
           index={index}
           onExchange={addExchange}
+          onAction={onAction}
           onClose={(typeInstead) => { setVoiceOpen(false); if (typeInstead) setTyping(true); }}
         />
       )}

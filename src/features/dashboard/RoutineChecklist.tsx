@@ -13,18 +13,21 @@ export const ROUTINE_CHECKLIST_ITEMS = [
   { id: 'symptoms', label: 'Symptom review', metrics: [] },
 ] as const satisfies readonly { id: string; label: string; metrics: readonly MetricId[] }[];
 
-export function useRoutineChecklist(sol: number, latest: DailyCheckin | null) {
-  const mission = useMissionStore((state) => state.mission);
-  const toggleChecklistItem = useMissionStore((state) => state.toggleChecklistItem);
-  const savedChecks = mission.checklist?.[mission.scenarioId]?.[String(sol)] ?? [];
+export function routineChecklistItems(sol: number, latest: DailyCheckin | null, savedChecks: readonly string[]) {
   const record = latest?.sol === sol ? latest : null;
   const measured = new Set(record?.measurements.map(({ metric }) => metric));
-  const items = ROUTINE_CHECKLIST_ITEMS.map((item) => {
+  return ROUTINE_CHECKLIST_ITEMS.map((item) => {
     const recorded = item.id === 'symptoms'
       ? Boolean(record?.symptoms.length)
       : item.metrics.every((metric) => measured.has(metric));
     return { ...item, recorded, checked: recorded || savedChecks.includes(item.id) };
   });
+}
+
+export function useRoutineChecklist(sol: number, latest: DailyCheckin | null) {
+  const mission = useMissionStore((state) => state.mission);
+  const toggleChecklistItem = useMissionStore((state) => state.toggleChecklistItem);
+  const items = routineChecklistItems(sol, latest, mission.checklist?.[mission.scenarioId]?.[String(sol)] ?? []);
   const completeCount = items.filter(({ checked }) => checked).length;
 
   return {

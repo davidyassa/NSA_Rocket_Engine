@@ -12,7 +12,7 @@ import { sessionsForSol, vigilanceSessionSchema, VIGILANCE_MODES, type Vigilance
 
 const nullableString = z.string().nullable();
 const sourceSchema = z.enum([
-  'manual', 'validated_hardware', 'camera_estimate',
+  'manual', 'validated_hardware', 'camera_estimate', 'microphone_estimate',
   'self_report', 'research_import', 'synthetic',
 ]).nullable();
 const statusSchema = z.enum(['accepted', 'rejected_low_quality', 'missing', 'corrected']).nullable();

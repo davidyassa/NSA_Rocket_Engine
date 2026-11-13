@@ -303,3 +303,37 @@
   .assessment-reading-preview .assessment-table { white-space: normal; }
   .assessment-reading-preview .assessment-table :is(td, th) { padding-inline: 0.3rem; }
 }
+
+/* Each finding is a disclosure: collapsed shows only its title. */
+details.assessment-finding { padding: 0; }
+.assessment-finding-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: clamp(0.85rem, 2.2vw, 1.15rem) clamp(1rem, 2.7vw, 1.5rem);
+  border-radius: inherit;
+  cursor: pointer;
+  list-style: none;
+}
+.assessment-finding-summary::-webkit-details-marker { display: none; }
+.assessment-finding-summary::after {
+  content: '';
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.2rem;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.assessment-finding[open] > .assessment-finding-summary::after { transform: translateY(25%) rotate(-135deg); }
+.assessment-finding-summary:hover::after { border-color: var(--accent); }
+.assessment-finding-summary h3 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.assessment-finding-body { padding: 0 clamp(1rem, 2.7vw, 1.5rem) clamp(1rem, 2.7vw, 1.5rem); }
+@media (prefers-reduced-motion: reduce) {
+  .assessment-finding-summary::after { transition: none; }
+}
+
+.assessment-support + .assessment-findings { margin-top: 1.75rem; }

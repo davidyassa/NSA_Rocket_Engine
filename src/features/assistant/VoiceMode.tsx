@@ -3,9 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { MoodMcqAnswers } from '../checkin/moodAssessment';
 import type { KnowledgeIndex } from './knowledge';
 import { MOOD_QUESTIONS, moodQuestionSpeech, moodReply, parseMoodAnswer } from './mood';
-import { respond, type AssistantContext, type AssistantReply } from './respond';
+import { type AssistantContext, type AssistantReply } from './respond';
+import { converse, newDialogue, type DialogueAction } from './dialogue';
+import { SolBubble } from './SolBubble';
+import { setVoiceModeOpen } from './solListener';
 import { speechToText } from './speechToText';
-import { SpeechSegmenter, resampleTo16k, rms } from './voiceAudio';
+import { SpeechSegmenter, resampleTo16k } from './voiceAudio';
+import { prepareVoice, speak, stopSpeaking } from './voiceOutput';
 import './voiceMode.css';
 
 type Phase = 'loading' | 'listening' | 'hearing' | 'thinking' | 'speaking' | 'error';
@@ -20,54 +24,50 @@ const PHASE_TEXT: Record<Phase, string> = {
 };
 
 /** Whisper sometimes "hears" these in silence; never treat them as a question. */
-const NOISE = /^\s*(\[.*\]|\(.*\)|you|thank you\.?|thanks for watching\.?|\.|,)?\s*$/i;
-const CLOSE = /^\s*(stop|goodbye|bye|close|exit|end (the )?(call|conversation))\b/i;
+const NOISE = /^\s*(\[.*\]|\(.*\)|you[.!?]?|thanks for watching[.!?]?|[.,])?\s*$/i;
+const CLOSE = /^\s*(?:(?:stop|close|exit)(?: (?:the )?(?:call|conversation|voice mode))?|end (?:the )?(?:call|conversation))[.!?]*\s*$/i;
 
-export function VoiceMode({ ctx, index, onExchange, onClose }: {
+export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
   ctx: AssistantContext;
   index: KnowledgeIndex;
   onExchange: (question: string, reply: AssistantReply) => void;
   onClose: (typeInstead?: boolean) => void;
+  onAction: (action: DialogueAction) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [progress, setProgress] = useState(0);
   const [heard, setHeard] = useState('');
   const [reply, setReply] = useState<AssistantReply | null>(null);
   const [error, setError] = useState('');
-  const orbRef = useRef<HTMLDivElement>(null);
   const busy = useRef(true);
   const mood = useRef<{ step: number; answers: MoodMcqAnswers } | null>(null);
   const ctxRef = useRef(ctx);
+  const actionRef = useRef(onAction);
+  const dialogue = useRef(newDialogue());
   ctxRef.current = ctx;
+  actionRef.current = onAction;
 
   useEffect(() => {
+    setVoiceModeOpen(true);
     let cancelled = false;
+    let startupFailed = false;
     let stream: MediaStream | null = null;
     let audio: AudioContext | null = null;
-    let frame = 0;
-    let level = 0;
-
-    const speak = (text: string) => new Promise<void>((resolve) => {
-      const synth = window.speechSynthesis;
-      if (!synth) { window.setTimeout(resolve, Math.min(8000, 400 + text.length * 45)); return; }
-      synth.cancel();
-      let done = false;
-      const finish = () => { if (!done) { done = true; window.clearTimeout(timer); resolve(); } };
-      // Some browsers never fire "end" (or have no voices): never get stuck in "Speaking".
-      const timer = window.setTimeout(finish, 2500 + text.length * 75);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.onend = finish;
-      utterance.onerror = finish;
-      synth.speak(utterance);
-    });
+    const playback = new AbortController();
+    busy.current = true;
+    prepareVoice();
 
     const answer = async (text: string, segmenter: SpeechSegmenter) => {
-      let next: AssistantReply;
+      if (CLOSE.test(text)) { onClose(); return; }
+      const turn = converse(text, dialogue.current, ctxRef.current, index, '/assistant');
+      dialogue.current = turn.state;
+      let next = turn.reply;
       let speech: string;
       const state = mood.current;
-      if (CLOSE.test(text)) { onClose(); return; }
-      if (state) {
+      if (next.kind === 'farewell' || next.kind === 'crisis' || next.kind === 'urgent') {
+        mood.current = null;
+        speech = next.text;
+      } else if (state) {
         const score = parseMoodAnswer(text, state.step);
         if (score === null) {
           next = { kind: 'help', text: 'Sorry, I didn’t catch that. Say a number from 1 to 5.', sources: [] };
@@ -85,15 +85,20 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
           }
         }
       } else {
-        next = respond(text, ctxRef.current, index);
         speech = next.text;
         if (next.kind === 'mood_start') { mood.current = { step: 0, answers: {} }; speech = `${next.text} ${moodQuestionSpeech(0)}`; }
       }
       onExchange(text, next);
       setReply(next);
+      if (!state && turn.action && !turn.action.navigate) actionRef.current(turn.action);
       setPhase('speaking');
-      await speak(speech);
+      await speak(speech, playback.signal);
       if (cancelled) return;
+      if (next.kind === 'farewell') { onClose(); return; }
+      if (!state && turn.action?.navigate && turn.action.navigate !== '/assistant') {
+        actionRef.current(turn.action);
+        return;
+      }
       segmenter.reset();
       busy.current = false;
       setPhase('listening');
@@ -103,22 +108,24 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
       try {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('NO_MIC');
         // Ask for the microphone and load the on-device model at the same time.
-        const [mic] = await Promise.all([
-          navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }),
+        await Promise.all([
+          navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }).then((mic) => {
+            if (cancelled || startupFailed) mic.getTracks().forEach((track) => track.stop());
+            else stream = mic;
+          }),
           speechToText.load((p) => !cancelled && setProgress(p)),
         ]);
-        if (cancelled) { mic.getTracks().forEach((t) => t.stop()); return; }
-        stream = mic;
+        if (cancelled || !stream) return;
         audio = new AudioContext();
         await audio.resume();
-        const source = audio.createMediaStreamSource(mic);
+        if (cancelled) return;
+        const source = audio.createMediaStreamSource(stream);
         const processor = audio.createScriptProcessor(2048, 1, 1);
         const segmenter = new SpeechSegmenter(audio.sampleRate);
         const rate = audio.sampleRate;
         processor.onaudioprocess = (event) => {
+          if (cancelled || busy.current) return;
           const data = new Float32Array(event.inputBuffer.getChannelData(0));
-          level = rms(data);
-          if (busy.current) return;
           const result = segmenter.push(data);
           if (!result) return;
           if (result.type === 'speech_start') setPhase('hearing');
@@ -130,28 +137,30 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
               if (cancelled) return;
               if (!text || NOISE.test(text)) { segmenter.reset(); busy.current = false; setPhase('listening'); return; }
               setHeard(text);
-              void answer(text, segmenter);
-            }).catch(() => { segmenter.reset(); busy.current = false; setPhase('listening'); });
+              return answer(text, segmenter);
+            }).catch(() => {
+              if (cancelled) return;
+              segmenter.reset();
+              busy.current = false;
+              setPhase('listening');
+            });
           }
         };
         source.connect(processor);
         processor.connect(audio.destination);
-        const animate = () => {
-          orbRef.current?.style.setProperty('--level', Math.min(1, level * 12).toFixed(3));
-          frame = requestAnimationFrame(animate);
-        };
-        animate();
         const first = ctxRef.current.crewName.split(' ')[0];
         const hello = `Hi ${first}, I'm listening. Ask me about your health, your check-in, or the mission.`;
         setReply({ kind: 'help', text: hello, sources: [] });
         setPhase('speaking');
-        await speak(hello);
+        await speak(hello, playback.signal);
         if (cancelled) return;
         segmenter.reset();
         busy.current = false;
         setPhase('listening');
       } catch (err) {
         if (cancelled) return;
+        startupFailed = true;
+        (stream as MediaStream | null)?.getTracks().forEach((track) => track.stop());
         const name = (err as { name?: string }).name ?? '';
         setError(name === 'NotAllowedError' || name === 'SecurityError'
           ? 'The microphone is blocked for Sol Check. Allow the microphone in your browser’s site settings (or the app’s settings on a phone), then open voice again.'
@@ -167,10 +176,10 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
     return () => {
       cancelled = true;
       window.removeEventListener('keydown', onKey);
-      cancelAnimationFrame(frame);
-      window.speechSynthesis?.cancel();
+      playback.abort();
       stream?.getTracks().forEach((track) => track.stop());
-      void audio?.close();
+      void audio?.close().catch(() => undefined);
+      setVoiceModeOpen(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -179,13 +188,9 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
     <div className="voice-mode" role="dialog" aria-modal="true" aria-label="Voice conversation with Sol">
       <button type="button" className="voice-close" aria-label="End voice conversation" onClick={() => onClose()}><X size={22} aria-hidden="true" /></button>
 
-      <div className={`voice-orb-stage phase-${phase}`}>
-        <div className="voice-orb" ref={orbRef} aria-hidden="true">
-          <div className="voice-orb-surface" />
-          <div className="voice-orb-shade" />
-        </div>
-        <div className="voice-orb-ring" aria-hidden="true" />
-      </div>
+      <button type="button" className={`voice-orb-stage phase-${phase}`} disabled={phase !== 'speaking'} aria-label="Interrupt Sol" onClick={stopSpeaking}>
+        <SolBubble speaking={phase === 'speaking'} />
+      </button>
 
       <p className="voice-status" aria-live="polite">
         {phase === 'loading' && progress > 0 && progress < 1
@@ -205,7 +210,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose }: {
 
       <div className="voice-controls">
         <button type="button" className="button button-secondary" onClick={() => onClose(true)}><Keyboard size={18} aria-hidden="true" /> Type instead</button>
-        <span className="voice-privacy"><Mic size={14} aria-hidden="true" /> Your voice is turned into text on this device. Say “stop” to finish.</span>
+        <span className="voice-privacy"><Mic size={14} aria-hidden="true" /> Your voice is turned into text on this device. Say “goodbye” to end the call.</span>
       </div>
     </div>
   );

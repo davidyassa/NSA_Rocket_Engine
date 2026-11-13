@@ -45,10 +45,10 @@
   5. `reported-symptoms`: Records current symptoms (e.g. Fatigue) and detects recurring symptoms across the lookback window.
   6. `archive-replay-context`: Contextual association linking lower sleep/mood during shelter protocol with the aligned Curiosity RAD radiation event.
   7. `data-unavailable`: Discloses unmeasured metrics or insufficient history (< 5 sols) preventing baseline calculation.
-* **3D Crew Digital Twin Host & 2D Crew Figure (`src/features/dashboard/CrewBody3D.tsx`, `twin/`, `CrewBodyFigure.tsx`):**
+* **3D Crew Digital Twin (`src/features/dashboard/CrewBody3D.tsx`, `twin/`, `CrewBodyFigure.tsx`):**
   * **Team Blender astronaut:** lazily loaded, self-hosted three.js viewport (own chunk, precached offline) rendering `assets/astronaut/astronaut_sol_check.glb`, imported directly. Export checklist: `docs/3d-model-integration.md`.
   * **Orbit, framing, hotspots:** damped orbit with pitch limits and no scroll hijacking, idle auto-rotation (off under reduced motion), double-click / Reset view, keyboard Rotate left/right, bounds-based camera framing, and six projected `.figure-region-target` buttons with icon + colour + label status. The chest marker pulses at the latest heart rate.
-  * **Toggleable View:** `[ ✦ 3D model ]` (default) and `[ ☷ 2D view ]` segmented toggle. The view falls back to 2D automatically without WebGL.
+  * **Health links:** six keyboard-accessible links stay available if the model cannot load.
   * **Anatomical Hotspots & Routing:**
     * **Head (shortcut `"Head"`):** Navigates to `#/trends?metric=mood` (Behavioral health).
     * **Visor (shortcut `"Visor"`):** Navigates to `#/trends?metric=sleep_duration` (Sleep).

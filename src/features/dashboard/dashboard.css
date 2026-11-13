@@ -65,14 +65,13 @@
 .mission-stats svg { grid-row: 1 / 3; color: var(--accent); }
 .mission-stats span { color: var(--text-secondary); font-size: 0.82rem; }
 .mission-stats strong { font: 600 1.2rem/1.25 var(--font-display); letter-spacing: -0.02em; }
-.dashboard-health { margin-top: 32px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 9px; margin-bottom: 12px; }
 .section-title h2 { margin: 0; font-size: 1.44rem; font-weight: 670; letter-spacing: -0.035em; }
 .section-title p { margin: 2px 0 0; font-size: 0.85rem; color: var(--muted); }
 .status-provenance { display: flex; gap: 6px; flex-wrap: wrap; }
 .domain-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .domain-card { min-width: 0; padding: 14px; }
-.domain-title, .flags-title { display: flex; align-items: center; gap: 9px; }
+.domain-title { display: flex; align-items: center; gap: 9px; }
 .domain-title h3 { margin: 0; font-size: 0.96rem; font-weight: 640; }
 .domain-icon {
   display: grid;
@@ -191,101 +190,13 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
-.crew-figure-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-.crew-figure-item {
-  min-width: 0;
-}
-.crew-figure-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  text-decoration: none;
-  color: inherit;
-  min-height: 58px;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.crew-figure-link:hover,
-.crew-figure-link.is-active {
-  border-color: color-mix(in srgb, var(--status-trend) 40%, transparent);
-  background: var(--bg-raised);
-}
-.crew-figure-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: var(--accent);
-}
-.crew-figure-link-main {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-.crew-figure-link-text {
-  min-width: 0;
-}
-.crew-figure-link-title {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  flex-wrap: wrap;
-  font-size: 0.86rem;
-}
-.crew-figure-region-tag {
-  font-size: 0.8rem;
-  color: var(--muted);
-  font-weight: normal;
-}
-.crew-figure-reading-val {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.crew-figure-link-aside {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.crew-figure-status {
-  font-size: 0.8rem;
-  white-space: nowrap;
-}
-.crew-figure-arrow {
-  color: var(--muted);
-  opacity: 0.6;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.crew-figure-link:hover .crew-figure-arrow {
-  opacity: 1;
-  transform: translateX(2px);
-}
 
 @media (max-width: 810px) {
   .crew-figure-layout {
     grid-template-columns: 1fr;
     justify-items: center;
   }
-  .crew-figure-list {
-    grid-template-columns: 1fr;
-    width: 100%;
-  }
+  .crew-figure-controls { width: 100%; }
   .domain-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 490px) {
@@ -297,19 +208,6 @@
   .domain-title h3 { font-size: 0.85rem; }
 }
 
-.dashboard-quick-intel-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
-  margin-top: 24px;
-  align-items: start;
-}
-.dashboard-intel-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
-}
 
 .action-center-banner {
   margin-top: 14px;
@@ -439,11 +337,6 @@
 .mission-habitat { margin: 2px 0 0; color: var(--accent); font-weight: 600; }
 .action-center-title { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--text-primary); }
 .action-center-title svg { color: var(--status-trend); flex: none; }
-.habitat-air-now { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 4px 0; }
-.habitat-air-value { font: 600 1.5rem/1.2 var(--mono); font-variant-numeric: tabular-nums; color: var(--text-primary); }
-.habitat-air-value small { font-size: 0.6em; color: var(--text-secondary); }
-.habitat-air-note { margin: 0 0 10px; font-size: 0.9rem; }
-.habitat-air-table td.status-change { color: var(--status-change); }
 
 .dashboard-recent { margin-top: 18px; }
 .recent-readings { min-width: 0; padding: clamp(16px, 2.2vw, 25px); }
@@ -454,7 +347,7 @@
 }
 .recent-readings-header { justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
 .chart-heading svg { color: var(--accent); flex: none; }
-.chart-heading h2, .dashboard-intel-image h2 {
+.chart-heading h2 {
   margin: 0;
   font-size: 1.17rem;
   letter-spacing: -0.025em;
@@ -551,18 +444,6 @@
 }
 .domain-info-link:hover { background: var(--tint-accent); }
 .domain-icon { border-radius: 50%; }
-.dashboard-intel-image {
-  --intel-photo: url('../../ui/assets/nasa/crew-lab.webp');
-  min-height: 260px;
-  justify-content: flex-end;
-  align-items: flex-start;
-  background-image: linear-gradient(0deg, #141211 16%, #141211cf 55%, #14121112 100%), var(--intel-photo);
-  background-position: center;
-  background-size: cover;
-}
-.hazards-feature { --intel-photo: url('../../ui/assets/nasa/crew-orbit.webp'); }
-.dashboard-intel-image p { margin: 6px 0 14px; color: var(--text-secondary); font-size: 0.92rem; }
-.habitat-air { background: radial-gradient(ellipse at 100% 0%, #303528 0%, var(--bg-surface) 68%); }
 .mission-explore {
   margin-top: 24px;
   min-height: 380px;
@@ -601,11 +482,9 @@
   .mission-stats > div { padding: 10px; gap: 4px 7px; }
   .mission-stats svg { width: 16px; }
   .mission-explore { min-height: 350px; background-position: center, 62% center; }
-  .dashboard-quick-intel-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
 }
 @media (max-width: 420px) {
   .domain-title { flex-wrap: wrap; gap: 6px; }
-  .dashboard-quick-intel-grid { grid-template-columns: 1fr; }
 }
 
 .dashboard-start {
@@ -647,4 +526,63 @@
 @media (max-width: 730px) {
   .dashboard .crew-figure-subtitle { display: none; }
   .dashboard .twin-viewport { aspect-ratio: 1; }
+}
+
+/* ───────── Radiation status banner (mirrors the Radiation Monitor simulation) ───────── */
+.dashboard-radiation-status {
+  /* Clear gap between the Mission Dashboard block and this block. */
+  margin-top: 22px;
+  padding: 12px 18px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dashboard-radiation-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 320px; }
+.dashboard-radiation-main > div { min-width: 0; flex: 1 1 auto; }
+.dashboard-radiation-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+.dashboard-radiation-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.dashboard-radiation-title .badge { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; }
+.dashboard-radiation-title strong { font-size: 0.98rem; }
+.dashboard-radiation-status .muted { margin: 3px 0 0; font-size: 0.84rem; }
+@media (max-width: 730px) {
+  .dashboard-radiation-status { margin-top: 16px; }
+}
+
+/* ───────── Health Metrics cards beside the crew digital twin ───────── */
+.crew-figure-layout { align-items: start; }
+.crew-figure-controls { min-width: 0; }
+.crew-figure-metrics-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 10px;
+}
+.crew-figure-metrics-head h3 { margin: 0; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.02em; }
+.crew-figure-metrics-head p { margin: 0; font-size: 0.82rem; color: var(--muted); }
+.crew-figure-metrics-head .status-provenance { margin-left: auto; }
+.crew-figure-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.crew-figure-metrics .domain-card { padding: 12px; }
+.crew-figure-metrics .domain-card.is-active {
+  border-color: color-mix(in srgb, var(--domain-glow, var(--accent)) 55%, transparent);
+  background: var(--bg-raised);
+}
+.domain-region { margin: 2px 0 0; font-size: 0.76rem; color: var(--muted); }
+@media (max-width: 1100px) {
+  .crew-figure-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 490px) {
+  .crew-figure-metrics { grid-template-columns: minmax(0, 1fr); }
 }

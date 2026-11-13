@@ -282,10 +282,10 @@ async function main() {
     const updatedChecklist = await cdp.eval(`document.querySelector('.routine-checklist-count')?.innerText`);
     console.log(`   ✓ Checklist toggled: ${updatedChecklist}`);
 
-    // Crew figure SVG & controls
+    // Crew model hotspots and health links
     const regionsCount = await cdp.eval(`document.querySelectorAll('.figure-region-target').length`);
     const controlsCount = await cdp.eval(`document.querySelectorAll('.crew-figure-link').length`);
-    console.log(`   ✓ 2D Figure: ${regionsCount} regions, ${controlsCount} accessible controls.`);
+    console.log(`   ✓ 3D crew model: ${regionsCount} hotspots, ${controlsCount} accessible links.`);
     if (regionsCount !== 6 || controlsCount !== 6) throw new Error('Crew figure regions mismatch.');
 
     // Mobile layout (390px)

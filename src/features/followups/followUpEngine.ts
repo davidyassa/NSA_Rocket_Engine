@@ -139,6 +139,23 @@ export function generateFollowUpTasks(
     });
   }
 
+  const hasHeartSoundEstimate = checkin.measurements.some(m => m.metric === 'heart_rate' && m.source === 'microphone_estimate');
+  if (hasHeartSoundEstimate) {
+    upsertTask({
+      id: `task-heart-sound-provenance-sol-${checkin.sol}`,
+      astronautId: checkin.astronautId,
+      sol: checkin.sol,
+      title: 'Verify Heart-Sound Heart Rate with Manual Pulse',
+      description: 'Count your wrist pulse to cross-check the heart-sound estimate.',
+      reason: 'Microphone readings can be affected by phone placement, movement and background sound.',
+      priority: 'low',
+      assignedRole: 'astronaut',
+      status: 'open',
+      metric: 'heart_rate',
+      createdAtUtc: nowUtc,
+    });
+  }
+
   return tasks;
 }
 

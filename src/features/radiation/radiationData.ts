@@ -4,6 +4,11 @@ import type {
   CrewRadiationProfile,
   PostEventRecoveryState,
 } from './radiationEngine';
+import type {
+  CompartmentSnapshot,
+  EnvironmentFrame,
+  SensorOrigin,
+} from './compartmentEnvironmentEngine';
 
 export const SPACECRAFT_COMPARTMENTS: CompartmentNode[] = [
   {
@@ -411,4 +416,279 @@ export function generateCARNTimeline(
   }
 
   return points;
+}
+
+/* ============================================================================
+ * Simulated environmental telemetry (Radiation Map upgrade)
+ *
+ * Adds per-compartment TEMPERATURE (°C) and CO2 (mmHg) alongside the existing
+ * CARN radiation readings, plus deterministic timestamped event sequences so the
+ * map can demonstrate first-hit ordering and a rough exposure-sector estimate.
+ *
+ * These temperature/CO2 values are CLEARLY SIMULATED mock readings. They do NOT
+ * come from NASA/ISS live sensors. Units follow the app's habitat convention
+ * (CO2 in mmHg per engine/rules CO2_LIMIT_MMHG; cabin temperature in °C).
+ * ==========================================================================*/
+
+/** Plausible simulated nominal baseline per compartment. */
+const BASE_ENVIRONMENT: Record<string, { temperatureC: number; co2Mmhg: number }> = {
+  'flight-deck': { temperatureC: 22.5, co2Mmhg: 2.1 },
+  airlock: { temperatureC: 21.8, co2Mmhg: 2.0 },
+  habitation: { temperatureC: 23.0, co2Mmhg: 2.4 },
+  'storm-shelter': { temperatureC: 22.0, co2Mmhg: 2.2 },
+  galley: { temperatureC: 23.4, co2Mmhg: 2.6 },
+  'equipment-bay': { temperatureC: 24.0, co2Mmhg: 2.3 },
+};
+
+/** Nominal radiation baseline (mirrors the GREEN preset). */
+const NOMINAL_RADIATION: Record<string, number> = {
+  'flight-deck': 0.11,
+  airlock: 0.13,
+  habitation: 0.08,
+  'storm-shelter': 0.03,
+  galley: 0.09,
+  'equipment-bay': 0.07,
+};
+
+/** Fixed epoch keeps every fixture deterministic (no Date.now in event sequences). */
+const SEQUENCE_EPOCH_MS = Date.parse('2031-05-14T12:00:00.000Z');
+const FRAME_INTERVAL_MS = 60_000; // one logical CARN sample per simulated minute
+
+type RoomOverride = Partial<{ rad: number | null; temp: number | null; co2: number | null }>;
+
+function buildFrame(
+  frameIndex: number,
+  overrides: Record<string, RoomOverride> = {},
+  origin: SensorOrigin = 'simulated',
+): EnvironmentFrame {
+  const timestamp = new Date(SEQUENCE_EPOCH_MS + frameIndex * FRAME_INTERVAL_MS).toISOString();
+  return SPACECRAFT_COMPARTMENTS.map((compartment): CompartmentSnapshot => {
+    const override = overrides[compartment.id] ?? {};
+    return {
+      roomId: compartment.id,
+      radiationDoseRateMsvH: 'rad' in override ? override.rad ?? null : NOMINAL_RADIATION[compartment.id],
+      temperatureC: 'temp' in override ? override.temp ?? null : BASE_ENVIRONMENT[compartment.id].temperatureC,
+      co2Mmhg: 'co2' in override ? override.co2 ?? null : BASE_ENVIRONMENT[compartment.id].co2Mmhg,
+      timestamp,
+      origin,
+    };
+  });
+}
+
+export interface EnvironmentScenario {
+  key: string;
+  name: string;
+  group: 'preset' | 'demo';
+  short: string;
+  description: string;
+  frames: EnvironmentFrame[];
+  recoveryActive?: boolean;
+}
+
+export const ENVIRONMENT_SCENARIOS: EnvironmentScenario[] = [
+  {
+    key: 'GREEN',
+    name: 'Safe Baseline (Green)',
+    group: 'preset',
+    short: 'Green',
+    description: 'All CARN sensors <= 0.15 mSv/h. Temperature and CO2 within simulated nominal cabin ranges. No radiation alarm; shelter remains visible.',
+    frames: [buildFrame(0)],
+  },
+  {
+    key: 'YELLOW',
+    name: 'Elevated Exposure (Yellow)',
+    group: 'preset',
+    short: 'Yellow',
+    description: 'Sunward CARN sensors read 0.15 - 2.1 mSv/h. Elevated but below the solar-event alarm threshold — environmental WATCH, not a flare alert.',
+    frames: [
+      buildFrame(0, {
+        'flight-deck': { rad: 0.95, temp: 23.1 },
+        airlock: { rad: 1.65, temp: 22.6 },
+        habitation: { rad: 0.28 },
+        'storm-shelter': { rad: 0.05 },
+        galley: { rad: 0.22 },
+        'equipment-bay': { rad: 0.14 },
+      }),
+    ],
+  },
+  {
+    key: 'ORANGE',
+    name: 'Solar Particle Event (Orange)',
+    group: 'preset',
+    short: 'Orange',
+    description: 'Correlated radiation + temperature spike on the sunward outer hull. Airlock reacts first, then Flight Deck — a demonstration-level sunward exposure sector.',
+    frames: [
+      buildFrame(0),
+      buildFrame(1, {
+        airlock: { rad: 2.5, temp: 24.3 },
+      }),
+      buildFrame(2, {
+        airlock: { rad: 3.85, temp: 25.0 },
+        'flight-deck': { rad: 2.75, temp: 24.8 },
+        habitation: { rad: 0.3 },
+      }),
+      buildFrame(3, {
+        airlock: { rad: 3.85, temp: 25.1 },
+        'flight-deck': { rad: 2.75, temp: 24.9 },
+        habitation: { rad: 0.85, temp: 23.4 },
+        galley: { rad: 0.65 },
+        'equipment-bay': { rad: 0.35 },
+      }),
+    ],
+  },
+  {
+    key: 'RED',
+    name: 'Severe Solar Storm (Red)',
+    group: 'preset',
+    short: 'Red',
+    description: 'Severe correlated radiation + temperature spike. Multiple sunward modules breach the storm threshold; Airlock and Flight Deck are hit first.',
+    frames: [
+      buildFrame(0),
+      buildFrame(1, {
+        airlock: { rad: 4.5, temp: 25.0 },
+      }),
+      buildFrame(2, {
+        airlock: { rad: 8.9, temp: 27.2 },
+        'flight-deck': { rad: 6.2, temp: 26.4 },
+        habitation: { rad: 1.4 },
+      }),
+      buildFrame(3, {
+        airlock: { rad: 8.9, temp: 27.4 },
+        'flight-deck': { rad: 6.2, temp: 26.6 },
+        habitation: { rad: 4.4, temp: 24.9 },
+        galley: { rad: 3.1, temp: 24.2 },
+        'equipment-bay': { rad: 1.85 },
+      }),
+    ],
+  },
+  {
+    key: 'RECOVERY',
+    name: 'Post-Event Recovery',
+    group: 'preset',
+    short: 'Recovery',
+    description: 'Dose rates back to nominal, but the 6-hour hysteresis window and lymphocyte assays are still pending. Warnings do not clear on a single low reading.',
+    frames: [buildFrame(0)],
+    recoveryActive: true,
+  },
+  {
+    key: 'AFT_EVENT',
+    name: 'Aft-sector Event (demo)',
+    group: 'demo',
+    short: 'Aft event',
+    description: 'A contrasting direction: Equipment Bay and Galley react first. The estimated exposure sector and the incoming-wave arcs relocate to the aft/starboard side.',
+    frames: [
+      buildFrame(0),
+      buildFrame(1, {
+        'equipment-bay': { rad: 2.6, temp: 26.2 },
+      }),
+      buildFrame(2, {
+        'equipment-bay': { rad: 3.4, temp: 26.8 },
+        galley: { rad: 2.4, temp: 25.1 },
+      }),
+      buildFrame(3, {
+        'equipment-bay': { rad: 3.4, temp: 26.9 },
+        galley: { rad: 2.4, temp: 25.2 },
+        habitation: { rad: 0.6 },
+      }),
+    ],
+  },
+  {
+    key: 'RADIATION_ONLY',
+    name: 'Radiation-only spike (demo)',
+    group: 'demo',
+    short: 'Rad-only',
+    description: 'Sunward radiation spike with FLAT temperature. Still a radiation alarm — temperature does not corroborate and is not claimed as evidence.',
+    frames: [
+      buildFrame(0),
+      buildFrame(1, {
+        airlock: { rad: 2.6 },
+      }),
+      buildFrame(2, {
+        airlock: { rad: 3.9 },
+        'flight-deck': { rad: 2.7 },
+      }),
+      buildFrame(3, {
+        airlock: { rad: 3.9 },
+        'flight-deck': { rad: 2.7 },
+        habitation: { rad: 0.7 },
+      }),
+    ],
+  },
+  {
+    key: 'DIFFUSE',
+    name: 'Diffuse / simultaneous (demo)',
+    group: 'demo',
+    short: 'Diffuse',
+    description: 'All modules rise together in one sample. A radiation alarm fires, but the direction is reported as uncertain — no fabricated bearing.',
+    frames: [
+      buildFrame(0),
+      buildFrame(1, {
+        'flight-deck': { rad: 2.4, temp: 23.6 },
+        airlock: { rad: 2.5, temp: 22.9 },
+        habitation: { rad: 2.3, temp: 24.0 },
+        'storm-shelter': { rad: 2.2, temp: 23.0 },
+        galley: { rad: 2.4, temp: 24.3 },
+        'equipment-bay': { rad: 2.5, temp: 25.0 },
+      }),
+    ],
+  },
+  {
+    key: 'CO2_ONLY',
+    name: 'CO2 scrubber anomaly (demo)',
+    group: 'demo',
+    short: 'CO2 only',
+    description: 'Cabin CO2 climbs above the 3 mmHg limit with nominal radiation. Reported as an air-quality warning only — never a solar-flare alert.',
+    frames: [
+      buildFrame(0, {
+        habitation: { co2: 3.4, temp: 24.1 },
+        galley: { co2: 3.2 },
+      }),
+    ],
+  },
+  {
+    key: 'SENSOR_GAP',
+    name: 'Missing sensor data (demo)',
+    group: 'demo',
+    short: 'Sensor gap',
+    description: 'Equipment Bay reports no recent readings. Averages exclude it (5/6 reporting) and the node shows "—" rather than a fabricated zero.',
+    frames: [
+      buildFrame(0, {
+        'equipment-bay': { rad: null, temp: null, co2: null },
+      }),
+    ],
+  },
+];
+
+export const ENVIRONMENT_SCENARIO_MAP: Record<string, EnvironmentScenario> = Object.fromEntries(
+  ENVIRONMENT_SCENARIOS.map((scenario) => [scenario.key, scenario]),
+);
+
+/** Latest reading per compartment is "now" for the current frame. */
+export function frameNowMs(frame: EnvironmentFrame): number {
+  return frame.reduce((latest, reading) => {
+    const parsed = Date.parse(reading.timestamp);
+    return Number.isFinite(parsed) ? Math.max(latest, parsed) : latest;
+  }, 0);
+}
+
+/**
+ * Derive the CARN radiation telemetry record consumed by the existing panels
+ * (vehicle status, room-access matrix, directional HUD, routing) from a frame.
+ * Rooms with no valid radiation reading are omitted so existing fallbacks apply.
+ */
+export function telemetryFromFrame(frame: EnvironmentFrame): Record<string, CARNSensorTelemetry> {
+  const telemetry: Record<string, CARNSensorTelemetry> = {};
+  for (const reading of frame) {
+    const rate = reading.radiationDoseRateMsvH;
+    if (typeof rate !== 'number' || !Number.isFinite(rate)) continue;
+    telemetry[reading.roomId] = {
+      roomId: reading.roomId,
+      doseRateMsvH: rate,
+      projectedDailyMsv: Number((rate * 24).toFixed(2)),
+      particleFlux: Math.round(rate * 1300),
+      timestamp: reading.timestamp,
+      ...(rate > 2.1 ? { sustainedAboveAcuteBreachMinutes: 20 } : {}),
+    };
+  }
+  return telemetry;
 }

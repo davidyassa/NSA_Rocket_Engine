@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
-import {
-  ArrowRight, HeartPulse, Moon, Smile, Stethoscope, Thermometer, Waves,
-} from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { HEALTH_DOMAINS, type DailyCheckin, type HealthDomain, type RiskAssessment } from '../../contracts';
-import { STATUS_META } from '../../ui/tokens';
-import { PLAIN_DOMAIN, PLAIN_STATUS } from '../../content/plainLanguage';
+import { ORIGIN_META } from '../../ui/tokens';
+import { PLAIN_DOMAIN } from '../../content/plainLanguage';
 import { CrewBody3D, type DomainSummary } from './CrewBody3D';
+import { HealthMetricCards, domainReading } from './HealthMetricCards';
 
 export const DOMAIN_TARGETS: Record<HealthDomain, { path: string; label: string; region: string; shortcut: string }> = {
   behavioral: { path: '/trends?metric=mood', label: PLAIN_DOMAIN.behavioral, region: 'Head (mind & mood)', shortcut: 'Head' },
@@ -17,26 +15,22 @@ export const DOMAIN_TARGETS: Record<HealthDomain, { path: string; label: string;
   symptoms: { path: '/assessment', label: PLAIN_DOMAIN.symptoms, region: 'Systemic (reported symptoms)', shortcut: 'Limbs' },
 };
 
-const domainIcons = {
-  behavioral: Smile,
-  sleep: Moon,
-  cardiovascular: HeartPulse,
-  temperature: Thermometer,
-  metabolic: Waves,
-  symptoms: Stethoscope,
-};
-
-const statusLabels = STATUS_META;
+/** Health Metrics card links keep their original targets (symptoms open the symptom trend). */
+const CARD_TARGETS = Object.fromEntries(HEALTH_DOMAINS.map((domain) => [domain, {
+  region: DOMAIN_TARGETS[domain].region,
+  path: domain === 'symptoms' ? '/trends?metric=symptoms' : DOMAIN_TARGETS[domain].path,
+}])) as Record<HealthDomain, { path: string; region: string }>;
 
 export function CrewBodyFigure({
   latest,
   assessment,
-  domainReading,
 }: {
   latest: DailyCheckin | null;
   assessment: RiskAssessment | null;
-  domainReading: (domain: HealthDomain, latest: DailyCheckin | null) => string;
 }) {
+  const readings = latest?.measurements ?? [];
+  const hasSynthetic = readings.some((reading) => reading.provenance === 'synthetic_demo');
+  const hasEntered = readings.some((reading) => reading.provenance === 'user_entered');
   const navigate = useNavigate();
   const [activeDomain, setActiveDomain] = useState<HealthDomain | null>(null);
   const [fallbackReason, setFallbackReason] = useState('');
@@ -45,7 +39,7 @@ export function CrewBodyFigure({
     label: DOMAIN_TARGETS[domain].label,
     value: domainReading(domain, latest),
     status: assessment?.domainStatuses[domain] ?? 'not_measured',
-  }])) as Record<HealthDomain, DomainSummary>, [latest, assessment, domainReading]);
+  }])) as Record<HealthDomain, DomainSummary>, [latest, assessment]);
   const heartRate = latest?.measurements.find((m) => m.metric === 'heart_rate')?.value ?? null;
 
   const domainOrder: HealthDomain[] = [
@@ -61,7 +55,7 @@ export function CrewBodyFigure({
     <section className="panel crew-figure-card" aria-labelledby="crew-figure-heading">
       <div className="crew-figure-header">
         <h2 id="crew-figure-heading" className="crew-figure-title">Crew digital twin</h2>
-        <p className="crew-figure-subtitle">Rotate the suit and select a marker to open its readings.</p>
+        <p className="crew-figure-subtitle">Drag to rotate the suit and select a marker or card to open its readings.</p>
       </div>
 
       <div className="crew-figure-layout">
@@ -80,55 +74,25 @@ export function CrewBodyFigure({
           )}
         </div>
 
-        {/* Keyboard-accessible list of domain controls with visible focus and non-color status labels */}
-        <div className="crew-figure-controls" role="navigation" aria-label="Health domains by body region">
-          <ul className="crew-figure-list">
-            {domainOrder.map((domain) => {
-              const { path, label, region } = DOMAIN_TARGETS[domain];
-              const Icon = domainIcons[domain];
-              const status = statusLabels[assessment?.domainStatuses[domain] ?? 'not_measured'];
-              const value = domainReading(domain, latest);
-              const isHovered = activeDomain === domain;
-
-              return (
-                <li key={domain} className="crew-figure-item">
-                  <Link
-                    to={path}
-                    className={`crew-figure-link ${isHovered ? 'is-active' : ''}`}
-                    onMouseEnter={() => setActiveDomain(domain)}
-                    onMouseLeave={() => setActiveDomain(null)}
-                    onFocus={() => setActiveDomain(domain)}
-                    onBlur={() => setActiveDomain(null)}
-                    aria-label={`${label} (${region}): ${value}. Status: ${status.label}. Select to view details.`}
-                  >
-                    <div className="crew-figure-link-main">
-                      <span className="domain-icon" aria-hidden="true">
-                        <Icon size={16} strokeWidth={1.8} />
-                      </span>
-                      <div className="crew-figure-link-text">
-                        <div className="crew-figure-link-title">
-                          <strong>{label}</strong>
-                          <span className="crew-figure-region-tag">{region}</span>
-                        </div>
-                        <p className="crew-figure-reading-val">{value}</p>
-                        <p className="crew-figure-plain">{PLAIN_STATUS[assessment?.domainStatuses[domain] ?? 'not_measured']}</p>
-                      </div>
-                    </div>
-
-                    <div className="crew-figure-link-aside">
-                      {/* Explicit text status label that works without color */}
-                      <span className={`domain-status status-${status.tone} crew-figure-status`}>
-                        <status.Icon size={13} aria-hidden="true" />
-                        <span>{status.label}</span>
-                      </span>
-                      <ArrowRight size={15} className="crew-figure-arrow" aria-hidden="true" />
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        {/* Health Metrics cards beside the model; hover/focus highlights the matching body region. */}
+        <section className="crew-figure-controls" aria-labelledby="health-metrics-heading">
+          <div className="crew-figure-metrics-head">
+            <h3 id="health-metrics-heading">Health metrics</h3>
+            {latest && <p>From the Sol {latest.sol} check-in</p>}
+            <div className="status-provenance">
+              {hasSynthetic && <span className={ORIGIN_META.synthetic_demo.className}>{ORIGIN_META.synthetic_demo.label}</span>}
+              {hasEntered && <span className={ORIGIN_META.user_entered.className}>{ORIGIN_META.user_entered.label}</span>}
+            </div>
+          </div>
+          <HealthMetricCards
+            latest={latest}
+            assessment={assessment}
+            order={domainOrder}
+            targets={CARD_TARGETS}
+            activeDomain={activeDomain}
+            onHoverDomain={setActiveDomain}
+          />
+        </section>
       </div>
     </section>
   );

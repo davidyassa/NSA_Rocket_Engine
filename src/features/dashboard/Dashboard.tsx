@@ -1,62 +1,26 @@
 import {
-  ArrowRight, ArrowUpRight, Brain, CalendarClock, CircleAlert, HeartPulse, Info, MapPin, Moon,
-  Radiation, Radio, ShieldAlert, Smile, Stethoscope, Thermometer, Waves,
+  ArrowRight, ArrowUpRight, CalendarClock, CircleAlert, MapPin, Radiation, Radio,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { HEALTH_DOMAINS, METRICS } from '../../contracts';
-import type { DailyCheckin, DemoScenario, HealthDomain, MetricId, RiskAssessment } from '../../contracts';
-import { ORIGIN_META, STATUS_META } from '../../ui/tokens';
+import type { DailyCheckin, DemoScenario, RiskAssessment } from '../../contracts';
 import { RecentReadings } from './RecentReadings';
-import { CrewBodyFigure, DOMAIN_TARGETS } from './CrewBodyFigure';
+import { CrewBodyFigure } from './CrewBodyFigure';
 import { RoutineChecklist, useRoutineChecklist } from './RoutineChecklist';
 import { MissedCheckin, missedPreviousSol } from './MissedCheckin';
-import { HabitatAir } from './HabitatAir';
 import { tasksForScenario, useFollowUpStore } from '../followups/useFollowUpStore';
-import { PLAIN_DOMAIN, PLAIN_STATUS, plainFinding } from '../../content/plainLanguage';
+import { radiationSimCondition, useRadiationSimStore } from '../radiation/radiationSimStore';
+import type { VehicleRadiationStatus } from '../radiation/radiationEngine';
+import { plainFinding } from '../../content/plainLanguage';
 import './dashboard.css';
 
-const domainInfo = {
-  cardiovascular: { label: PLAIN_DOMAIN.cardiovascular, Icon: HeartPulse },
-  metabolic: { label: PLAIN_DOMAIN.metabolic, Icon: Waves },
-  temperature: { label: PLAIN_DOMAIN.temperature, Icon: Thermometer },
-  sleep: { label: PLAIN_DOMAIN.sleep, Icon: Moon },
-  behavioral: { label: PLAIN_DOMAIN.behavioral, Icon: Smile },
-  symptoms: { label: PLAIN_DOMAIN.symptoms, Icon: Stethoscope },
-} satisfies Record<HealthDomain, { label: string; Icon: typeof HeartPulse }>;
+export { domainReading } from './HealthMetricCards';
 
-
-const numberFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
-
-export function domainReading(domain: HealthDomain, latest: DailyCheckin | null) {
-  const readings = new Map(latest?.measurements.map((measurement) => [measurement.metric, measurement]));
-  const value = (metric: MetricId) => {
-    const reading = readings.get(metric);
-    return reading ? numberFormat.format(reading.value) : null;
-  };
-  const withUnit = (metric: MetricId, unit: string) => {
-    const reading = value(metric);
-    return reading === null ? '—' : `${reading} ${unit}`;
-  };
-
-  switch (domain) {
-    case 'cardiovascular': {
-      const systolic = value('bp_systolic');
-      const diastolic = value('bp_diastolic');
-      const heartRate = value('heart_rate');
-      const pressure = systolic && diastolic ? `${systolic}/${diastolic} mmHg` : null;
-      return [heartRate && `${heartRate} bpm`, pressure].filter(Boolean).join(' · ') || '—';
-    }
-    case 'metabolic': return withUnit('blood_glucose', 'mg/dL');
-    case 'temperature': return withUnit('body_temp', '°C');
-    case 'sleep': return withUnit('sleep_duration', 'h');
-    case 'behavioral': return withUnit('mood', '/ 5');
-    case 'symptoms': {
-      if (!latest || latest.symptoms.length === 0) return '—';
-      const count = latest.symptoms.filter(({ present }) => present).length;
-      return count > 0 ? `${count} reported` : 'None reported';
-    }
-  }
-}
+const RADIATION_TONE: Record<VehicleRadiationStatus, { color: string; tint: string }> = {
+  GREEN: { color: 'var(--status-steady)', tint: 'var(--tint-steady)' },
+  YELLOW: { color: 'var(--status-change)', tint: 'color-mix(in srgb, var(--status-change) 16%, transparent)' },
+  ORANGE: { color: 'var(--status-trend)', tint: 'color-mix(in srgb, var(--status-trend) 18%, transparent)' },
+  RED: { color: 'var(--nasa-red)', tint: 'color-mix(in srgb, var(--nasa-red) 18%, transparent)' },
+};
 
 export function Dashboard({ scenario, records, latest, assessment }: {
   scenario: DemoScenario;
@@ -73,14 +37,18 @@ export function Dashboard({ scenario, records, latest, assessment }: {
   ].slice(0, 2);
   const checklist = useRoutineChecklist(startSol, latest);
   const showHealthSummary = checklist.completeCount === checklist.items.length && assessment;
-  const readings = latest?.measurements ?? [];
-  const hasSynthetic = readings.some((reading) => reading.provenance === 'synthetic_demo');
-  const hasEntered = readings.some((reading) => reading.provenance === 'user_entered');
 
   const activeRecords = records ?? (latest ? [...scenario.history, latest] : scenario.history);
   const missedSol = missedPreviousSol(startSol, activeRecords);
   const { tasks } = useFollowUpStore();
   const pendingTasks = tasksForScenario(tasks, scenario.id).filter(t => t.status !== 'resolved');
+
+  // Same simulated transit condition the Radiation Monitor is showing.
+  const simKey = useRadiationSimStore((state) => state.scenarioKey);
+  const simFrame = useRadiationSimStore((state) => state.frameIndex);
+  const radiation = radiationSimCondition(simKey, simFrame);
+  const { status, statusLabel } = radiation.assessment;
+  const tone = RADIATION_TONE[status];
 
   return (
     <div className="dashboard">
@@ -101,23 +69,32 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         <RoutineChecklist {...checklist} />
       </div>
 
-      {/* Deep-Space Transit Space Radiation Health Status Banner */}
-      <aside className="panel" style={{ padding: '12px 18px', background: 'var(--bg-surface)', border: '1px solid color-mix(in srgb, var(--status-steady) 35%, var(--border-subtle))', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }} aria-label="Space Radiation Health Telemetry">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className="hazard-icon" style={{ width: '38px', height: '38px', background: 'var(--tint-steady)', color: 'var(--status-steady)', borderRadius: '10px', display: 'grid', placeItems: 'center' }}>
+      {/* Deep-Space Transit Space Radiation Health Status Banner (mirrors the Radiation Monitor simulation) */}
+      <aside
+        className="panel dashboard-radiation-status"
+        data-status={status}
+        style={{ borderColor: `color-mix(in srgb, ${tone.color} 35%, var(--border-subtle))` }}
+        aria-label="Space Radiation Health Telemetry"
+      >
+        <div className="dashboard-radiation-main">
+          <span className="dashboard-radiation-icon" style={{ background: tone.tint, color: tone.color }}>
             <Radiation size={20} aria-hidden="true" />
           </span>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge" style={{ background: 'var(--tint-steady)', color: 'var(--status-steady)', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px' }}>
-                VEHICLE: GREEN · SAFE BASELINE
+            <div className="dashboard-radiation-title">
+              <span className="badge" style={{ background: tone.tint, color: tone.color }}>
+                VEHICLE: {status} · {statusLabel.toUpperCase()}
               </span>
-              <strong style={{ fontSize: '0.98rem' }}>Space Radiation Health Monitoring</strong>
+              <strong>Space Radiation Health Monitoring</strong>
             </div>
-            <p className="muted" style={{ margin: '3px 0 0', fontSize: '0.84rem' }}>
-              NASA-STD-3001 Universal 600 mSv Career Ceiling · CARN Compartment Sensors · Dynamic Lockdown Active
+            <p className="muted" role="status">
+              {radiation.isDefault
+                ? 'NASA-STD-3001 Universal 600 mSv Career Ceiling · CARN Compartment Sensors · Dynamic Lockdown Active'
+                : <>Simulated transit condition: <strong>{radiation.scenario.name}</strong>
+                  {radiation.frameCount > 1 && ` · sample ${radiation.frameIndex + 1} of ${radiation.frameCount}`}</>}
             </p>
           </div>
+          <span className="badge badge-synthetic">Simulated</span>
         </div>
         <Link to="/hazards/radiation" className="button button-secondary" style={{ whiteSpace: 'nowrap' }}>
           Open Radiation Monitor <ArrowRight size={15} aria-hidden="true" style={{ marginLeft: '4px' }} />
@@ -137,7 +114,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         </section>
       )}
 
-      <CrewBodyFigure latest={latest} assessment={assessment} domainReading={domainReading} />
+      <CrewBodyFigure latest={latest} assessment={assessment} />
 
       {pendingTasks.length > 0 && (
         <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
@@ -154,89 +131,12 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         </aside>
       )}
 
-      <section aria-labelledby="health-domains-heading" className="dashboard-health">
-        <div className="section-title">
-          <div>
-            <h2 id="health-domains-heading">Health metrics</h2>
-            {latest && <p>From the Sol {latest.sol} check-in</p>}
-          </div>
-          <div className="status-provenance">
-            {hasSynthetic && <span className={ORIGIN_META.synthetic_demo.className}>{ORIGIN_META.synthetic_demo.label}</span>}
-            {hasEntered && <span className={ORIGIN_META.user_entered.className}>{ORIGIN_META.user_entered.label}</span>}
-          </div>
-        </div>
-
-        <div className="domain-grid">
-          {HEALTH_DOMAINS.map((domain) => {
-            const { label, Icon } = domainInfo[domain];
-            const status = STATUS_META[assessment?.domainStatuses[domain] ?? 'not_measured'];
-            const domainReadings = readings.filter((reading) => METRICS[reading.metric].domain === domain);
-            const origins = new Set(domainReadings.map((reading) => reading.provenance));
-            const target = DOMAIN_TARGETS[domain];
-            return (
-              <article className="panel domain-card" key={domain} data-tone={status.tone}>
-                <div className="domain-title">
-                  <span className="domain-icon"><Icon size={18} strokeWidth={1.75} aria-hidden="true" /></span>
-                  <h3>{label}</h3>
-                </div>
-                <p className="domain-value">{domainReading(domain, latest)}</p>
-                <span className={`domain-status status-${status.tone}`}><status.Icon size={14} aria-hidden="true" />{status.label}</span>
-                <p className="domain-plain">{PLAIN_STATUS[assessment?.domainStatuses[domain] ?? 'not_measured']}</p>
-                {origins.size === 1 && (
-                  <span className={`${ORIGIN_META[[...origins][0]].className} domain-origin-badge`}>{ORIGIN_META[[...origins][0]].label}</span>
-                )}
-                {origins.size > 1 && (
-                  <ul className="domain-origin">
-                    {domainReadings.map((reading) => (
-                      <li key={reading.id}>{METRICS[reading.metric].label} · <span className={ORIGIN_META[reading.provenance].className}>{ORIGIN_META[reading.provenance].label}</span></li>
-                    ))}
-                  </ul>
-                )}
-                <Link to={domain === 'symptoms' ? '/trends?metric=symptoms' : target.path} className="domain-info-link" aria-label={`View ${label} trends`}>
-                  <Info size={19} aria-hidden="true" />
-                </Link>
-              </article>
-            );
-          })}
-        </div>
-
-      </section>
-
       <div className="dashboard-recent"><RecentReadings records={activeRecords} /></div>
 
       <div className="mission-stats panel">
         <div><CalendarClock size={19} aria-hidden="true" /><span>Last check-in</span><strong>{latest ? `Sol ${latest.sol}` : 'None recorded'}</strong></div>
         <div><Radio size={19} aria-hidden="true" /><span>Simulated one-way delay</span><strong>{missionContext.oneWayDelayMinutes} min</strong></div>
       </div>
-
-      <section className="dashboard-quick-intel-grid" aria-label="Operational Health Intelligence">
-        <HabitatAir environment={scenario.environment} sol={startSol} />
-        <article className="panel dashboard-intel-card dashboard-intel-image radiation-feature">
-          <div className="flags-title">
-            <span className="domain-icon"><Radiation size={18} aria-hidden="true" /></span>
-            <h2>Radiation health</h2>
-          </div>
-          <p>CARN compartment sensors, 600 mSv career limit, and dynamic room lockdown.</p>
-          <Link to="/hazards/radiation" className="button button-secondary">Open monitor <ArrowUpRight size={16} aria-hidden="true" /></Link>
-        </article>
-        <article className="panel dashboard-intel-card dashboard-intel-image cognitive-feature">
-          <div className="flags-title">
-            <span className="domain-icon"><Brain size={18} aria-hidden="true" /></span>
-            <h2>Cognitive lab</h2>
-          </div>
-          <p>Check reaction time and lapses with the brief vigilance test.</p>
-          <Link to="/cognitive" className="button button-secondary">Open lab <ArrowUpRight size={16} aria-hidden="true" /></Link>
-        </article>
-
-        <article className="panel dashboard-intel-card dashboard-intel-image hazards-feature">
-          <div className="flags-title">
-            <span className="domain-icon"><ShieldAlert size={18} aria-hidden="true" /></span>
-            <h2>Hazards</h2>
-          </div>
-          <p>See how radiation, isolation, distance, gravity and habitat conditions connect to crew readings.</p>
-          <Link to="/hazards" className="button button-secondary">Explore the hazards <ArrowUpRight size={16} aria-hidden="true" /></Link>
-        </article>
-      </section>
 
       <section className="mission-explore" aria-labelledby="mission-explore-title">
         <div className="mission-explore-content">

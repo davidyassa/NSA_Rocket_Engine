@@ -12,6 +12,7 @@ export const measurementSourceLabels: Record<NonNullable<HealthMeasurement['sour
   manual: 'Manual entry',
   validated_hardware: 'Validated hardware',
   camera_estimate: 'Camera estimate',
+  microphone_estimate: 'Microphone estimate',
   self_report: 'Self-report',
   research_import: 'Research import',
   synthetic: 'Synthetic',

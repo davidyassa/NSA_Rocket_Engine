@@ -3,9 +3,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import stationUrl from '../../../assets/iss/international-space-station.glb?url';
 
+const SENSOR_ZOOM = 3.5;
+const FOCUS_DURATION_MS = 320;
+
 export interface StationViewport {
   reset: () => void;
   zoom: (direction: 'in' | 'out') => void;
+  focusAnchor: (id: string) => void;
   setIncident: (incident: StationIncident | null) => void;
   dispose: () => void;
 }
@@ -87,6 +91,9 @@ export function mountStationViewport(
   let frame = 0;
   let modelHalfWidth = 0.5;
   let modelHalfHeight = 0.5;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let focus: { from: THREE.Vector3; to: THREE.Vector3; fromZoom: number; start: number } | undefined;
+  const focusTarget = new THREE.Vector3();
   const anchors = new Map<string, THREE.Vector3>();
   const projected = new THREE.Vector3();
   const corridorGeometry = new THREE.BufferGeometry();
@@ -125,11 +132,34 @@ export function mountStationViewport(
     }));
   }
 
+  function moveCamera(target: THREE.Vector3, zoom: number) {
+    // Translate the orbit pivot and camera together to keep the current viewing angle.
+    camera.position.sub(controls.target).add(target);
+    controls.target.copy(target);
+    camera.zoom = zoom;
+    camera.updateProjectionMatrix();
+    controls.update();
+  }
+
+  function cancelFocus() {
+    focus = undefined;
+  }
+
   function requestRender() {
     if (frame || disposed || contextLost || !model) return;
-    frame = window.requestAnimationFrame(() => {
-      frame = 0;
+    frame = window.requestAnimationFrame((now) => {
+      if (focus) {
+        const progress = THREE.MathUtils.clamp((now - focus.start) / FOCUS_DURATION_MS, 0, 1);
+        const eased = progress * progress * (3 - 2 * progress);
+        moveCamera(
+          focusTarget.lerpVectors(focus.from, focus.to, eased),
+          THREE.MathUtils.lerp(focus.fromZoom, SENSOR_ZOOM, eased),
+        );
+        if (progress === 1) cancelFocus();
+      }
       render();
+      frame = 0;
+      if (focus) requestRender();
     });
   }
 
@@ -148,7 +178,7 @@ export function mountStationViewport(
   }
 
   function handleKeys(event: KeyboardEvent) {
-    const spherical = new THREE.Spherical().setFromVector3(camera.position);
+    const spherical = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
     const step = Math.PI / 24;
     switch (event.key) {
       case 'ArrowLeft': spherical.theta -= step; break;
@@ -158,7 +188,8 @@ export function mountStationViewport(
       default: return;
     }
     event.preventDefault();
-    camera.position.setFromSpherical(spherical.makeSafe());
+    cancelFocus();
+    camera.position.setFromSpherical(spherical.makeSafe()).add(controls.target);
     controls.update();
   }
 
@@ -169,6 +200,7 @@ export function mountStationViewport(
   }
 
   controls.addEventListener('change', requestRender);
+  controls.addEventListener('start', cancelFocus);
   canvas.addEventListener('keydown', handleKeys);
   canvas.addEventListener('webglcontextlost', handleContextLoss);
   const observer = new ResizeObserver(resize);
@@ -241,13 +273,28 @@ export function mountStationViewport(
   void load();
 
   return {
-    reset: () => controls.reset(),
+    reset: () => {
+      cancelFocus();
+      controls.reset();
+    },
+    focusAnchor: (id) => {
+      const target = anchors.get(id);
+      if (!target) return;
+      if (reducedMotion.matches) {
+        cancelFocus();
+        moveCamera(target, SENSOR_ZOOM);
+      } else {
+        focus = { from: controls.target.clone(), to: target, fromZoom: camera.zoom, start: performance.now() };
+      }
+      requestRender();
+    },
     setIncident: (next) => {
       incident = next;
       updateIncident();
       requestRender();
     },
     zoom: (direction) => {
+      cancelFocus();
       camera.zoom = THREE.MathUtils.clamp(camera.zoom * (direction === 'in' ? 1.25 : 0.8), 0.75, 5);
       camera.updateProjectionMatrix();
       requestRender();

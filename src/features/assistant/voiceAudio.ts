@@ -36,7 +36,7 @@ export const VAD = {
   /** loud for this long → speech has started */
   startMs: 120,
   /** quiet for this long → the person has finished */
-  endSilenceMs: 900,
+  endSilenceMs: 640,
   /** shorter segments are ignored (coughs, clicks) */
   minSpeechMs: 350,
   /** never record longer than this in one go */
@@ -44,6 +44,10 @@ export const VAD = {
   /** keep this much audio from just before speech started */
   preRollMs: 250,
 } as const;
+
+// A quick two-syllable wake phrase can finish before the normal speech gate.
+const WAKE_START_MS = 80;
+const WAKE_MIN_SPEECH_MS = 240;
 
 export type SegmenterEvent = { type: 'speech_start' } | { type: 'speech_end'; audio: Float32Array; durationMs: number } | { type: 'discarded' };
 
@@ -69,7 +73,7 @@ export class SpeechSegmenter {
     this.loudMs = 0; this.quietMs = 0; this.speaking = false; this.chunks = []; this.speechMs = 0; this.preRoll = []; this.preRollMs = 0;
   }
 
-  push(frame: Float32Array): SegmenterEvent | null {
+  push(frame: Float32Array, forWakePhrase = false): SegmenterEvent | null {
     const ms = (frame.length / this.sampleRate) * 1000;
     const level = rms(frame);
     const threshold = Math.max(VAD.minLevel, this.floor * VAD.startRatio);
@@ -81,7 +85,7 @@ export class SpeechSegmenter {
       this.preRoll.push(frame); this.preRollMs += ms;
       while (this.preRollMs > VAD.preRollMs && this.preRoll.length > 1) { this.preRollMs -= (this.preRoll.shift()!.length / this.sampleRate) * 1000; }
       this.loudMs = loud ? this.loudMs + ms : 0;
-      if (this.loudMs >= VAD.startMs) {
+      if (this.loudMs >= (forWakePhrase ? WAKE_START_MS : VAD.startMs)) {
         this.speaking = true; this.chunks = [...this.preRoll]; this.speechMs = this.preRollMs; this.quietMs = 0;
         return { type: 'speech_start' };
       }
@@ -90,14 +94,21 @@ export class SpeechSegmenter {
 
     this.chunks.push(frame); this.speechMs += ms;
     this.quietMs = loud ? 0 : this.quietMs + ms;
-    if (this.quietMs >= VAD.endSilenceMs || this.speechMs >= VAD.maxSpeechMs) {
+    // Allow a little more pause inside multi-field dictation.
+    const endSilence = this.speechMs - this.quietMs > 2200 ? 900 : VAD.endSilenceMs;
+    if (this.quietMs >= endSilence || this.speechMs >= VAD.maxSpeechMs) {
       const durationMs = this.speechMs - this.quietMs;
-      const total = this.chunks.reduce((n, c) => n + c.length, 0);
+      const total = this.chunks.reduce((n, c) => n + c.length, 0) - Math.round(Math.max(0, this.quietMs - 360) * this.sampleRate / 1000);
       const audio = new Float32Array(total);
       let offset = 0;
-      for (const c of this.chunks) { audio.set(c, offset); offset += c.length; }
+      for (const c of this.chunks) {
+        if (offset >= total) break;
+        audio.set(c.subarray(0, total - offset), offset);
+        offset += c.length;
+      }
       this.reset();
-      return durationMs >= VAD.minSpeechMs ? { type: 'speech_end', audio, durationMs } : { type: 'discarded' };
+      const minimum = forWakePhrase ? WAKE_MIN_SPEECH_MS : VAD.minSpeechMs;
+      return durationMs >= minimum ? { type: 'speech_end', audio, durationMs } : { type: 'discarded' };
     }
     return null;
   }

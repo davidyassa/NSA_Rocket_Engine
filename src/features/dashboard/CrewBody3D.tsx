@@ -44,7 +44,8 @@ export function CrewBody3D({
   callbacks.current = { onHoverDomain, onSelectDomain, onUnavailable };
 
   const [reducedMotion] = useState(() => typeof window !== 'undefined' && window.matchMedia?.(reducedMotionQuery).matches);
-  const [autoRotate, setAutoRotate] = useState(!reducedMotion);
+  // Stationary on load; the existing toggle can still start auto-rotation on request.
+  const [autoRotate, setAutoRotate] = useState(false);
   const [model, setModel] = useState<ModelSource | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -70,7 +71,7 @@ export function CrewBody3D({
           onSelectDomain: (domain) => callbacks.current.onSelectDomain(domain),
           onModel: (source) => setModel(source),
           onError: (message) => callbacks.current.onUnavailable(message),
-        }, { autoRotate: !reducedMotion, reducedMotion });
+        }, { autoRotate: false, reducedMotion });
       })
       .catch(() => {
         if (!cancelled) callbacks.current.onUnavailable('The 3D module could not be loaded.');

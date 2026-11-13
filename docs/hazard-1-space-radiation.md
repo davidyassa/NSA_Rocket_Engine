@@ -85,3 +85,42 @@ $$\text{Total Career Dose} = \text{Pre-Mission Baseline} + \sum \text{Daily Miss
 2. **Hysteresis Completion Rule:** An SPE or storm is declared **ENDED** only when **all** compartment CARN sensors verify dose rates $\le 3.5\text{ mSv/day}$ ($\le 0.15\text{ mSv/h}$) continuously for **at least 6 consecutive hours**. A single low reading will never clear warnings.
 3. **Mandatory Post-Event Biometric Checks:** Prompts automated finger-prick blood/saliva lymphocyte assay at **24 hours** and **48 hours** post-event to evaluate bone-marrow recovery.
 4. **Phased Room Re-Opening:** Recalculates remaining 30-day and career budgets; compartments reopen selectively per individual permissible limits.
+
+---
+
+## 7. Environmental Map Upgrade: Tri-Metric Nodes, Averages & Event Localization
+
+The Radiation Map (`#/hazards/radiation`) overlays **three simultaneous environmental readings** on every one of the six compartment nodes:
+
+| Metric | Unit | Role |
+|---|---|---|
+| Temperature | °C | **Corroborating** evidence only when it actually rises |
+| Radiation dose rate | mSv/h | **Safety-critical primary** signal (existing CARN data) |
+| Carbon dioxide (CO₂) | mmHg | **Independent** air-quality metric (never a solar-event signal) |
+
+### ISS-wide averages
+An averages strip inside the map card shows **Avg Temp / Avg Radiation / Avg CO₂**. Each is the **arithmetic mean of the valid readings across all six compartments (including the shelter)**, computed independently per metric. Invalid (missing) and stale readings are excluded and the node count (`N/6 reporting`) is shown; a metric with no valid samples reads `Unavailable`. Hazard **severity** still uses the **peak** affected room, never the mean.
+
+### Event detection (`src/features/radiation/compartmentEnvironmentEngine.ts`)
+A pure, independently-tested module derives the current event from a window of **timestamped** frames:
+
+* **Radiation is the only alarm trigger** — a peak dose above the CARN acute-breach rate (`2.1 mSv/h`). A radiation-only spike with flat temperature **still alarms**.
+* **Temperature corroborates** only where it actually rose in the first-hit rooms; it never triggers an alarm by itself.
+* **CO₂** is surfaced as a separate air-quality `WATCH` (threshold reuses `CO2_LIMIT_MMHG = 3` from `engine/rules`) and is **never** interpreted as a radiation event.
+* **First-hit ordering** comes from the earliest qualifying onset **timestamp per room**, not render order or the largest final reading.
+* **Estimated exposure sector** is inferred from the earliest-hit nodes' quadrants, with `insufficient` / `low` / `medium` confidence. Single-node, diffuse, or simultaneous evidence yields **`Direction uncertain`** — no fabricated bearing.
+
+### Map overlays
+* **Red `⚠️ POSSIBLE RADIATION EVENT`** panel (`role="alert"`) with `WARN`/`CRITICAL` severity, first-hit rooms, corroboration note, estimated sector, and a `Simulated` badge.
+* **Three curved incoming-wave arcs** anchored to the estimated incident side via the live Three.js camera projection — they track rotation/zoom and relocate when a different side is hit first. Hidden (replaced by `Direction uncertain`) when direction cannot be determined.
+* **Bright-green `SAFETY SHELTER` beacon** pinned to the projected `storm-shelter` node. If the shelter is itself above the acute rate or the route is unavailable it shows **`SHELTER — VERIFY`** instead of a false green safe status.
+* **Optional audio alarm** — explicitly user-enabled, muteable (acknowledge silences audio but **not** the visual alarm), Web Audio only (no network asset).
+
+### Demo controls
+The simulation bar exposes the five presets (`GREEN`, `YELLOW`, `ORANGE`, `RED`, `RECOVERY`) plus demonstration events: **Aft event** (different sector), **Rad-only** (no temperature corroboration), **Diffuse** (Direction uncertain), **CO₂ only** (air-quality watch, not a flare), and **Sensor gap** (missing data → `5/6 reporting`). A **Replay / Step / Reset** transport steps through each event's timestamped samples so the first-hit group and incoming-wave direction are visible as they unfold. Selecting a preset jumps straight to its full-state frame.
+
+### Limitations (simulation, not operational ISS telemetry)
+* Temperature and CO₂ values are **clearly simulated mock readings**, not NASA/ISS live sensors.
+* With six sensors and minute-scale sampling the exposure sector is a **demonstration-level spatial heuristic**, not a solar-flare arrival direction, source, or celestial bearing.
+* Compartment-to-ISS-node mappings place simulated transit modules on visible ISS geometry; they are **not** verified real ISS storm-shelter locations or sensor placements.
+* The entire feature runs **offline** from the bundled GLB model and synthetic fixtures — no network access and no implied live data.

@@ -25,6 +25,9 @@ export const DEMO_DELTAS: Readonly<Record<MetricId, number>> = {
   hrv_rmssd: 10,
   calorie_intake: 300,
   body_mass: 1,
+  voice_pitch_variability: 0.6,
+  voice_articulation_rate: 0.4,
+  voice_pause_ratio: 6,
 };
 
 /** Stand-up test thresholds (consensus definition of orthostatic hypotension; adult heart-rate rise on standing). */
@@ -41,6 +44,18 @@ export const BREATHING_RANGE = { low: 12, high: 20 } as const;
 export const HRV_DROP_FRACTION = 0.7;
 /** Demo daily food-energy minimum, kcal (real targets are individual). */
 export const ENERGY_MIN_KCAL = 2000;
+/**
+ * Voice check: each marker counts when it moves the "tired / low" way (flatter pitch, slower
+ * pace, more pausing) by at least its demo delta AND by at least 2 personal standard deviations
+ * (1.4826 × MAD of the person's own readings). Two of the three markers must agree.
+ */
+export const VOICE_MARKERS = [
+  { metric: 'voice_pitch_variability', lowDirection: -1 },
+  { metric: 'voice_articulation_rate', lowDirection: -1 },
+  { metric: 'voice_pause_ratio', lowDirection: 1 },
+] as const satisfies readonly { metric: MetricId; lowDirection: -1 | 1 }[];
+export const VOICE_MIN_MARKERS = 2;
+export const VOICE_PERSONAL_SD = 2;
 /** Body mass below the personal usual: 3% is flagged, 5% goes to the Crew Medical Officer (demo values). */
 export const BODY_MASS_DROP = { flag: 0.03, cmo: 0.05 } as const;
 export const MOTION_SICKNESS_SYMPTOMS = ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] as const;
@@ -273,16 +288,36 @@ const optionalRuleDefinitions = {
   },
   'breathing-rate-range': {
     ruleId: 'breathing-rate-range',
-    version: '1.0.0',
+    version: '1.1.0',
     metricIds: ['respiratory_rate'],
-    conditions: [`Flag a resting breathing rate below ${BREATHING_RANGE.low} or above ${BREATHING_RANGE.high} breaths/min on the current check-in.`],
-    contextRequirements: ['A breathing-rate entry on the current check-in (camera estimate or counted).'],
+    conditions: [
+      `For a microphone estimate, flag a change of at least ${DEMO_DELTAS.respiratory_rate} breaths/min from the personal median of at least ${MIN_BASELINE_READINGS} prior sols in the last ${BASELINE_LOOKBACK_SOLS}.`,
+      `For other sources, flag a resting breathing rate below ${BREATHING_RANGE.low} or above ${BREATHING_RANGE.high} breaths/min on the current check-in.`,
+    ],
+    contextRequirements: ['A breathing-rate entry on the current check-in.'],
     priority: 55,
-    reason: 'A resting breathing rate outside the usual adult range can be an early sign of illness, anxiety or high cabin CO2. Camera estimates are re-measured before acting.',
-    sourceRefs: ['ppg-respiratory-fusion'],
+    reason: 'Changes in resting breathing rate can have several causes. Repeat an estimate at rest to check the reading.',
+    sourceRefs: ['ppg-respiratory-fusion', 'mic-respiration'],
     reviewStatus: 'demo_heuristic',
     actionCardIds: ['breathing-recheck'],
-    testCases: ['24 breaths/min is flagged as higher; 16 is not.', '9 breaths/min is flagged as lower.'],
+    testCases: ['A counted rate of 24 breaths/min is flagged as higher.', 'A microphone estimate of 20 vs a personal median of 16 is flagged as higher.'],
+  },
+  'voice-change-from-usual': {
+    ruleId: 'voice-change-from-usual',
+    version: '1.0.0',
+    metricIds: ['voice_pitch_variability', 'voice_articulation_rate', 'voice_pause_ratio'],
+    conditions: [
+      `Each voice marker is compared with the median of at least ${MIN_BASELINE_READINGS} prior sols in the last ${BASELINE_LOOKBACK_SOLS}.`,
+      `A marker counts when it moves the tired way (pitch movement down, speaking pace down, pause time up) by at least its demo delta (${DEMO_DELTAS.voice_pitch_variability} semitones, ${DEMO_DELTAS.voice_articulation_rate} syllables/s, ${DEMO_DELTAS.voice_pause_ratio} percentage points) and by at least ${VOICE_PERSONAL_SD} personal standard deviations.`,
+      `At least ${VOICE_MIN_MARKERS} of the 3 markers must count.`,
+    ],
+    contextRequirements: ['A voice check (the same read-aloud passage) today and on at least 5 prior sols.'],
+    priority: 52,
+    reason: 'Flatter pitch, slower speech and more pausing are the speech changes most often reported with low mood and fatigue. Voice alone cannot diagnose anything, so this is a prompt to check in, not an escalation.',
+    sourceRefs: ['speech-mental-health', 'speech-methods'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['voice-check-in'],
+    testCases: ['Pitch movement 1.6 vs 2.6 semitones and pauses 27% vs 18% is flagged.', 'One marker alone is not flagged.', 'No finding without 5 prior voice checks.'],
   },
   'hrv-below-usual': {
     ruleId: 'hrv-below-usual',

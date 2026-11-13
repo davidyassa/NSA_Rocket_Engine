@@ -1,5 +1,6 @@
 import { Activity, ChevronDown, Wind, ChevronLeft, ChevronRight, Flag, Pause, Play, RadioTower, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DailyCheckin, DemoScenario, HealthMeasurement, MissionEvent, Provenance } from '../../contracts';
 import {
@@ -69,7 +70,12 @@ function eventsAtSol(events: readonly MissionEvent[], sol: number) {
   return events.filter((event) => event.startSol <= sol && event.endSol >= sol);
 }
 
-export function Timeline({ scenario, records }: { scenario: DemoScenario; records: readonly DailyCheckin[] }) {
+export function Timeline({ scenario, records, onInspect, voiceControl }: {
+  scenario: DemoScenario;
+  records: readonly DailyCheckin[];
+  onInspect?: (sol: number) => void;
+  voiceControl?: { action: 'play' | 'pause' | 'next' | 'back' | 'restart' };
+}) {
   const { missionContext } = scenario;
   const eventSol = radlabEventSol(missionContext);
   const { firstTimestampArchive, lastTimestampArchive, verifiedEventReading, peakReading } = RADLAB_MANIFEST;
@@ -84,9 +90,13 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
     ...scenario.events.map((event) => event.endSol),
   );
   const end = last + 1;
-  const [selection, setSelection] = useState(eventSol);
+  const [params] = useSearchParams();
+  const requestedSol = Number(params.get('sol')) || eventSol;
+  const [selection, setSelection] = useState(requestedSol);
   const [isPlaying, setIsPlaying] = useState(false);
   const selectedSol = Math.max(start, Math.min(selection, last));
+  useEffect(() => { setIsPlaying(false); setSelection(requestedSol); }, [requestedSol]);
+  useEffect(() => { onInspect?.(selectedSol); }, [onInspect, selectedSol]);
   const sols = Array.from({ length: end - start }, (_, index) => start + index);
   const tickInterval = Math.ceil(sols.length / 7);
   const visibleSolTicks = sols.filter((sol, index) =>
@@ -137,6 +147,19 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
     setIsPlaying(false);
     setSelection((curr) => Math.min(last, curr + 1));
   }
+
+  useEffect(() => {
+    switch (voiceControl?.action) {
+      case 'play':
+        if (selectedSol >= last) setSelection(start);
+        setIsPlaying(true);
+        break;
+      case 'pause': setIsPlaying(false); break;
+      case 'restart': restartReplay(); break;
+      case 'next': stepForward(); break;
+      case 'back': stepBack(); break;
+    }
+  }, [voiceControl]);
 
   const crewBySol = new Map<number, DailyCheckin>();
   for (const record of records) {

@@ -41,6 +41,42 @@ export const SOURCES: Record<string, SourceRecord> = {
     supports: 'Breathing changes the pulse wave in three ways (baseline, amplitude, beat timing). Fusing all three and discarding estimates that disagree gave about 3 breaths/min error, better than any single method.',
     doesNotSupport: 'That a webcam pulse wave is as accurate as a fingertip pulse oximeter; the study used contact sensors.',
   },
+  'pcg-segmentation': {
+    id: 'pcg-segmentation',
+    title: 'Logistic regression-HSMM-based heart sound segmentation (Springer, Tarassenko & Clifford, IEEE TBME 2016)',
+    publisher: 'IEEE Transactions on Biomedical Engineering',
+    url: 'https://doi.org/10.1109/TBME.2015.2475278',
+    retrievedOn: '2026-11-13',
+    supports: 'Heart sounds are analysed in a 25–400 Hz band; the heart rate is the autocorrelation peak of the heart-sound envelope. Sol Check uses this heart-rate step (and the Shannon-energy envelope of Liang et al. 1997).',
+    doesNotSupport: 'Detecting murmurs or heart disease; Sol Check reads only the heart rate and was tested on synthetic recordings, not patients.',
+  },
+  'mic-respiration': {
+    id: 'mic-respiration',
+    title: 'Estimation of respiratory rates using the built-in microphone of a smartphone or headset (Nam, Reyes & Chon, IEEE JBHI 2016)',
+    publisher: 'IEEE Journal of Biomedical and Health Informatics',
+    url: 'https://doi.org/10.1109/JBHI.2015.2480838',
+    retrievedOn: '2026-11-13',
+    supports: 'Breath sounds recorded near the nose with a phone or headset microphone give an accurate breathing rate from the sound-energy envelope.',
+    doesNotSupport: 'Measuring breathing during talking or in a noisy room; Sol Check shows no number when its two estimates disagree.',
+  },
+  'speech-mental-health': {
+    id: 'speech-mental-health',
+    title: 'A review of depression and suicide risk assessment using speech analysis (Cummins et al., Speech Communication 2015) and Automated assessment of psychiatric disorders using speech: a systematic review (Low, Bentley & Ghosh, 2020)',
+    publisher: 'Speech Communication · Laryngoscope Investigative Otolaryngology',
+    url: 'https://doi.org/10.1002/lio2.354',
+    retrievedOn: '2026-11-13',
+    supports: 'Reduced pitch variability, slower speech and longer or more frequent pauses are the speech changes most often reported with depression and fatigue; changes within a person over time are more informative than comparing people.',
+    doesNotSupport: 'Diagnosing depression or any disorder from voice. Published models vary widely between datasets, so Sol Check only compares a person with their own usual and never labels a condition.',
+  },
+  'speech-methods': {
+    id: 'speech-methods',
+    title: 'YIN pitch estimator (de Cheveigné & Kawahara, JASA 2002) and automatic syllable-nuclei detection (de Jong & Wempe, Behavior Research Methods 2009)',
+    publisher: 'Journal of the Acoustical Society of America · Behavior Research Methods',
+    url: 'https://doi.org/10.3758/BRM.41.2.385',
+    retrievedOn: '2026-11-13',
+    supports: 'Pitch from the YIN difference function; syllables from intensity peaks with a 2 dB dip in voiced speech, with silence 25 dB below the loudest speech; pauses of at least 250 ms.',
+    doesNotSupport: 'Clinical voice-quality grading: jitter, shimmer and harmonics-to-noise from connected speech on a consumer microphone are shown for personal comparison only.',
+  },
   'hrv-norms': {
     id: 'hrv-norms',
     title: 'An overview of heart rate variability metrics and norms (Shaffer & Ginsberg, 2017)',
@@ -354,6 +390,22 @@ MEASUREMENT_GUIDES.hrv_rmssd = {
   sourceId: 'hrv-norms',
 };
 
+const voiceGuide: MeasurementGuide = {
+  text: 'Read the same short passage aloud with the voice check. Sol Check measures pitch movement, speaking pace and pauses.',
+  steps: [
+    'Tap "Read a short passage aloud" on the Mood page, in a quiet spot.',
+    'Hold the device about 20–30 cm from your mouth and read the whole passage once, at your normal pace.',
+    'Use the same device, place and time of day each sol so readings compare fairly.',
+  ],
+  whyInSpace: 'Isolation, confinement and poor sleep can wear down mood and energy slowly. Speech often becomes flatter, slower and more hesitant on hard days, sometimes before people say so.',
+  typicalRange: 'Very personal. Sol Check compares each marker only with your own median over the last 14 sols.',
+  watchFor: 'Two or more markers moving the tired way together (flatter, slower, more pauses), especially with low mood or short sleep.',
+  sourceId: 'speech-mental-health',
+};
+MEASUREMENT_GUIDES.voice_pitch_variability = voiceGuide;
+MEASUREMENT_GUIDES.voice_articulation_rate = voiceGuide;
+MEASUREMENT_GUIDES.voice_pause_ratio = voiceGuide;
+
 MEASUREMENT_GUIDES.calorie_intake = {
   text: 'Add up the food energy you ate today. Every space-food package lists its calories (kcal).',
   steps: [
@@ -477,11 +529,24 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     title: 'Rest and measure your breathing again',
     tier: 'self_care',
     steps: [
-      'Sit quietly for 5 minutes, then repeat the camera check or count breaths for 60 seconds.',
-      'If it is still outside 12–20 a minute, or you feel short of breath, tell your crew medical officer.',
+      'Sit quietly for 5 minutes, then count breaths for 60 seconds or repeat the check.',
+      'If the change persists or you feel short of breath, tell your crew medical officer.',
       'If several crew breathe faster at once, ask life support to check cabin CO2.',
     ],
     sourceRefs: ['ppg-respiratory-fusion'],
+    reviewStatus: 'demo_heuristic',
+  },
+  'voice-check-in': {
+    id: 'voice-check-in',
+    title: 'Check in with yourself and your crew',
+    tier: 'self_care',
+    steps: [
+      'Look at today’s sleep and mood answers together with the voice result. A tired voice after a short night is common.',
+      'Take a real break, eat, drink and talk with a crewmate today.',
+      'Repeat the voice check tomorrow at the same time, with the same device and passage.',
+      'If you feel low, hopeless or unable to cope, talk to your crew medical officer now. You do not have to wait for a trend.',
+    ],
+    sourceRefs: ['speech-mental-health'],
     reviewStatus: 'demo_heuristic',
   },
   'recovery-day': {

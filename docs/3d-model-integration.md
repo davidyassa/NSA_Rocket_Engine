@@ -3,15 +3,17 @@
 ## International Space Station
 
 The dashboard’s **Explore the ISS in 3D** link opens the station viewer in Mission media.
+The **Radiation monitor** places simulated CARN sensors, corridors, crew beacons, and
+the incident direction on the same 3D model.
 [Open the editable Blender scene](../assets/iss/international-space-station.blend) to edit the
 station assembly, orbital camera, lighting, or Earth backplate. The scene contains packed textures.
 
 Export the **ISS | NASA VTAD** collection as a binary glTF with **+Y Up** and
 **Custom Properties** enabled. Put the result at
-`assets/iss/international-space-station.glb` and render the orbital camera to update
-`assets/iss/international-space-station.webp`. Keep the GLB below the service worker’s
+`assets/iss/international-space-station.glb`. Keep the GLB below the service worker’s
 15 MiB precache limit. The current export uses texture deduplication and mesh quantization.
-Run `npm run build` to package both assets.
+Preserve the module node names used in `RadiationStationMap.tsx` so the sensor positions
+follow the model after re-export. Run `npm run build` to package the model.
 
 Station geometry and textures are from
 [NASA Visualization Technology Applications and Development](https://science.nasa.gov/resource/international-space-station-3d-model/).
@@ -23,7 +25,7 @@ The orbital scene uses the project's existing Earth imagery and follows the
 The dashboard's 3D view (`src/features/dashboard/CrewBody3D.tsx`) shows exactly one model:
 **`assets/astronaut/astronaut_sol_check.glb`**, imported directly by
 `src/features/dashboard/twin/astronautViewport.ts`. There is no copy, manifest or
-placeholder. If the file cannot load, the dashboard switches to the 2D body map and says why.
+placeholder. If the file cannot load, the dashboard reports the error and keeps the health links available.
 
 ## Drop-in steps
 
@@ -97,5 +99,3 @@ still rotate with the model.
   for PBR reflections (no external HDR files).
 - Rendering pauses when the view is off-screen or the tab is hidden. All GPU
   resources are disposed on unmount.
-- If WebGL is unavailable or the context is lost, the figure switches to the
-  accessible 2D body map and says why.

@@ -93,9 +93,47 @@ describe('Sol 43 hero scenario tells the after-the-storm story', () => {
     const history = scenario.history.map((h) => ({ ...h, astronautId: 'crew-1', measurements: h.measurements.map((m) => ({ ...m, astronautId: 'crew-1' })) }));
     const result = evaluateCheckin(today, history, { events: scenario.events, archiveEvent: { sol: 41, date: '2017-09-11' }, environment: scenario.environment });
     const rules = result.findings.map((f) => f.ruleId);
-    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual', 'energy-intake-low', 'bone-kidney-compound']));
+    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual', 'energy-intake-low', 'bone-kidney-compound', 'voice-change-from-usual']));
     expect(rules).not.toContain('orthostatic-check'); // the scripted stand test is normal
-    expect(result.engineVersion).toBe('1.6.0');
+    expect(result.domainStatuses.behavioral).not.toBe('no_change_detected');
+    expect(result.engineVersion).toBe('1.7.0');
+  });
+});
+
+describe('voice check (read-aloud passage)', () => {
+  const usual = { voice_pitch_variability: 2.6, voice_articulation_rate: 4.8, voice_pause_ratio: 18 };
+  const history = [36, 37, 38, 39, 40].map((sol, i) => checkin(sol, {
+    voice_pitch_variability: usual.voice_pitch_variability + (i % 2) * 0.1,
+    voice_articulation_rate: usual.voice_articulation_rate + (i % 2) * 0.05,
+    voice_pause_ratio: usual.voice_pause_ratio + (i % 2),
+  }));
+  const voice = (values: Partial<Record<MetricId, number>>, prior = history) =>
+    ids(checkin(43, { ...usual, ...values }), prior).findings.find((f) => f.ruleId === 'voice-change-from-usual');
+
+  it('flags two markers moving the tired way against the personal usual', () => {
+    const found = voice({ voice_pitch_variability: 1.6, voice_pause_ratio: 27 });
+    expect(found?.summary).toMatch(/2 of 3 markers/);
+    expect(found?.baselineUsed.map((b) => b.metric)).toEqual(['voice_pitch_variability', 'voice_pause_ratio']);
+    expect(found?.kind).toBe('observation');
+  });
+
+  it('stays quiet for one marker alone, a change the other way, or a small change', () => {
+    expect(voice({ voice_pitch_variability: 1.6 })).toBeUndefined();
+    expect(voice({ voice_pitch_variability: 3.6, voice_pause_ratio: 10 })).toBeUndefined();
+    expect(voice({ voice_pitch_variability: 2.3, voice_pause_ratio: 21 })).toBeUndefined();
+  });
+
+  it('respects a person whose voice varies a lot from sol to sol', () => {
+    const variable = [36, 37, 38, 39, 40].map((sol, i) => checkin(sol, {
+      voice_pitch_variability: [1.6, 3.6, 2.6, 1.8, 3.4][i], voice_articulation_rate: 4.8, voice_pause_ratio: [10, 26, 18, 12, 24][i],
+    }));
+    expect(voice({ voice_pitch_variability: 1.8, voice_pause_ratio: 25 }, variable)).toBeUndefined();
+  });
+
+  it('needs 5 prior voice checks and never escalates on voice alone', () => {
+    expect(voice({ voice_pitch_variability: 1.6, voice_pause_ratio: 27 }, history.slice(0, 4))).toBeUndefined();
+    const result = ids(checkin(43, { ...usual, voice_pitch_variability: 1.6, voice_pause_ratio: 27 }), history);
+    expect(result.recommendedTier).toBe('self_care');
   });
 });
 
@@ -104,6 +142,20 @@ describe('camera breathing rate and HRV', () => {
     expect(ids(checkin(43, { respiratory_rate: 24 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/above/);
     expect(ids(checkin(43, { respiratory_rate: 9 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/below/);
     expect(ids(checkin(43, { respiratory_rate: 16 })).findings.some((f) => f.ruleId === 'breathing-rate-range')).toBe(false);
+  });
+
+  it('compares microphone breathing with the personal median once it has five prior readings', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { respiratory_rate: 16 }));
+    const recorded = (rate: number): DailyCheckin => {
+      const current = checkin(43, { respiratory_rate: rate });
+      return { ...current, measurements: current.measurements.map((m) => ({ ...m, source: 'microphone_estimate' })) };
+    };
+    const finding = (rate: number, prior: DailyCheckin[]) =>
+      ids(recorded(rate), prior).findings.find((f) => f.ruleId === 'breathing-rate-range');
+    expect(finding(20, history)?.baselineUsed[0]?.median).toBe(16);
+    expect(finding(12, history)?.summary).toMatch(/below the personal usual/);
+    expect(finding(19, history)).toBeUndefined();
+    expect(finding(24, history.slice(0, 4))).toBeUndefined();
   });
 
   it('compares HRV only with the person’s own usual, and needs 5 prior readings', () => {

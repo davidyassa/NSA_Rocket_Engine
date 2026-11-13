@@ -11,7 +11,9 @@ export class SpeechToText {
   load(onProgress?: (fraction: number) => void): Promise<void> {
     if (this.ready) return this.ready;
     this.worker = new Worker(new URL('./whisper.worker.ts', import.meta.url), { type: 'module' });
+    let startupTimeout: number;
     this.ready = new Promise<void>((resolve, reject) => {
+      startupTimeout = window.setTimeout(() => reject(new Error('Speech model did not finish loading')), 60_000);
       this.worker!.onmessage = (event: MessageEvent) => {
         const msg = event.data as { type: string; id?: number; text?: string; message?: string; file?: string; loaded?: number; total?: number };
         if (msg.type === 'progress' && msg.file) {
@@ -29,9 +31,16 @@ export class SpeechToText {
           if (msg.id !== undefined && this.pending.has(msg.id)) { this.pending.get(msg.id)!.reject(error); this.pending.delete(msg.id); } else reject(error);
         }
       };
-      this.worker!.onerror = (event) => reject(new Error(event.message || 'Speech worker failed to start'));
-    });
-    this.worker.postMessage({ type: 'load' });
+      this.worker!.onerror = (event) => {
+        const error = new Error(event.message || 'Speech worker stopped');
+        reject(error);
+        this.dispose(error);
+      };
+    }).catch((error: Error) => {
+      this.dispose(error);
+      throw error;
+    }).finally(() => window.clearTimeout(startupTimeout));
+    this.worker.postMessage({ type: 'load', vendorUrl: new URL('vendor/', document.baseURI).href });
     return this.ready;
   }
 
@@ -44,9 +53,13 @@ export class SpeechToText {
     });
   }
 
-  dispose() {
+  dispose(error = new Error('Speech worker closed')) {
     this.worker?.terminate();
-    this.worker = null; this.ready = null; this.pending.clear(); this.files.clear();
+    this.worker = null;
+    this.ready = null;
+    this.pending.forEach(({ reject }) => reject(error));
+    this.pending.clear();
+    this.files.clear();
   }
 }
 

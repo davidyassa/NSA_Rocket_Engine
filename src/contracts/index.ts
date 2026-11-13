@@ -12,6 +12,8 @@ export const METRIC_IDS = [
   'fluid_intake', 'exercise_minutes', // hydration and the muscle/bone countermeasure
   'respiratory_rate', 'hrv_rmssd', // camera-derived from the same face pulse signal (no extra hardware)
   'calorie_intake', 'body_mass', // food system: menu fatigue and weight loss far from resupply
+  // Voice check (read-aloud passage, microphone): compared only with the person's own usual.
+  'voice_pitch_variability', 'voice_articulation_rate', 'voice_pause_ratio',
 ] as const;
 export const HEALTH_DOMAINS = [
   'cardiovascular', 'metabolic', 'temperature', 'sleep', 'behavioral', 'symptoms',
@@ -19,7 +21,7 @@ export const HEALTH_DOMAINS = [
 
 const metricIdSchema = z.enum(METRIC_IDS);
 const healthDomainSchema = z.enum(HEALTH_DOMAINS);
-const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min', 'breaths_min', 'ms', 'kcal', 'kg']);
+const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min', 'breaths_min', 'ms', 'kcal', 'kg', 'semitones', 'syllables_s', 'percent']);
 const provenanceSchema = z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']);
 const findingKindSchema = z.enum(['observation', 'trend', 'contextual_association', 'data_quality', 'data_unavailable']);
 const domainStatusSchema = z.enum([
@@ -70,6 +72,9 @@ export const METRICS: Record<MetricId, MetricInfo> = {
   hrv_rmssd: { label: 'Heart rate variability (RMSSD)', unit: 'ms', unitLabel: 'ms', domain: 'cardiovascular', optional: true },
   calorie_intake: { label: 'Food energy', unit: 'kcal', unitLabel: 'kcal', domain: 'metabolic', optional: true, countermeasure: true },
   body_mass: { label: 'Body mass', unit: 'kg', unitLabel: 'kg', domain: 'metabolic', optional: true },
+  voice_pitch_variability: { label: 'Voice pitch movement', unit: 'semitones', unitLabel: 'semitones', domain: 'behavioral', optional: true },
+  voice_articulation_rate: { label: 'Speaking pace', unit: 'syllables_s', unitLabel: 'syllables/s', domain: 'behavioral', optional: true },
+  voice_pause_ratio: { label: 'Time in pauses', unit: 'percent', unitLabel: '%', domain: 'behavioral', optional: true },
 };
 
 export const CORE_SYMPTOM_OPTIONS = [
@@ -138,6 +143,18 @@ export function measurementValueError(metric: MetricId, value: number): string |
     if (value < 5 || value > 250) return 'Enter milliseconds from 5 to 250.';
     return;
   }
+  if (metric === 'voice_pitch_variability') {
+    if (value < 0 || value > 12) return 'Enter semitones from 0 to 12.';
+    return;
+  }
+  if (metric === 'voice_articulation_rate') {
+    if (value < 1 || value > 10) return 'Enter syllables per second from 1 to 10.';
+    return;
+  }
+  if (metric === 'voice_pause_ratio') {
+    if (value < 0 || value > 90) return 'Enter a percentage from 0 to 90.';
+    return;
+  }
   if (value <= 0) return 'Enter a value greater than zero.';
 }
 
@@ -160,7 +177,7 @@ export const healthMeasurementSchema = z.object({
   observedAtUtc: utc,
   capturedAtUtc: utc.optional(),
   provenance: provenanceSchema,
-  source: z.enum(['manual', 'validated_hardware', 'camera_estimate', 'self_report', 'research_import', 'synthetic']).optional(),
+  source: z.enum(['manual', 'validated_hardware', 'camera_estimate', 'microphone_estimate', 'self_report', 'research_import', 'synthetic']).optional(),
   status: z.enum(['accepted', 'rejected_low_quality', 'missing', 'corrected']).optional(),
   signalQuality: z.number().min(0).max(1).nullable().optional(),
   algorithm: z.string().optional(),

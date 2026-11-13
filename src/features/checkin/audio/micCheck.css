@@ -1,0 +1,127 @@
+/* Microphone checks reuse the camera card styles; these rules add the sound traces. */
+
+.mic-live,
+.mic-trace svg {
+  display: block;
+  width: 100%;
+  height: 72px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.mic-live { margin: 0.6rem 0; }
+
+.mic-trace { margin: 0.6rem 0; }
+
+.mic-trace figcaption {
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.mic-trace-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.mic-trace-marker {
+  stroke: var(--status-steady);
+  stroke-width: 2;
+}
+
+.mic-rec-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: var(--nasa-red);
+  vertical-align: baseline;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-rec-dot { animation: none; }
+}
+
+.mic-passage {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.mic-passage p { margin: 0 0 0.4rem; }
+.mic-passage p:last-child { margin-bottom: 0; }
+
+.mic-result-number { margin: 0.4rem 0; }
+
+.mic-result-number strong {
+  font-family: var(--mono);
+  font-size: 2.2rem;
+  color: var(--text-primary);
+}
+
+.mic-result-number > span:not(.camera-result-label) { color: var(--text-secondary); }
+
+.mic-result-number .camera-result-label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.mic-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0.4rem 0;
+}
+
+.mic-voice-grid > div {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.mic-voice-grid dt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.mic-voice-grid dd {
+  margin: 0.15rem 0 0;
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  color: var(--text-primary);
+}
+
+.mic-voice-grid dd span {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.wizard-page .mic-voice-section {
+  margin-top: 1.4rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.mic-voice-section legend {
+  padding: 0 4px;
+  font-weight: 650;
+  color: var(--text-primary);
+}

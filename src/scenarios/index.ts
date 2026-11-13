@@ -46,6 +46,10 @@ export const HERO_PREFILL: Record<MetricId, number> = {
   // Shelter rations and menu fatigue: still eating little; weight down 1.8%, not yet flagged.
   calorie_intake: 1900,
   body_mass: 59.9,
+  // Voice check: flatter, slower reading with longer pauses than her usual (synthetic).
+  voice_pitch_variability: 1.7,
+  voice_articulation_rate: 4.3,
+  voice_pause_ratio: 26,
 };
 
 /** Shelter protocol (sols 41–42) and the sol before: exercise was cut short. */
@@ -64,10 +68,17 @@ const shelterHrvBySol: Partial<Record<number, number>> = { 41: 37, 42: 34 };
 /** Crowded shelter, rationed menu: food energy dropped (synthetic). */
 const shelterKcalBySol: Partial<Record<number, number>> = { 40: 1750, 41: 1600, 42: 1800 };
 
+/** Crowded shelter sols: the read-aloud passage sounded flatter and more hesitant (synthetic). */
+const shelterVoiceBySol: Partial<Record<number, { pitch: number; pace: number; pauses: number }>> = {
+  41: { pitch: 2.0, pace: 4.5, pauses: 22 },
+  42: { pitch: 1.9, pace: 4.4, pauses: 24 },
+};
+
 const lowerSleepBySol: Partial<Record<number, number>> = { 39: 5.1, 40: 4.8, 42: 4.6 };
 
 function historicalValues(sol: number, includesTrend: boolean): Record<MetricId, number> {
   const lowerSleep = includesTrend ? lowerSleepBySol[sol] : undefined;
+  const voice = includesTrend ? shelterVoiceBySol[sol] : undefined;
   return {
     heart_rate: 68 + (sol % 5) - 2,
     bp_systolic: 116 + (sol % 5) - 2,
@@ -85,6 +96,9 @@ function historicalValues(sol: number, includesTrend: boolean): Record<MetricId,
     hrv_rmssd: (includesTrend ? shelterHrvBySol[sol] : undefined) ?? 48 + (sol % 5) - 2,
     calorie_intake: (includesTrend ? shelterKcalBySol[sol] : undefined) ?? 2600 + (sol % 4) * 50,
     body_mass: Number((61 + ((sol % 3) - 1) / 10).toFixed(1)),
+    voice_pitch_variability: voice?.pitch ?? Number((2.5 + (sol % 3) / 10).toFixed(1)),
+    voice_articulation_rate: voice?.pace ?? Number((4.7 + (sol % 4) * 0.05).toFixed(2)),
+    voice_pause_ratio: voice?.pauses ?? 17 + (sol % 3),
   };
 }
 

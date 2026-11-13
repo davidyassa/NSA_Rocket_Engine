@@ -66,6 +66,32 @@ describe('Ask Sol answers only from Sol Check’s cited knowledge', () => {
   });
 });
 
+describe('Ask Sol handles everyday conversation', () => {
+  it.each([
+    ['Hello, Sol!', /Hi Maya/],
+    ['Hello, Soul.', /Hi Maya/],
+    ['Good morning.', /Hi Maya/],
+    ['Hey, how are you?', /ready to help/],
+    ['Thank you, Sol.', /welcome/],
+  ])('replies naturally to %s', (question, pattern) => {
+    expect(ask(question)).toMatchObject({ kind: 'help', text: expect.stringMatching(pattern), sources: [] });
+  });
+
+  it.each(['Good bye, Sol.', 'Goodbye, Soul.', 'Goodbye!', 'Bye.', 'Thanks, see you later.'])('gives a farewell for %s', (question) => {
+    expect(ask(question)).toMatchObject({ kind: 'farewell', text: expect.stringMatching(/Goodbye, Maya/), sources: [] });
+  });
+
+  it('answers the question after a greeting', () => {
+    expect(ask('Hi Sol, how is my sleep?').kind).toBe('personal');
+    expect(ask('Hello. What is SANS?').kind).toBe('answer');
+  });
+
+  it('prioritizes urgent symptoms even when the message opens with a social phrase', () => {
+    expect(ask('Hello, I have chest pain.').kind).toBe('urgent');
+    expect(ask('Goodbye. I feel hopeless.').kind).toBe('crisis');
+  });
+});
+
 describe('Ask Sol knows the crew member’s own check-in', () => {
   it('explains a personal reading against their usual', () => {
     const reply = ask('How is my sleep?');

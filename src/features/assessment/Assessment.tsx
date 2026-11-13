@@ -154,9 +154,12 @@ function FindingCard({ finding, readings }: { finding: Finding; readings: Readon
   const rule = RULES[finding.ruleId];
 
   return (
-    <article className={`panel assessment-finding assessment-finding--${finding.kind}`}>
+    <details className={`panel assessment-finding assessment-finding--${finding.kind}`}>
+      <summary className="assessment-finding-summary">
+        <h3>{summary}</h3>
+      </summary>
+      <div className="assessment-finding-body">
       <span className="badge assessment-kind">{findingLabels[finding.kind]}</span>
-      <h3>{summary}</h3>
       {finding.baselineUsed.length > 0 && (
         <p className="assessment-baseline-preview">
           Personal baseline · {finding.baselineUsed.map(({ metric, median, count }) =>
@@ -186,7 +189,8 @@ function FindingCard({ finding, readings }: { finding: Finding; readings: Readon
         )}
         <EvidenceSources ids={finding.sourceRefs} />
       </details>
-    </article>
+      </div>
+    </details>
   );
 }
 
@@ -242,41 +246,6 @@ export function Assessment({ assessment, records, mission, scenarioId, vigilance
 
       {assessment ? (
         <>
-          <section className="assessment-findings" aria-labelledby="findings-title">
-            <h2 id="findings-title" ref={findingsHeading} tabIndex={-1}>Findings</h2>
-            {reviewTier && (
-              <p className="assessment-review-note">{PLAIN_NEXT_STEP[reviewTier].title}</p>
-            )}
-            {symptoms.length > 0 && (
-              <p className="muted assessment-symptoms">Reported symptoms · {symptoms.map(symptom => symptom.label).join(', ')}</p>
-            )}
-            {warnings.length > 0 && (
-              <ul className="panel assessment-warnings">
-                {warnings.map(warning => <li key={warning}>{warning}</li>)}
-              </ul>
-            )}
-            {assessment.findings.map((finding, index) => (
-              <FindingCard key={`${finding.ruleId}-${index}`} finding={finding} readings={readings} />
-            ))}
-            {assessment.findings.length === 0 && (
-              <p className="panel assessment-empty">No change detected in the readings that could be compared.</p>
-            )}
-          </section>
-
-          {record && (needsVigilance || vigilanceResults.length > 0) && (
-            <div className="assessment-vigilance">
-              {vigilanceResults.length > 0 && <VigilanceReadings sol={record.sol} history={vigilance} />}
-              {needsVigilance && vigilanceResults.length === 0 && (
-                <div className="panel cognitive-arena-card">
-                  <h2>Vigilance check recommended</h2>
-                  <p className="muted">Check reaction time and attention in Cognitive Lab.</p>
-                  <Link to="/cognitive" className="text-link">Open Cognitive Lab</Link>
-                </div>
-              )}
-              <Link to="/hazards/isolation" className="text-link">Open Hazard 2 and plan follow-up</Link>
-            </div>
-          )}
-
           {cards.length > 0 && (
             <details className="panel assessment-support">
               <summary>Suggested actions</summary>
@@ -312,6 +281,42 @@ export function Assessment({ assessment, records, mission, scenarioId, vigilance
               </div>
             </details>
           )}
+
+          <section className="assessment-findings" aria-labelledby="findings-title">
+            <h2 id="findings-title" ref={findingsHeading} tabIndex={-1}>Findings</h2>
+            {reviewTier && (
+              <p className="assessment-review-note">{PLAIN_NEXT_STEP[reviewTier].title}</p>
+            )}
+            {symptoms.length > 0 && (
+              <p className="muted assessment-symptoms">Reported symptoms · {symptoms.map(symptom => symptom.label).join(', ')}</p>
+            )}
+            {warnings.length > 0 && (
+              <ul className="panel assessment-warnings">
+                {warnings.map(warning => <li key={warning}>{warning}</li>)}
+              </ul>
+            )}
+            {assessment.findings.map((finding, index) => (
+              <FindingCard key={`${finding.ruleId}-${index}`} finding={finding} readings={readings} />
+            ))}
+            {assessment.findings.length === 0 && (
+              <p className="panel assessment-empty">No change detected in the readings that could be compared.</p>
+            )}
+          </section>
+
+          {record && (needsVigilance || vigilanceResults.length > 0) && (
+            <div className="assessment-vigilance">
+              {vigilanceResults.length > 0 && <VigilanceReadings sol={record.sol} history={vigilance} />}
+              {needsVigilance && vigilanceResults.length === 0 && (
+                <div className="panel cognitive-arena-card">
+                  <h2>Vigilance check recommended</h2>
+                  <p className="muted">Check reaction time and attention in Cognitive Lab.</p>
+                  <Link to="/cognitive" className="text-link">Open Cognitive Lab</Link>
+                </div>
+              )}
+              <Link to="/hazards/isolation" className="text-link">Open Hazard 2 and plan follow-up</Link>
+            </div>
+          )}
+
         </>
       ) : (
         <section className="panel assessment-empty">

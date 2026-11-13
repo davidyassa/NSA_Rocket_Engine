@@ -102,6 +102,39 @@ function TrendChart({ points, metric }: { points: TrendPoint[]; metric: ChartInd
 const indicators = [...METRIC_IDS, 'symptoms', 'vigilance'] as const;
 type Indicator = (typeof indicators)[number];
 
+/** Categories group the existing indicators by their health domain; no new charts. */
+export const TREND_CATEGORIES = [
+  { id: 'cardiovascular', label: 'Cardiovascular' },
+  { id: 'metabolic', label: 'Metabolic & physical' },
+  { id: 'wellbeing', label: 'Sleep & wellbeing' },
+] as const;
+export type TrendCategory = (typeof TREND_CATEGORIES)[number]['id'];
+
+export function trendCategoryOf(indicator: Indicator): TrendCategory {
+  if (indicator === 'symptoms' || indicator === 'vigilance') return 'wellbeing';
+  switch (METRICS[indicator].domain) {
+    case 'cardiovascular': return 'cardiovascular';
+    case 'metabolic':
+    case 'temperature': return 'metabolic';
+    default: return 'wellbeing';
+  }
+}
+
+export function indicatorsInCategory(category: TrendCategory): Indicator[] {
+  return indicators.filter((id) => trendCategoryOf(id) === category);
+}
+
+/** Arrow / Home / End index for a horizontal tab list (wraps around). */
+function nextTabIndex(key: string, index: number, count: number): number | undefined {
+  const last = count - 1;
+  return new Map([
+    ['ArrowLeft', index === 0 ? last : index - 1],
+    ['ArrowRight', index === last ? 0 : index + 1],
+    ['Home', 0],
+    ['End', last],
+  ]).get(key);
+}
+
 function IndicatorTrend({ metric, records, showAll, setShowAll }: {
   metric: ChartIndicator;
   records: readonly DailyCheckin[];
@@ -174,6 +207,10 @@ export function Trends({ records, vigilance, sol }: {
   const metric = indicators.find((id) => id === queryMetric) ?? 'sleep_duration';
   const [showAll, setShowAll] = useState(false);
   const tabs = useRef<HTMLDivElement>(null);
+  const categoryTabs = useRef<HTMLDivElement>(null);
+  // The selected indicator (URL) decides the category, so deep links like ?metric=mood still work.
+  const category = trendCategoryOf(metric);
+  const categoryIndicators = useMemo(() => indicatorsInCategory(category), [category]);
 
   useEffect(() => {
     const list = tabs.current;
@@ -189,19 +226,24 @@ export function Trends({ records, vigilance, sol }: {
     if (id !== metric) setSearchParams({ metric: id });
   }
 
-  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const lastIndex = indicators.length - 1;
-    const nextIndex = new Map([
-      ['ArrowLeft', index === 0 ? lastIndex : index - 1],
-      ['ArrowRight', index === lastIndex ? 0 : index + 1],
-      ['Home', 0],
-      ['End', lastIndex],
-    ]).get(event.key);
+  function chooseCategory(id: TrendCategory) {
+    if (id !== category) chooseMetric(indicatorsInCategory(id)[0]);
+  }
 
+  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const nextIndex = nextTabIndex(event.key, index, categoryIndicators.length);
     if (nextIndex === undefined) return;
     event.preventDefault();
     tabs.current?.querySelectorAll('button')[nextIndex]?.focus({ preventScroll: true });
-    chooseMetric(indicators[nextIndex]);
+    chooseMetric(categoryIndicators[nextIndex]);
+  }
+
+  function handleCategoryKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const nextIndex = nextTabIndex(event.key, index, TREND_CATEGORIES.length);
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    categoryTabs.current?.querySelectorAll('button')[nextIndex]?.focus({ preventScroll: true });
+    chooseCategory(TREND_CATEGORIES[nextIndex].id);
   }
 
   return (
@@ -211,8 +253,28 @@ export function Trends({ records, vigilance, sol }: {
         <p>Compare your check-ins with your personal baseline by mission sol.</p>
       </header>
 
+      <div className="trend-categories" role="tablist" aria-label="Trend categories" ref={categoryTabs}>
+        {TREND_CATEGORIES.map(({ id, label }, index) => (
+          <button
+            type="button"
+            className="trend-category"
+            id={`trend-category-${id}`}
+            key={id}
+            role="tab"
+            aria-selected={id === category}
+            aria-controls="trend-category-panel"
+            tabIndex={id === category ? 0 : -1}
+            onClick={() => chooseCategory(id)}
+            onKeyDown={(event) => handleCategoryKey(event, index)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div id="trend-category-panel" role="tabpanel" aria-labelledby={`trend-category-${category}`}>
       <div className="trend-tabs" role="tablist" aria-label="Health indicators" ref={tabs}>
-        {indicators.map((id, index) => (
+        {categoryIndicators.map((id, index) => (
           <button
             type="button"
             className="trend-tab"
@@ -234,6 +296,7 @@ export function Trends({ records, vigilance, sol }: {
         {metric === 'vigilance'
           ? <VigilanceReadings sol={sol} history={vigilance} showHistory />
           : <IndicatorTrend metric={metric} records={records} showAll={showAll} setShowAll={setShowAll} />}
+      </div>
       </div>
     </div>
   );

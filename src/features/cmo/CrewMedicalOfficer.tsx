@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, UserCheck, CheckCircle2, Check, Radiation } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { DailyCheckin, RiskAssessment, DemoScenario } from '../../contracts';
 import { METRICS } from '../../contracts';
+import { supersedeSubsumedFindings } from '../../engine';
 import { FollowUpCenter } from '../followups/FollowUpCenter';
 import { tasksForScenario, useFollowUpStore } from '../followups/useFollowUpStore';
 import { VigilanceReadings } from '../cognitive/VigilanceReadings';
@@ -13,6 +14,7 @@ import { generateMedicalHandoffPackage } from '../assessment/medicalHandoff';
 import { MedicalKitTable } from '../assessment/KitItems';
 
 interface CrewMedicalOfficerProps {
+  onAssistantReview?: (status: { signed: boolean; notes?: string } | undefined) => void;
   scenario: DemoScenario;
   scenarioId: ScenarioId;
   latest: DailyCheckin | null;
@@ -21,13 +23,22 @@ interface CrewMedicalOfficerProps {
   vigilance: readonly VigilanceSession[];
 }
 
-export function CrewMedicalOfficer({ scenario, scenarioId, latest, assessment, records, vigilance }: CrewMedicalOfficerProps) {
-  const [activeTab, setActiveTab] = useState<'triage' | 'actions' | 'kit' | 'quality' | 'telemetry'>('triage');
+export function CrewMedicalOfficer({ scenario, scenarioId, latest, assessment, records, vigilance, onAssistantReview }: CrewMedicalOfficerProps) {
+  const [params, setParams] = useSearchParams();
+  const tabs = ['triage', 'actions', 'kit', 'quality', 'telemetry'] as const;
+  const activeTab = tabs.find(tab => tab === params.get('tab')) ?? 'triage';
+  const setActiveTab = (tab: typeof tabs[number]) => setParams({ tab }, { replace: true });
   const [cmoSignOff, setCmoSignOff] = useState<{ signed: boolean; timestamp?: string; notes?: string }>({ signed: false });
   const [cmoNotes, setCmoNotes] = useState('');
+  useEffect(() => {
+    onAssistantReview?.(cmoSignOff);
+  }, [cmoSignOff, onAssistantReview]);
+  useEffect(() => () => onAssistantReview?.(undefined), [onAssistantReview]);
 
   const { tasks: allTasks, setTasks } = useFollowUpStore();
   const tasks = tasksForScenario(allTasks, scenarioId);
+  // One combined observation replaces the sleep and mood observations it fully covers.
+  const observations = useMemo(() => supersedeSubsumedFindings(assessment?.findings ?? []), [assessment]);
 
   const handoffPkg = latest && assessment
     ? generateMedicalHandoffPackage(latest, assessment, scenario.profile.displayName, scenario.missionContext.oneWayDelayMinutes, undefined, vigilance)
@@ -98,7 +109,7 @@ export function CrewMedicalOfficer({ scenario, scenarioId, latest, assessment, r
             {assessment ? assessment.recommendedTier.replace(/_/g, ' ').toUpperCase() : 'NO ASSESSMENT'}
           </p>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-            {assessment?.findings.length ?? 0} active findings flagged
+            {observations.length} active findings flagged
           </span>
         </div>
 
@@ -180,8 +191,8 @@ export function CrewMedicalOfficer({ scenario, scenarioId, latest, assessment, r
           </div>
 
           <div style={{ display: 'grid', gap: '8px' }}>
-            {(assessment?.findings ?? []).map((finding, idx) => (
-              <div key={idx} className="cmo-finding-row">
+            {observations.map((finding, idx) => (
+              <div key={`${finding.ruleId}-${idx}`} className="cmo-finding-row">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="badge" style={{ fontSize: '0.8rem' }}>{finding.kind.toUpperCase()}</span>
                   <code style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Rule: {finding.ruleId}</code>

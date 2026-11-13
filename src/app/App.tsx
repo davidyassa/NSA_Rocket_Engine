@@ -1,6 +1,9 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BookOpen, Brain, ChartNoAxesCombined, ClipboardList, Database, Ellipsis, LayoutGrid, MessagesSquare, Radiation, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronDown, ClipboardList, Database, Ellipsis, Info, LayoutGrid, MessagesSquare, Radiation, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { isNavItemActive } from './navigation';
+import { radiationSimCondition, useRadiationSimStore } from '../features/radiation/radiationSimStore';
+import { SPACECRAFT_COMPARTMENTS } from '../features/radiation/radiationData';
 import type { CheckinEntry } from '../contracts';
 import rocketEngineMark from '../ui/assets/nasa/rocket-engine.webp';
 import { RADLAB_MANIFEST } from '../data/nasa';
@@ -9,6 +12,7 @@ import { Assessment } from '../features/assessment/Assessment';
 import { Checkin } from '../features/checkin/Checkin';
 import { CognitiveLab } from '../features/cognitive/CognitiveLab';
 import { Dashboard } from '../features/dashboard/Dashboard';
+import { routineChecklistItems } from '../features/dashboard/RoutineChecklist';
 import { NasaHazards } from '../features/hazards/NasaHazards';
 import { RadiationHazard } from '../features/radiation/RadiationHazard';
 import { DistanceHazard } from '../features/hazards/DistanceHazard';
@@ -21,25 +25,52 @@ import { DemoData } from './DemoData';
 import { RouteErrorBoundary, lazyWithReload } from './lazyRoute';
 import { confirmTap } from './native';
 import { GLOSSARY } from '../content/plainLanguage';
-import { activeSol, entryFromCheckin, useMissionStore } from './store';
-import { useFollowUpStore } from '../features/followups/useFollowUpStore';
+import { activeSol, useMissionStore } from './store';
+import { tasksForScenario, useFollowUpStore } from '../features/followups/useFollowUpStore';
 import { AskSol } from '../features/assistant/AskSol';
+import { SolDock } from '../features/assistant/SolDock';
+import type { DialogueAction } from '../features/assistant/dialogue';
+import type { MissionEvidence } from '../features/assistant/missionAnswers';
+import type { AssistantContext } from '../features/assistant/respond';
 
 const Trends = lazyWithReload(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
 
-const navigation = [
+const primaryNavigation = [
   { to: '/', label: 'Dashboard', Icon: LayoutGrid },
   { to: '/hazards/radiation', label: 'Radiation monitor', Icon: Radiation },
   { to: '/check-in', label: 'Sol check-in', Icon: ClipboardList },
   { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
-  { to: '/hazards', label: 'Hazards', Icon: ShieldAlert },
   { to: '/assessment', label: 'Assessment', Icon: Activity },
   { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
   { to: '/trends', label: 'Trends', Icon: ChartNoAxesCombined },
   { to: '/timeline', label: 'Timeline', Icon: RouteIcon },
   { to: '/assistant', label: 'Ask Sol', Icon: MessagesSquare },
+];
+/** Grouped under the sidebar's "About" disclosure. */
+const aboutNavigation = [
+  { to: '/hazards', label: 'Hazards', Icon: ShieldAlert },
   { to: '/demo', label: 'Demo and data', Icon: Database },
 ];
+const navigation = [...primaryNavigation, ...aboutNavigation];
+type NavItem = (typeof navigation)[number];
+
+function NavItemLink({ item, pathname, className, iconSize = 18, strokeWidth = 1.65, text }: {
+  item: NavItem;
+  pathname: string;
+  className?: string;
+  iconSize?: number;
+  strokeWidth?: number;
+  text?: string;
+}) {
+  const active = isNavItemActive(item.to, pathname);
+  const classes = [className, active ? 'active' : undefined].filter(Boolean).join(' ');
+  return (
+    <Link to={item.to} className={classes || undefined} aria-current={active ? 'page' : undefined}>
+      <item.Icon size={iconSize} strokeWidth={strokeWidth} aria-hidden="true" />
+      <span>{text ?? item.label}</span>
+    </Link>
+  );
+}
 
 /** Phone bottom bar: Dashboard · Assessment · Check-in (centre) · Timeline · More (CMO, trends, cognitive, hazards, demo). */
 const bottomNavigation = ['/', '/assessment', '/check-in', '/timeline'] as const;
@@ -63,9 +94,23 @@ export function App() {
   const saveIsolationPlan = useMissionStore((state) => state.saveIsolationPlan);
   const syncFollowUps = useFollowUpStore((state) => state.syncWithAssessment);
   const resetFollowUps = useFollowUpStore((state) => state.resetTasks);
+  const tasks = useFollowUpStore((state) => state.tasks);
   const [resetError, setResetError] = useState('');
   const [revision, setRevision] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
+  const aboutHasActive = aboutNavigation.some(({ to }) => isNavItemActive(to, pathname));
+  const [aboutOpen, setAboutOpen] = useState(aboutHasActive);
+  const resetRadiationSim = useRadiationSimStore((state) => state.reset);
+  const radiationKey = useRadiationSimStore((state) => state.scenarioKey);
+  const radiationFrame = useRadiationSimStore((state) => state.frameIndex);
+  const [timelineSol, setTimelineSol] = useState<number>();
+  const [timelineControl, setTimelineControl] = useState<{ action: NonNullable<DialogueAction['timeline']> }>();
+  const [checkinDraft, setCheckinDraft] = useState<MissionEvidence['checkinDraft']>();
+  const [officerReview, setOfficerReview] = useState<MissionEvidence['officerReview']>();
+  const [controlled, setControlled] = useState(false);
+  const controlTimer = useRef<number>(0);
+  const [voiceDraft, setVoiceDraft] = useState<{ scope: string; patches: NonNullable<DialogueAction['checkin']>[] }>();
+  const [radiationRoom, setRadiationRoom] = useState('flight-deck');
   const resetDialog = useRef<HTMLDialogElement>(null);
   const glossaryDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
@@ -94,6 +139,58 @@ export function App() {
   const isLogged = latest?.sol === scenario.startSol;
   const section = routeLabels[pathname] ?? navigation.find((item) => item.to === pathname)?.label ?? 'Dashboard';
   const { profile, startSol } = scenario;
+  const draftScope = `${scenarioId}:${sol}:${revision}`;
+  const radiationCondition = useMemo(() => radiationSimCondition(radiationKey, radiationFrame), [radiationKey, radiationFrame]);
+  const roomReading = radiationCondition.scenario.frames[radiationCondition.frameIndex]?.find(reading => reading.roomId === radiationRoom);
+  const routine = routineChecklistItems(sol, latest, mission.checklist?.[scenarioId]?.[sol] ?? []);
+  const assistantContext: AssistantContext = {
+    crewName: profile.displayName,
+    sol,
+    oneWayDelayMinutes: scenario.missionContext.oneWayDelayMinutes,
+    latest, assessment, history: records,
+    mission: {
+      scenario, vigilance, routine, timelineSol, checkinDraft, officerReview,
+      followUps: tasksForScenario(tasks, scenarioId),
+      isolation: mission.isolationPlans?.[scenarioId]?.[sol],
+      radiation: {
+        status: radiationCondition.assessment.status,
+        label: radiationCondition.assessment.statusLabel,
+        frame: radiationCondition.frameIndex + 1,
+        room: SPACECRAFT_COMPARTMENTS.find(room => room.id === radiationRoom)?.name,
+        doseRate: roomReading?.radiationDoseRateMsvH ?? null,
+        origin: roomReading?.origin ?? 'simulated',
+      },
+    },
+  };
+
+  function applySolAction(action: DialogueAction) {
+    window.clearTimeout(controlTimer.current);
+    setControlled(true);
+    controlTimer.current = window.setTimeout(() => setControlled(false), 2200);
+    if (action.checkin) {
+      const patch = action.checkin;
+      setVoiceDraft(previous => ({
+        scope: draftScope,
+        patches: [...(previous?.scope === draftScope ? previous.patches : []), patch],
+      }));
+    }
+    if (action.routine) {
+      const { id, checked } = action.routine;
+      const item = routine.find(entry => entry.id === id);
+      if (item && !item.recorded && item.checked !== checked) useMissionStore.getState().toggleChecklistItem(id, sol);
+    }
+    if (action.scroll) {
+      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+      if (action.scroll === 'top' || action.scroll === 'bottom') window.scrollTo({ top: action.scroll === 'top' ? 0 : document.documentElement.scrollHeight, behavior });
+      else window.scrollBy({ top: (action.scroll === 'up' ? -1 : 1) * window.innerHeight * 0.8, behavior });
+    }
+    if (action.timeline) setTimelineControl({ action: action.timeline });
+    if (action.navigate) navigate(action.navigate);
+  }
+  useEffect(() => () => window.clearTimeout(controlTimer.current), []);
+  useEffect(() => {
+    if (pathname !== '/timeline') setTimelineControl(undefined);
+  }, [pathname]);
   const initials = profile.displayName.split(' ').map((part) => part[0]).join('');
 
   useEffect(() => {
@@ -104,17 +201,25 @@ export function App() {
   }, [pathname, section]);
 
   useEffect(() => {
+    if (aboutHasActive) setAboutOpen(true);
+  }, [aboutHasActive, pathname]);
+
+  useEffect(() => {
     if (latest && assessment && latest.sol >= seed.startSol) syncFollowUps(latest, assessment, scenarioId);
   }, [latest, assessment, scenarioId, seed.startSol, syncFollowUps]);
 
   function submit(entry: CheckinEntry) {
     saveCheckin(entry);
+    setVoiceDraft(undefined);
     void confirmTap();
     navigate('/assessment');
   }
 
   function switchScenario(scenarioId: ScenarioId) {
     loadScenario(scenarioId);
+    setVoiceDraft(undefined);
+    setRadiationRoom('flight-deck');
+    resetRadiationSim();
     navigate('/');
   }
 
@@ -128,6 +233,9 @@ export function App() {
     try {
       resetDemo();
       resetFollowUps();
+      setVoiceDraft(undefined);
+      setRadiationRoom('flight-deck');
+      resetRadiationSim();
       setRevision((value) => value + 1);
       resetDialog.current?.close();
       navigate('/');
@@ -148,12 +256,23 @@ export function App() {
         <div className="sidebar-body">
           <p className="sidebar-label">Crew health</p>
           <nav aria-label="Main navigation" className="side-nav">
-            {navigation.map(({ to, label, Icon }) => (
-              <NavLink end={to === '/'} key={to} to={to}>
-                <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
-                <span>{label}</span>
-              </NavLink>
-            ))}
+            {primaryNavigation.map((item) => <NavItemLink key={item.to} item={item} pathname={pathname} />)}
+            <div className="side-nav-group" data-has-active={aboutHasActive || undefined}>
+              <button
+                type="button"
+                className="side-nav-group-toggle"
+                aria-expanded={aboutOpen}
+                aria-controls="side-nav-about"
+                onClick={() => setAboutOpen((open) => !open)}
+              >
+                <Info size={18} strokeWidth={1.65} aria-hidden="true" />
+                <span>About</span>
+                <ChevronDown size={16} className="side-nav-chevron" aria-hidden="true" />
+              </button>
+              <div id="side-nav-about" className="side-nav-submenu" hidden={!aboutOpen}>
+                {aboutNavigation.map((item) => <NavItemLink key={item.to} item={item} pathname={pathname} />)}
+              </div>
+            </div>
           </nav>
         </div>
 
@@ -188,14 +307,15 @@ export function App() {
                 sol={startSol}
                 profile={profile}
                 demoPrefill={sol === seed.startSol ? prefill : undefined}
-                initialEntry={isLogged && latest ? entryFromCheckin(latest) : undefined}
+                voiceDraft={voiceDraft?.scope === draftScope ? voiceDraft.patches : undefined}
+                onAssistantDraft={setCheckinDraft}
                 onSubmit={submit}
               />
             } />
             <Route path="/cognitive" element={<CognitiveLab key={`${scenarioId}:${sol}:${revision}`} currentSol={sol}
               history={vigilance} onSave={(session) => saveVigilance(scenarioId, session)} />} />
             <Route path="/hazards" element={<NasaHazards />} />
-            <Route path="/hazards/radiation" element={<RadiationHazard scenario={scenario} />} />
+            <Route path="/hazards/radiation" element={<RadiationHazard scenario={scenario} onInspectRoom={setRadiationRoom} />} />
             <Route path="/radiation" element={<Navigate to="/hazards/radiation" replace />} />
             <Route path="/space-radiation" element={<Navigate to="/hazards/radiation" replace />} />
             <Route path="/hazards/distance" element={<DistanceHazard scenario={scenario} />} />
@@ -207,7 +327,7 @@ export function App() {
             <Route path="/assessment" element={<Assessment key={`${scenarioId}:${revision}`} assessment={assessment} records={records}
               mission={scenario.missionContext} scenarioId={scenarioId} vigilance={vigilance} />} />
             <Route path="/cmo" element={<CrewMedicalOfficer key={`${scenarioId}:${sol}:${revision}`} scenario={scenario}
-              scenarioId={scenarioId} latest={latest} assessment={assessment} records={records} vigilance={vigilance} />} />
+              scenarioId={scenarioId} latest={latest} assessment={assessment} records={records} vigilance={vigilance} onAssistantReview={setOfficerReview} />} />
             <Route path="/trends" element={
               <RouteErrorBoundary name="Trends">
                 <Suspense fallback={<p role="status">Loading trends…</p>}>
@@ -215,9 +335,9 @@ export function App() {
                 </Suspense>
               </RouteErrorBoundary>
             } />
-            <Route path="/timeline" element={<Timeline key={mission.scenarioId} scenario={scenario} records={records} />} />
+            <Route path="/timeline" element={<Timeline key={mission.scenarioId} scenario={scenario} records={records} onInspect={setTimelineSol} voiceControl={timelineControl} />} />
             <Route path="/demo" element={<DemoData scenario={scenario} records={records} scenarioId={mission.scenarioId} onLoad={switchScenario} />} />
-            <Route path="/assistant" element={<AskSol scenario={scenario} records={records} latest={latest} assessment={assessment} />} />
+            <Route path="/assistant" element={<AskSol ctx={assistantContext} onAction={applySolAction} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <footer className="workspace-footer">
@@ -232,10 +352,8 @@ export function App() {
           const item = navigation.find((entry) => entry.to === to)!;
           const isCheckin = to === '/check-in';
           return (
-            <NavLink end={to === '/'} key={to} to={to} className={isCheckin ? 'bottom-nav-checkin' : undefined}>
-              <item.Icon size={isCheckin ? 24 : 20} strokeWidth={1.75} aria-hidden="true" />
-              <span>{isCheckin ? 'Check-in' : item.label}</span>
-            </NavLink>
+            <NavItemLink key={to} item={item} pathname={pathname} className={isCheckin ? 'bottom-nav-checkin' : undefined}
+              iconSize={isCheckin ? 24 : 20} strokeWidth={1.75} text={isCheckin ? 'Check-in' : item.label} />
           );
         })}
         <button type="button" aria-expanded={moreOpen} aria-controls="more-sheet" onClick={() => setMoreOpen((open) => !open)}>
@@ -244,16 +362,16 @@ export function App() {
         </button>
       </nav>
       <div id="more-sheet" className="more-sheet" data-open={moreOpen} hidden={!moreOpen}>
-        {navigation.filter(({ to }) => !(bottomNavigation as readonly string[]).includes(to)).map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to}>
-            <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
-            <span>{label}</span>
-          </NavLink>
+        {navigation.filter(({ to }) => !(bottomNavigation as readonly string[]).includes(to)).map((item) => (
+          <NavItemLink key={item.to} item={item} pathname={pathname} />
         ))}
         <button type="button" onClick={openReset}>
           <RotateCcw size={18} aria-hidden="true" /> <span>Reset demo</span>
         </button>
       </div>
+
+      <SolDock ctx={assistantContext} onAction={applySolAction} />
+      {controlled && <div className="sol-control-bar" role="status"><span className="sr-only">Sol is controlling this page</span></div>}
 
       <dialog className="reset-dialog glossary-dialog" ref={glossaryDialog} aria-labelledby="glossary-title">
         <button type="button" className="dialog-close" aria-label="Close" onClick={() => glossaryDialog.current?.close()}>

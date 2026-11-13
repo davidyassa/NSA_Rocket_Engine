@@ -69,6 +69,17 @@ describe('Mission Health Action Center & Follow-Up Engine', () => {
     expect(qualityTask?.status).toBe('awaiting_measurement');
   });
 
+  it('adds one low-priority manual pulse task for a heart-sound estimate', () => {
+    const checkin: DailyCheckin = {
+      ...dummyCheckin,
+      measurements: dummyCheckin.measurements.map((m) => ({ ...m, source: 'microphone_estimate' })),
+    };
+    const tasks = generateFollowUpTasks(checkin, dummyAssessment);
+    expect(tasks).toHaveLength(3);
+    expect(tasks).toContainEqual(expect.objectContaining({ metric: 'heart_rate', priority: 'low', assignedRole: 'astronaut' }));
+    expect(generateFollowUpTasks(checkin, dummyAssessment, tasks)).toEqual(tasks);
+  });
+
   it('preserves existing tasks and tracks audit trail across state transitions', () => {
     const initialTasks = generateFollowUpTasks(dummyCheckin, dummyAssessment);
     const task = initialTasks[0];

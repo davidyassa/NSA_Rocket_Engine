@@ -6,12 +6,9 @@
  */
 import { env, pipeline, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers';
 
-const vendor = new URL('../vendor/', self.location.href);
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
-env.localModelPath = new URL('whisper/', vendor).href;
 if (env.backends.onnx.wasm) {
-  env.backends.onnx.wasm.wasmPaths = new URL('ort/', vendor).href;
   env.backends.onnx.wasm.numThreads = 1; // no cross-origin isolation needed
 }
 
@@ -31,10 +28,13 @@ function load() {
   return asr;
 }
 
-self.onmessage = async (event: MessageEvent<{ type: 'load' } | { type: 'transcribe'; id: number; audio: Float32Array }>) => {
+self.onmessage = async (event: MessageEvent<{ type: 'load'; vendorUrl: string } | { type: 'transcribe'; id: number; audio: Float32Array }>) => {
   const message = event.data;
   try {
     if (message.type === 'load') {
+      // The worker lives under src/ in dev and assets/ in the built app.
+      env.localModelPath = new URL('whisper/', message.vendorUrl).href;
+      if (env.backends.onnx.wasm) env.backends.onnx.wasm.wasmPaths = new URL('ort/', message.vendorUrl).href;
       await load();
       self.postMessage({ type: 'ready' });
     } else if (message.type === 'transcribe') {

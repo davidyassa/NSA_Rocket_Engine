@@ -24,6 +24,9 @@ import {
   HRV_DROP_FRACTION,
   ENERGY_MIN_KCAL,
   BODY_MASS_DROP,
+  VOICE_MARKERS,
+  VOICE_MIN_MARKERS,
+  VOICE_PERSONAL_SD,
   MOTION_SICKNESS_SYMPTOMS,
   ORTHOSTATIC,
   DEMO_DELTAS,
@@ -35,6 +38,7 @@ import {
 } from './rules';
 
 export { RULES } from './rules';
+export { supersedeSubsumedFindings } from './supersession';
 
 type Measurements = Map<MetricId, HealthMeasurement>;
 type Issues = Map<MetricId, string>;
@@ -365,9 +369,18 @@ function assessCo2(recent: readonly ReviewedCheckin[], context?: AssessmentConte
   return finding('co2-headache-context', 'contextual_association', `Headaches were reported when habitat CO2 was at or above ${CO2_LIMIT_MMHG} mmHg: ${detail}. Timing alone cannot establish a cause.`);
 }
 
-function assessBreathing(current: ReviewedCheckin): Finding | null {
+function assessBreathing(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]): Finding | null {
   const today = current.measurements.get('respiratory_rate');
   if (!today) return null;
+  if (today.source === 'microphone_estimate') {
+    const baseline = buildBaseline('respiratory_rate', prior);
+    if (!baseline) return null;
+    const direction = deltaDirection(today.value, baseline);
+    if (direction === 0) return null;
+    const relation = direction < 0 ? 'below' : 'above';
+    return finding('breathing-rate-range', 'observation',
+      `Breathing rate ${today.value} breaths/min is ${relation} the personal usual of ${baseline.median} breaths/min.`, [today.id], [baseline]);
+  }
   if (today.value < BREATHING_RANGE.low) {
     return finding('breathing-rate-range', 'observation', `Breathing rate ${today.value} breaths/min is below the usual resting range (${BREATHING_RANGE.low}–${BREATHING_RANGE.high}).`, [today.id]);
   }
@@ -383,6 +396,33 @@ function assessHrv(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]):
   const baseline = buildBaseline('hrv_rmssd', prior);
   if (!baseline || today.value >= baseline.median * HRV_DROP_FRACTION) return null;
   return finding('hrv-below-usual', 'observation', `HRV (RMSSD) ${today.value} ms is below ${Math.round(HRV_DROP_FRACTION * 100)}% of the personal usual of ${Math.round(baseline.median)} ms.`, [today.id], [baseline]);
+}
+
+/** Voice check: two of three markers moved the tired way against the person's own usual. */
+function assessVoice(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]): Finding | null {
+  const moved: { label: string; detail: string; id: string; baseline: Baseline }[] = [];
+  let measured = 0;
+  for (const { metric, lowDirection } of VOICE_MARKERS) {
+    const today = current.measurements.get(metric);
+    if (!today) continue;
+    const baseline = buildBaseline(metric, prior);
+    if (!baseline) continue;
+    measured += 1;
+    const change = (today.value - baseline.median) * lowDirection;
+    const personalSd = 1.4826 * (baseline.mad ?? 0);
+    if (change >= DEMO_DELTAS[metric] && change >= VOICE_PERSONAL_SD * personalSd) {
+      const { label, unitLabel } = METRICS[metric];
+      moved.push({ label, detail: `${label.toLowerCase()} ${today.value} ${unitLabel} vs usual ${Math.round(baseline.median * 100) / 100}`, id: today.id, baseline });
+    }
+  }
+  if (measured < VOICE_MIN_MARKERS || moved.length < VOICE_MIN_MARKERS) return null;
+  return finding(
+    'voice-change-from-usual',
+    'observation',
+    `Voice check: ${moved.length} of ${VOICE_MARKERS.length} markers moved the tired way compared with the personal usual (${moved.map(({ detail }) => detail).join('; ')}).`,
+    moved.map(({ id }) => id),
+    moved.map(({ baseline }) => baseline),
+  );
 }
 
 function assessEnergy(current: ReviewedCheckin, recent: readonly ReviewedCheckin[]): Finding | null {
@@ -450,9 +490,14 @@ function assessOptionalReadings(
     : null;
   const findings = [
     orthostatic, assessHydration(current, recent), assessExercise(current, recent), assessMotionSickness(checkin),
-    assessSans(checkin), assessCo2(recent, context), assessBreathing(current), assessHrv(current, prior),
+    assessSans(checkin), assessCo2(recent, context), assessBreathing(current, prior), assessHrv(current, prior),
     assessEnergy(current, recent), bodyMass?.finding, kidney, crisis, assessBoneKidneyCompound(recent),
   ].filter((result): result is Finding => result != null);
+  const voice = assessVoice(current, prior);
+  if (voice) {
+    findings.push(voice);
+    if (statusPriority.change_from_baseline > statusPriority[domainStatuses.behavioral]) domainStatuses.behavioral = 'change_from_baseline';
+  }
   const needsMedicalOfficer = Boolean(orthostatic || kidney || crisis || bodyMass?.cmo)
     || present(checkin, 'vision_changes') || present(checkin, 'vomiting');
   return { findings, needsMedicalOfficer };
@@ -553,7 +598,7 @@ export function evaluateCheckin(
     dataQualityWarnings,
     recommendedTier: needsMedicalOfficer ? 'crew_medical_officer' : 'self_care',
     actionCardIds: actionCardIds.length > 0 ? actionCardIds : ['record-and-monitor'],
-    engineVersion: '1.6.0',
+    engineVersion: '1.7.0',
     overallState,
   };
 }

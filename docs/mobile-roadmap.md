@@ -117,8 +117,8 @@ Capacitor's WebChromeClient turns the WebView's camera request into the runtime 
    mid-scan; confirm tracks stop on route change.
 2. **iOS WebView inspection.** Use Safari ▸ Develop ▸ Simulator to confirm `esm.mjs` imports
    and the 3D view on iOS, as was done on Android.
-3. **WebGL and memory on low-end Android.** The 3D view falls back to the 2D body map if WebGL
-   fails; check the 2.7 MB GLB on a budget phone.
+3. **WebGL and memory on low-end Android.** Check the 2.7 MB crew GLB on a budget phone
+   and confirm the health links stay available if the model cannot load.
 4. **Signing and store upload.** Debug builds only so far; release needs a team Apple
    Developer account and an Android upload keystore.
 

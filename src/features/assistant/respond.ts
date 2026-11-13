@@ -5,14 +5,17 @@
  *  1. crisis words      → talk to the crew medical officer or a crewmate now (no counselling);
  *  2. emergency symptoms → tell the crew medical officer now;
  *  3. medicine / dose / diagnosis requests → politely declined (Sol Check never prescribes or diagnoses);
- *  4. "my …" questions  → the person's own readings, baseline and findings;
- *  5. everything else   → passages from Sol Check's cited knowledge, or "I only answer from…".
+ *  4. everyday greetings, farewells and help;
+ *  5. "my …" questions  → the person's own readings, baseline and findings;
+ *  6. everything else   → passages from Sol Check's cited knowledge, or "I only answer from…".
  */
 import type { DailyCheckin, MetricId, RiskAssessment } from '../../contracts';
 import { METRICS } from '../../contracts';
 import { PLAIN_FIELD_LABEL, PLAIN_NEXT_STEP, plainFinding } from '../../content/plainLanguage';
 import { metricBaseline, usableMeasurement } from '../../engine';
 import { KnowledgeIndex, tokenize, type KnowledgeDoc } from './knowledge';
+import type { MissionEvidence } from './missionAnswers';
+import { URGENT_CREW, URGENT_CRISIS } from './urgentSpeech';
 
 export interface AssistantContext {
   crewName: string;
@@ -21,9 +24,10 @@ export interface AssistantContext {
   latest: DailyCheckin | null;
   assessment: RiskAssessment | null;
   history: readonly DailyCheckin[];
+  mission?: MissionEvidence;
 }
 
-export type ReplyKind = 'help' | 'crisis' | 'urgent' | 'declined' | 'personal' | 'answer' | 'out_of_scope' | 'mood_start';
+export type ReplyKind = 'help' | 'farewell' | 'crisis' | 'urgent' | 'declined' | 'personal' | 'answer' | 'out_of_scope' | 'mood_start';
 
 export interface AssistantReply {
   kind: ReplyKind;
@@ -42,11 +46,20 @@ const MEDICINE = /\b(medicine|medicines|medication|drug|drugs|pill|pills|tablet|
 const DIAGNOSIS = /\b(diagnos\w*|do i have|have i got|am i sick|is it (cancer|serious)|what disease)\b/i;
 // Voice transcription often hears "mood" as "mode" or "mud".
 const MOOD = /\b((mood|mode|mud|moon) (check|chat|test)|check (my|in on my) (mood|mode)|how i feel|my feelings|feel(ing)? (sad|down|low|stressed|anxious|lonely|overwhelmed|tired)|i'?m (sad|down|low|stressed|anxious|lonely|overwhelmed))\b/i;
-const HELP = /^\s*(hi|hello|hey|help|salam|marhaba|what can you do|who are you)\b/i;
+// Whisper can transcribe the assistant's name as "Soul" or "Saul".
+const GREETING = /^(?:hi|hello|hey|salam|marhaba|good (?:morning|afternoon|evening))\b(?:[\s,.!?]+(?:there|sol|soul|saul)\b)*[\s,.!?;:–—-]*/i;
+const HELP = /^(?:help(?: me)?|what can you do|who are you)[.!?]*$/i;
+const HOW_ARE_YOU = /^how are you(?: doing)?(?: today)?(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
+const THANKS = /^(?:thanks|thank you)(?: so much| very much| a lot)?(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
+const FAREWELL = /^(?:(?:okay|ok|thanks|thank you)[\s,.!?]+)*(?:good[ -]?bye|bye(?:[- ]bye)?|see you(?: later| soon| around)?|talk to you later|take care|good night)(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
+const STARTERS = ['How am I doing today?', 'Why does CO2 cause headaches?', 'Start a mood check'];
 const PERSONAL = /\b(my|mine|me|am i|i am|i'm|how am i|today'?s)\b/i;
 const SUMMARY = /\b(how am i( doing)?|my (results|assessment|status|health)|what should i do|what do i do|anything wrong|am i ok(ay)?)\b/i;
 
 const METRIC_WORDS: [RegExp, MetricId][] = [
+  [/\b(standing systolic)\b/i, 'bp_systolic_standing'],
+  [/\b(standing diastolic)\b/i, 'bp_diastolic_standing'],
+  [/\b(hrv|heart rate variability)\b/i, 'hrv_rmssd'],
   [/\b(standing (pulse|heart))\b/i, 'heart_rate_standing'],
   [/\b(heart ?rate|pulse|bpm|heartbeat)\b/i, 'heart_rate'],
   [/\b(blood pressure|bp|systolic)\b/i, 'bp_systolic'],
@@ -56,7 +69,9 @@ const METRIC_WORDS: [RegExp, MetricId][] = [
   [/\b(sleep|slept)\b/i, 'sleep_duration'],
   [/\bmood\b/i, 'mood'],
   [/\b(breathing|breath|respiratory)\b/i, 'respiratory_rate'],
-  [/\b(hrv|heart rate variability)\b/i, 'hrv_rmssd'],
+  [/\b(voice pitch|pitch movement)\b/i, 'voice_pitch_variability'],
+  [/\b(speaking pace|articulation rate)\b/i, 'voice_articulation_rate'],
+  [/\b(time in pauses|voice pause)\b/i, 'voice_pause_ratio'],
   [/\b(water|fluid|drink)\w*/i, 'fluid_intake'],
   [/\b(exercise|workout|training)\b/i, 'exercise_minutes'],
   [/\b(calorie|food|eat|kcal)\w*/i, 'calorie_intake'],
@@ -125,19 +140,19 @@ function glossaryAnswer(q: string, index: KnowledgeIndex): AssistantReply | null
   };
 }
 
-export function respond(question: string, ctx: AssistantContext, index: KnowledgeIndex): AssistantReply {
-  const q = question.trim();
+export function respond(question: string, ctx: AssistantContext, index: KnowledgeIndex, intentsOnly = false): AssistantReply {
+  let q = question.trim();
   if (!q) return { kind: 'help', text: 'Ask me anything about your health check-in, life on the mission, or the NASA research Sol Check uses.', sources: [] };
 
   if (CRISIS.test(q)) {
     return {
       kind: 'crisis',
-      text: `I'm really glad you said something. Please talk to your crew medical officer or a crewmate you trust right now, in person. You do not have to wait ${ctx.oneWayDelayMinutes * 2} minutes for Earth: your crew is here. Stay with someone and take a break from critical tasks. I'm a helper, not a counsellor, so a person needs to hear this.`,
+      text: `${URGENT_CRISIS} You do not have to wait ${ctx.oneWayDelayMinutes * 2} minutes for Earth. Stay with someone and take a break from critical tasks.`,
       sources: [{ label: 'Talk to someone now (action card)', route: '/assessment' }, { label: 'NASA behavioral health risk', url: 'https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders' }],
     };
   }
   if (URGENT.test(q)) {
-    return { kind: 'urgent', text: 'That needs a person now. Tell your crew medical officer straight away and follow your crew’s emergency procedure. Don’t wait for a check-in or for Earth.', sources: [{ label: 'Crew medical officer console', route: '/cmo' }] };
+    return { kind: 'urgent', text: `${URGENT_CREW} Follow your crew’s emergency procedure. Don’t wait for a check-in or for Earth.`, sources: [{ label: 'Crew medical officer console', route: '/cmo' }] };
   }
   if (MEDICINE.test(q) || DIAGNOSIS.test(q)) {
     // Share related, non-treatment facts about the topic only (e.g. the headache), never about the medicine.
@@ -150,19 +165,45 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
       sources: hit && hit.score >= MIN_SCORE ? [hit.doc.cite] : [{ label: 'Crew medical officer console', route: '/cmo' }],
     };
   }
+  const firstName = ctx.crewName.split(' ')[0];
+  const greeting = q.match(GREETING)?.[0];
+  if (greeting) {
+    q = q.slice(greeting.length);
+    if (!q) {
+      return { kind: 'help', text: `Hi ${firstName}! What can I help you with today?`, sources: [], suggestions: STARTERS };
+    }
+  }
+  if (FAREWELL.test(q)) {
+    return { kind: 'farewell', text: `Goodbye, ${firstName}. Take care!`, sources: [] };
+  }
+  if (HOW_ARE_YOU.test(q)) {
+    return { kind: 'help', text: 'I’m here and ready to help. How are you doing today?', sources: [], suggestions: STARTERS };
+  }
+  if (THANKS.test(q)) {
+    return { kind: 'help', text: 'You’re welcome! I’m here if you need anything else.', sources: [] };
+  }
   if (HELP.test(q)) {
     return {
       kind: 'help',
-      text: `Hi ${ctx.crewName.split(' ')[0]}. I answer only from Sol Check’s NASA-based health information and your own check-in, and I show where each answer comes from. I can explain your results, how to measure something, why it matters in space, the five spaceflight hazards, or the real NASA data in the app. I can also run a short mood check. I don’t diagnose or recommend medicines.`,
+      text: `Hi ${firstName}. I answer only from Sol Check’s NASA-based health information and your own check-in, and I show where each answer comes from. I can explain your results, how to measure something, why it matters in space, the five spaceflight hazards, or the real NASA data in the app. I can also run a short mood check. I don’t diagnose or recommend medicines.`,
       sources: [],
-      suggestions: ['How am I doing today?', 'Why does CO2 cause headaches?', 'Start a mood check'],
+      suggestions: STARTERS,
     };
   }
   if (MOOD.test(q)) {
     return { kind: 'mood_start', text: 'Let’s do a short mood check: six quick questions, about one minute. Pick the answer closest to how you feel right now.', sources: [{ label: 'Sol Check mood questions', route: '/check-in' }] };
   }
+  if (intentsOnly) return { kind: 'help', text: '', sources: [] };
   if (SUMMARY.test(q)) return personalSummary(ctx);
   if (PERSONAL.test(q)) {
+    if (/\b(?:blood pressure|bp)\b/i.test(q) && !/\b(?:systolic|diastolic)\b/i.test(q)) {
+      const standing = /\bstanding\b/i.test(q);
+      const top = ctx.latest && usableMeasurement(ctx.latest, standing ? 'bp_systolic_standing' : 'bp_systolic');
+      const bottom = ctx.latest && usableMeasurement(ctx.latest, standing ? 'bp_diastolic_standing' : 'bp_diastolic');
+      return { kind: 'personal', text: top && bottom
+        ? `Your ${standing ? 'standing' : 'seated'} blood pressure on Sol ${ctx.latest?.sol} was ${top.value} over ${bottom.value} millimetres of mercury.${[top, bottom].some(x => x.provenance === 'synthetic_demo') ? ' This pair includes demo data.' : ''}`
+        : 'There is no complete usable blood pressure pair in your latest saved check-in.', sources: [{ label: 'Your check-in', route: '/check-in' }] };
+    }
     const metric = METRIC_WORDS.find(([pattern]) => pattern.test(q))?.[1];
     if (metric) return personalMetric(metric, ctx);
   }

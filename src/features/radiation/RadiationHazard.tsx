@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -10,15 +10,23 @@ import {
   Footprints,
   Lock,
   MapPin,
+  Pause,
   Pill,
+  Play,
   Radiation,
   RefreshCw,
+  RotateCcw,
   Salad,
   Shield,
   ShieldCheck,
+  SkipForward,
+  Thermometer,
   Timer,
   Unlock,
   Users,
+  Volume2,
+  VolumeX,
+  Wind,
 } from 'lucide-react';
 import type { DemoScenario } from '../../contracts';
 import { RadiationStationMap } from './RadiationStationMap';
@@ -30,28 +38,43 @@ import {
   evaluateRoomAccess,
   evaluateVehicleRadiationStatus,
   localizeDirectionalEvent,
-  type CARNSensorTelemetry,
   type CrewRadiationProfile,
-  type PostEventRecoveryState,
 } from './radiationEngine';
 import {
   DEFAULT_CREW_ROSTER,
+  ENVIRONMENT_SCENARIOS,
+  ENVIRONMENT_SCENARIO_MAP,
   SPACECRAFT_COMPARTMENTS,
   TELEMETRY_PRESETS,
+  frameNowMs,
   generateCARNTimeline,
+  telemetryFromFrame,
 } from './radiationData';
+import {
+  inferEnvironmentEvent,
+  summarizeEnvironment,
+  type CompartmentSnapshot,
+} from './compartmentEnvironmentEngine';
+import { useRadiationSimStore } from './radiationSimStore';
 import './radiation.css';
 
-export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
-  // Preset scenario state: GREEN, YELLOW, ORANGE, RED, or RECOVERY
-  const [activePresetKey, setActivePresetKey] = useState<keyof typeof TELEMETRY_PRESETS>('GREEN');
-  const [telemetry, setTelemetry] = useState<Record<string, CARNSensorTelemetry>>(
-    TELEMETRY_PRESETS.GREEN.telemetry,
-  );
-  const [recoveryState, setRecoveryState] = useState<PostEventRecoveryState | undefined>(undefined);
+function fmtAvg(value: number | null, digits: number, unit: string) {
+  return value === null ? 'Unavailable' : `${value.toFixed(digits)} ${unit}`;
+}
+
+export function RadiationHazard({ scenario, onInspectRoom }: {
+  scenario?: DemoScenario;
+  onInspectRoom?: (roomId: string) => void;
+}) {
+  // Scenario + sample live in the shared sim store so the dashboard shows the same condition.
+  const activeScenarioKey = useRadiationSimStore((state) => state.scenarioKey);
+  const frameIndex = useRadiationSimStore((state) => state.frameIndex);
+  const selectSimScenario = useRadiationSimStore((state) => state.selectScenario);
+  const setFrameIndex = useRadiationSimStore((state) => state.setFrameIndex);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // Selected crew member for personalized gauge & routing
-  const [selectedCrewId, setSelectedCrewId] = useState<string>(DEFAULT_CREW_ROSTER[1].id); // Dr. Maya Lin (Specialist)
+  const [selectedCrewId, setSelectedCrewId] = useState<string>(DEFAULT_CREW_ROSTER[1].id);
   // Selected compartment for CARN telemetry inspection & timeline
   const [selectedRoomId, setSelectedRoomId] = useState<string>('flight-deck');
   // Timeline chart resolution
@@ -64,12 +87,43 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
   const [assay48Done, setAssay48Done] = useState(false);
   const [reopenPhasedDone, setReopenPhasedDone] = useState(false);
 
-  // Switch simulation preset
-  function handlePresetChange(key: keyof typeof TELEMETRY_PRESETS) {
-    setActivePresetKey(key);
-    setTelemetry(TELEMETRY_PRESETS[key].telemetry);
-    setRecoveryState(TELEMETRY_PRESETS[key].recoveryState);
+  // Optional, explicitly user-enabled audio alarm
+  const [alarmSoundEnabled, setAlarmSoundEnabled] = useState(false);
+  const [alarmAcknowledged, setAlarmAcknowledged] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const envScenario = ENVIRONMENT_SCENARIO_MAP[activeScenarioKey] ?? ENVIRONMENT_SCENARIOS[0];
+  const frames = envScenario.frames;
+  const clampedIndex = Math.min(frameIndex, frames.length - 1);
+  const frame = frames[clampedIndex];
+  const nowMs = useMemo(() => frameNowMs(frame), [frame]);
+
+  // CARN radiation telemetry for the existing panels, derived from the current frame.
+  const telemetry = useMemo(() => telemetryFromFrame(frame), [frame]);
+  const snapshotByRoom = useMemo(
+    () => Object.fromEntries(frame.map((reading) => [reading.roomId, reading])) as Record<string, CompartmentSnapshot>,
+    [frame],
+  );
+  const recoveryState = envScenario.recoveryActive ? TELEMETRY_PRESETS.RECOVERY.recoveryState : undefined;
+
+  // Three ISS-wide averages (independent, excludes invalid/stale, never zero-fills).
+  const summary = useMemo(() => summarizeEnvironment(frame, nowMs), [frame, nowMs]);
+
+  // Temporal-spatial event inference over the frames seen so far.
+  const localization = useMemo(
+    () => inferEnvironmentEvent(frames.slice(0, clampedIndex + 1), SPACECRAFT_COMPARTMENTS, nowMs, {
+      recoveryActive: envScenario.recoveryActive,
+    }),
+    [frames, clampedIndex, nowMs, envScenario.recoveryActive],
+  );
+
+  function selectScenario(key: string) {
+    const next = ENVIRONMENT_SCENARIO_MAP[key];
+    if (!next) return;
+    selectSimScenario(key); // jumps straight to the full-state frame
+    setIsPlaying(false);
     setAccountabilityChecked(false);
+    setAlarmAcknowledged(false);
     if (key === 'RECOVERY') {
       setAssay24Done(true);
       setAssay48Done(false);
@@ -77,9 +131,26 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
     }
   }
 
+  function replayFromStart() {
+    if (frames.length <= 1) return;
+    setFrameIndex(0);
+    setIsPlaying(true);
+    setAlarmAcknowledged(false);
+  }
+
+  // Replay transport: advance one frame at a time while playing.
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    if (clampedIndex >= frames.length - 1) {
+      setIsPlaying(false);
+      return undefined;
+    }
+    const id = window.setTimeout(() => setFrameIndex((index) => index + 1), 950);
+    return () => window.clearTimeout(id);
+  }, [isPlaying, clampedIndex, frames.length]);
+
   // Crew radiation calculations
   const crewProfiles = useMemo<CrewRadiationProfile[]>(() => {
-    // Merge scenario profile into roster if available
     if (!scenario) return DEFAULT_CREW_ROSTER;
     return DEFAULT_CREW_ROSTER.map((c) => {
       if (c.role.includes('Specialist') && scenario.profile.displayName) {
@@ -93,84 +164,132 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
     });
   }, [scenario]);
 
-  const crewCalculatedList = useMemo(() => {
-    return crewProfiles.map(calculateCrewDose);
-  }, [crewProfiles]);
+  const crewCalculatedList = useMemo(() => crewProfiles.map(calculateCrewDose), [crewProfiles]);
 
-  const selectedCrewCalculated = useMemo(() => {
-    return (
-      crewCalculatedList.find((c) => c.crewId === selectedCrewId) ?? crewCalculatedList[0]
-    );
-  }, [crewCalculatedList, selectedCrewId]);
+  const selectedCrewCalculated = useMemo(
+    () => crewCalculatedList.find((c) => c.crewId === selectedCrewId) ?? crewCalculatedList[0],
+    [crewCalculatedList, selectedCrewId],
+  );
 
-  const selectedCrewProfile = useMemo(() => {
-    return (
-      crewProfiles.find((c) => c.id === selectedCrewId) ?? crewProfiles[0]
-    );
-  }, [crewProfiles, selectedCrewId]);
+  const selectedCrewProfile = useMemo(
+    () => crewProfiles.find((c) => c.id === selectedCrewId) ?? crewProfiles[0],
+    [crewProfiles, selectedCrewId],
+  );
 
-  // Vehicle-wide status assessment
-  const vehicleAssessment = useMemo(() => {
-    return evaluateVehicleRadiationStatus(
-      SPACECRAFT_COMPARTMENTS,
-      telemetry,
-      crewCalculatedList,
-      recoveryState,
-    );
-  }, [telemetry, crewCalculatedList, recoveryState]);
+  const vehicleAssessment = useMemo(
+    () => evaluateVehicleRadiationStatus(SPACECRAFT_COMPARTMENTS, telemetry, crewCalculatedList, recoveryState),
+    [telemetry, crewCalculatedList, recoveryState],
+  );
 
-  // Directional event localization
-  const directionalEvent = useMemo(() => {
-    return localizeDirectionalEvent(SPACECRAFT_COMPARTMENTS, telemetry);
-  }, [telemetry]);
+  useEffect(() => { onInspectRoom?.(selectedRoomId); }, [onInspectRoom, selectedRoomId]);
 
-  // Dynamic Room Access Matrix for all crew x all compartments
-  const accessMatrix = useMemo(() => {
-    return crewProfiles.map((crew, cIdx) => {
-      const calculated = crewCalculatedList[cIdx];
-      const roomEvaluations = SPACECRAFT_COMPARTMENTS.map((room) => {
-        const roomTelemetry = telemetry[room.id] ?? {
-          roomId: room.id,
-          doseRateMsvH: 0.08,
-          projectedDailyMsv: 1.92,
-          particleFlux: 100,
-          timestamp: new Date().toISOString(),
-        };
-        const isEvacUnderway =
-          vehicleAssessment.status === 'ORANGE' || vehicleAssessment.status === 'RED';
-        return evaluateRoomAccess(room, roomTelemetry, calculated, crew, isEvacUnderway);
-      });
-      return { crew, calculated, roomEvaluations };
+  const directionalEvent = useMemo(
+    () => localizeDirectionalEvent(SPACECRAFT_COMPARTMENTS, telemetry),
+    [telemetry],
+  );
+
+  const accessMatrix = useMemo(() => crewProfiles.map((crew, cIdx) => {
+    const calculated = crewCalculatedList[cIdx];
+    const roomEvaluations = SPACECRAFT_COMPARTMENTS.map((room) => {
+      const roomTelemetry = telemetry[room.id] ?? {
+        roomId: room.id,
+        doseRateMsvH: 0.08,
+        projectedDailyMsv: 1.92,
+        particleFlux: 100,
+        timestamp: new Date(nowMs).toISOString(),
+      };
+      const isEvacUnderway = vehicleAssessment.status === 'ORANGE' || vehicleAssessment.status === 'RED';
+      return evaluateRoomAccess(room, roomTelemetry, calculated, crew, isEvacUnderway);
     });
-  }, [crewProfiles, crewCalculatedList, telemetry, vehicleAssessment.status]);
+    return { crew, calculated, roomEvaluations };
+  }), [crewProfiles, crewCalculatedList, telemetry, vehicleAssessment.status, nowMs]);
 
-  // Automated lowest-dose evacuation route for selected crew member from their beacon location to storm shelter
   const evacuationRoute = useMemo(() => {
     const startRoom = selectedCrewProfile.lastBeaconLocation || 'flight-deck';
     return computeLowestDosePath(startRoom, 'storm-shelter', SPACECRAFT_COMPARTMENTS, telemetry);
   }, [selectedCrewProfile, telemetry]);
 
-  // Selected compartment details
-  const selectedCompartment = useMemo(() => {
-    return (
-      SPACECRAFT_COMPARTMENTS.find((r) => r.id === selectedRoomId) ?? SPACECRAFT_COMPARTMENTS[0]
-    );
-  }, [selectedRoomId]);
+  // Shelter safety: only call it "SAFE" if the destination is below the acute rate AND reachable.
+  const shelterRate = snapshotByRoom['storm-shelter']?.radiationDoseRateMsvH ?? 0.03;
+  const shelterReachable = evacuationRoute.path[evacuationRoute.path.length - 1] === 'storm-shelter';
+  const shelterSafe = typeof shelterRate === 'number'
+    && shelterRate <= CARN_RATES.ACUTE_BREACH_HOURLY
+    && shelterReachable;
+
+  const selectedCompartment = useMemo(
+    () => SPACECRAFT_COMPARTMENTS.find((r) => r.id === selectedRoomId) ?? SPACECRAFT_COMPARTMENTS[0],
+    [selectedRoomId],
+  );
 
   const selectedTelemetry = telemetry[selectedRoomId] ?? {
     roomId: selectedRoomId,
     doseRateMsvH: 0.08,
     projectedDailyMsv: 1.92,
     particleFlux: 100,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(nowMs).toISOString(),
   };
+  const selectedSnapshot = snapshotByRoom[selectedRoomId];
 
-  // Timeline series for selected room
   const timelinePoints = useMemo(() => {
-    const spikeMul =
-      activePresetKey === 'RED' ? 50 : activePresetKey === 'ORANGE' ? 25 : activePresetKey === 'YELLOW' ? 6 : 1;
+    const peak = localization.peakDoseRateMsvH ?? selectedTelemetry.doseRateMsvH;
+    const spikeMul = peak > 4 ? 50 : peak > 2.1 ? 25 : peak > 0.15 ? 6 : 1;
     return generateCARNTimeline(selectedTelemetry.doseRateMsvH, timelineResolution, spikeMul);
-  }, [selectedTelemetry.doseRateMsvH, timelineResolution, activePresetKey]);
+  }, [selectedTelemetry.doseRateMsvH, timelineResolution, localization.peakDoseRateMsvH]);
+
+  // Optional audio alarm (visual alert always remains; audio never required for safety).
+  const alarm = localization.state === 'ALERT';
+  const soundActive = alarm && alarmSoundEnabled && !alarmAcknowledged;
+  useEffect(() => {
+    if (!soundActive) return undefined;
+    function beep() {
+      try {
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = 880;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const t = ctx.currentTime;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+        osc.start(t);
+        osc.stop(t + 0.33);
+      } catch {
+        /* audio is best-effort only */
+      }
+    }
+    try {
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctor && !audioCtxRef.current) audioCtxRef.current = new Ctor();
+      void audioCtxRef.current?.resume();
+    } catch {
+      /* ignore */
+    }
+    beep();
+    const id = window.setInterval(beep, 1900);
+    return () => window.clearInterval(id);
+  }, [soundActive]);
+
+  useEffect(() => () => {
+    try {
+      void audioCtxRef.current?.close();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const peakRoomName = SPACECRAFT_COMPARTMENTS.find((c) => c.id === localization.peakRoomId)?.name;
+  const firstHitNames = localization.firstHitRoomIds
+    .map((id) => SPACECRAFT_COMPARTMENTS.find((c) => c.id === id)?.name ?? id);
+  const alarmSeverity = (localization.peakDoseRateMsvH ?? 0) > CARN_RATES.SEVERE_STORM_HOURLY ? 'CRITICAL' : 'WARN';
+  const minReporting = Math.min(
+    summary.validCounts.temperature,
+    summary.validCounts.radiation,
+    summary.validCounts.co2,
+  );
 
   return (
     <div className="radiation-container">
@@ -229,7 +348,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           <strong>Trigger Condition:</strong> {vehicleAssessment.conditionMet}
         </p>
 
-        {/* Countermeasures Checklist */}
         <div className="radiation-badge-row">
           {vehicleAssessment.countermeasures.map((cm, idx) => (
             <span key={idx} className="badge" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-control)' }}>
@@ -246,32 +364,82 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             <RefreshCw size={14} style={{ display: 'inline', marginRight: '6px' }} />
             Simulate Transit Conditions & CARN Flare Telemetry
           </span>
-          <span>Click to verify autonomous software responses:</span>
+          <span>Click a scenario, then replay to watch the event unfold:</span>
         </div>
-        <div className="sim-buttons-group" role="group" aria-label="Radiation telemetry scenarios">
-          {(Object.keys(TELEMETRY_PRESETS) as (keyof typeof TELEMETRY_PRESETS)[]).map((key) => {
-            const preset = TELEMETRY_PRESETS[key];
-            const isSelected = activePresetKey === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`sim-button${isSelected ? ' is-active' : ''}`}
-                onClick={() => handlePresetChange(key)}
-                aria-pressed={isSelected}
-              >
-                {key === 'GREEN' && <ShieldCheck size={14} />}
-                {key === 'YELLOW' && <AlertTriangle size={14} />}
-                {key === 'ORANGE' && <AlertTriangle size={14} />}
-                {key === 'RED' && <AlertOctagon size={14} />}
-                {key === 'RECOVERY' && <Activity size={14} />}
-                {preset.name}
-              </button>
-            );
-          })}
+
+        <div className="sim-scenario-groups">
+          <div className="sim-buttons-group" role="group" aria-label="Radiation telemetry scenarios">
+            {ENVIRONMENT_SCENARIOS.filter((s) => s.group === 'preset').map((s) => {
+              const isSelected = activeScenarioKey === s.key;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={`sim-button${isSelected ? ' is-active' : ''}`}
+                  onClick={() => selectScenario(s.key)}
+                  aria-pressed={isSelected}
+                >
+                  {s.key === 'GREEN' && <ShieldCheck size={14} />}
+                  {s.key === 'YELLOW' && <AlertTriangle size={14} />}
+                  {s.key === 'ORANGE' && <AlertTriangle size={14} />}
+                  {s.key === 'RED' && <AlertOctagon size={14} />}
+                  {s.key === 'RECOVERY' && <Activity size={14} />}
+                  {s.name}
+                </button>
+              );
+            })}
+          </div>
+          <div className="sim-buttons-group" role="group" aria-label="Additional demonstration events">
+            {ENVIRONMENT_SCENARIOS.filter((s) => s.group === 'demo').map((s) => {
+              const isSelected = activeScenarioKey === s.key;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={`sim-button sim-button-demo${isSelected ? ' is-active' : ''}`}
+                  onClick={() => selectScenario(s.key)}
+                  aria-pressed={isSelected}
+                >
+                  {s.short}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        <div className="sim-transport">
+          <button
+            type="button"
+            className="button button-sm button-secondary"
+            onClick={() => (isPlaying ? setIsPlaying(false) : replayFromStart())}
+            disabled={frames.length <= 1}
+          >
+            {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+            {isPlaying ? 'Pause' : 'Replay event'}
+          </button>
+          <button
+            type="button"
+            className="button button-sm button-secondary"
+            onClick={() => { setIsPlaying(false); setFrameIndex((i) => Math.min(i + 1, frames.length - 1)); }}
+            disabled={frames.length <= 1 || clampedIndex >= frames.length - 1}
+          >
+            <SkipForward size={14} /> Step
+          </button>
+          <button
+            type="button"
+            className="button button-sm button-secondary"
+            onClick={() => { setIsPlaying(false); setFrameIndex(0); }}
+            disabled={frames.length <= 1 || clampedIndex === 0}
+          >
+            <RotateCcw size={14} /> Reset
+          </button>
+          <span className="sim-frame-indicator">
+            Sample {clampedIndex + 1} / {frames.length}
+          </span>
+        </div>
+
         <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-          {TELEMETRY_PRESETS[activePresetKey].description}
+          {envScenario.description}
         </p>
       </section>
 
@@ -285,7 +453,7 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
                 Spacecraft Compartment Map & CARN Nodes
               </h2>
               <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.82rem' }}>
-                Simulated CARN dose rates (mSv/h), water-equivalent shielding (g/cm²), and corridors.
+                Each node shows temperature (°C), radiation (mSv/h) and CO₂ (mmHg) over the ISS model.
               </p>
             </div>
             <span className="badge">
@@ -293,10 +461,100 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             </span>
           </div>
 
+          {/* Three ISS-wide sensor averages */}
+          <div className="env-averages" role="group" aria-label="ISS-wide sensor averages">
+            <div className="env-averages-head">
+              <span>ISS-WIDE SENSOR AVERAGES</span>
+              <span className="badge badge-synthetic">
+                Simulated · {minReporting}/{summary.totalNodes} nodes reporting
+              </span>
+            </div>
+            <div className="env-averages-row">
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Thermometer size={13} aria-hidden="true" /> Avg Temp</span>
+                <span className="env-avg-value">{fmtAvg(summary.avgTemperatureC, 1, '°C')}</span>
+              </div>
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Radiation size={13} aria-hidden="true" /> Avg Radiation</span>
+                <span className="env-avg-value">{fmtAvg(summary.avgRadiationMsvH, 2, 'mSv/h')}</span>
+              </div>
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Wind size={13} aria-hidden="true" /> Avg CO₂</span>
+                <span className="env-avg-value">{fmtAvg(summary.avgCo2Mmhg, 1, 'mmHg')}</span>
+              </div>
+            </div>
+            <p className="env-averages-foot muted">
+              Averages are the arithmetic mean of valid nodes (including the shelter). Hazard severity uses the
+              peak affected room{peakRoomName ? <> — currently <strong>{peakRoomName}</strong> at {(localization.peakDoseRateMsvH ?? 0).toFixed(2)} mSv/h</> : ''}, not the mean.
+            </p>
+          </div>
+
+          {/* Possible radiation event / environmental alert */}
+          {alarm && (
+            <div className="env-alert env-alert-critical" role="alert">
+              <div className="env-alert-head">
+                <span className="env-alert-sign" aria-hidden="true">⚠️</span>
+                <div>
+                  <strong className="env-alert-title">
+                    POSSIBLE RADIATION EVENT · {alarmSeverity}
+                  </strong>
+                  <p className="env-alert-sector">
+                    {localization.estimatedSector
+                      ? <>Estimated exposure sector (simulation): <strong>{localization.estimatedSector}</strong> · {localization.confidence} confidence</>
+                      : <>Direction uncertain — evidence is diffuse or insufficient</>}
+                  </p>
+                </div>
+                <span className="badge badge-synthetic">Simulated</span>
+              </div>
+              <p className="env-alert-body">
+                {firstHitNames.length > 0 && <>First detected in <strong>{firstHitNames.join(' and ')}</strong>. </>}
+                {localization.temperatureCorroborated
+                  ? 'Temperature rose in those modules as corroboration. '
+                  : 'Temperature did not corroborate; the radiation reading alarms on its own. '}
+                Proceed to the Central Storm Shelter and follow the lowest-dose route below.
+              </p>
+              <div className="env-alert-actions">
+                <button
+                  type="button"
+                  className="button button-xs button-secondary"
+                  onClick={() => setAlarmSoundEnabled((on) => !on)}
+                  aria-pressed={alarmSoundEnabled}
+                >
+                  {alarmSoundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                  {alarmSoundEnabled ? 'Alarm sound on' : 'Enable alarm sound'}
+                </button>
+                {alarmSoundEnabled && (
+                  <button
+                    type="button"
+                    className="button button-xs button-secondary"
+                    onClick={() => setAlarmAcknowledged(true)}
+                    disabled={alarmAcknowledged}
+                  >
+                    {alarmAcknowledged ? 'Audio acknowledged (visual alarm stays)' : 'Acknowledge / mute audio'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {!alarm && (localization.state === 'WATCH' && localization.co2Anomaly) && (
+            <div className="env-alert env-alert-watch" role="status">
+              <div className="env-alert-head">
+                <Wind size={18} aria-hidden="true" />
+                <div>
+                  <strong className="env-alert-title">AIR-QUALITY WATCH — CO₂ elevated</strong>
+                  <p className="env-alert-sector">Independent environmental warning. This is <strong>not</strong> a solar-radiation event.</p>
+                </div>
+                <span className="badge badge-synthetic">Simulated</span>
+              </div>
+            </div>
+          )}
+
           <RadiationStationMap
-            telemetry={telemetry}
+            snapshotByRoom={snapshotByRoom}
             crew={crewProfiles}
             directionalEvent={directionalEvent}
+            localization={localization}
+            shelterSafe={shelterSafe}
             selectedRoomId={selectedRoomId}
             onSelectRoom={setSelectedRoomId}
           />
@@ -313,9 +571,12 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             <p className="muted" style={{ margin: 0, fontSize: '0.84rem' }}>
               {directionalEvent.description}
             </p>
+            <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+              <strong>Temporal estimate:</strong> {localization.explanation}
+            </p>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.82rem', marginTop: '2px' }}>
               <span>
-                Peak Exposed: <strong>{(SPACECRAFT_COMPARTMENTS.find(c => c.id === directionalEvent.primaryExposedModuleId)?.name) ?? 'None'}</strong> (
+                Peak Exposed: <strong>{peakRoomName ?? 'None'}</strong> (
                 {directionalEvent.highestDoseRateMsvH.toFixed(2)} mSv/h)
               </span>
               <span>
@@ -356,6 +617,25 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
                 </>
               )}
             </span>
+          </div>
+
+          {/* Tri-metric readings for the selected node */}
+          <div className="selected-metric-trio">
+            <div className="selected-metric">
+              <span className="muted"><Thermometer size={12} aria-hidden="true" /> Temperature</span>
+              <strong>{selectedSnapshot && typeof selectedSnapshot.temperatureC === 'number'
+                ? `${selectedSnapshot.temperatureC.toFixed(1)} °C` : 'No recent reading'}</strong>
+            </div>
+            <div className="selected-metric">
+              <span className="muted"><Radiation size={12} aria-hidden="true" /> Radiation</span>
+              <strong>{selectedSnapshot && typeof selectedSnapshot.radiationDoseRateMsvH === 'number'
+                ? `${selectedSnapshot.radiationDoseRateMsvH.toFixed(2)} mSv/h` : 'No recent reading'}</strong>
+            </div>
+            <div className="selected-metric">
+              <span className="muted"><Wind size={12} aria-hidden="true" /> CO₂</span>
+              <strong>{selectedSnapshot && typeof selectedSnapshot.co2Mmhg === 'number'
+                ? `${selectedSnapshot.co2Mmhg.toFixed(1)} mmHg` : 'No recent reading'}</strong>
+            </div>
           </div>
 
           {/* Key Metrics */}
@@ -404,22 +684,15 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
               </div>
             </div>
 
-            {/* Simple SVG Chart */}
             <svg className="chart-svg" viewBox="0 0 300 120" role="img" aria-label="CARN time series graph">
-              {/* Threshold Lines */}
-              {/* Safe Baseline line: 0.15 mSv/h */}
               <line x1="0" y1="95" x2="300" y2="95" stroke="var(--status-steady)" strokeWidth="1" strokeDasharray="3 3" />
               <text x="2" y="92" fill="var(--status-steady)" fontSize="7" fontFamily="var(--mono)">
                 0.15 mSv/h Safe Baseline
               </text>
-
-              {/* Acute Breach line: 2.1 mSv/h */}
               <line x1="0" y1="40" x2="300" y2="40" stroke="var(--nasa-red)" strokeWidth="1" strokeDasharray="3 3" />
               <text x="2" y="37" fill="var(--nasa-red)" fontSize="7" fontFamily="var(--mono)">
                 2.10 mSv/h Acute Breach
               </text>
-
-              {/* Sparkline Points */}
               {(() => {
                 const maxVal = Math.max(...timelinePoints.map((p) => p.doseRateMsvH), 2.5);
                 const pathD = timelinePoints
@@ -549,8 +822,7 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             </p>
           </div>
 
-          {/* Crew Selector for Routing */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="evac-crew-picker">
             <label htmlFor="evac-crew-select" className="muted" style={{ fontSize: '0.85rem' }}>
               Select Astronaut:
             </label>
@@ -570,7 +842,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           </div>
         </div>
 
-        {/* Evacuation Summary Info */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '10px', background: 'var(--bg-raised)', borderRadius: '8px' }}>
           <div>
             <span className="muted" style={{ fontSize: '0.75rem' }}>Starting Beacon:</span>{' '}
@@ -578,11 +849,13 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           </div>
           <div>
             <span className="muted" style={{ fontSize: '0.75rem' }}>Destination:</span>{' '}
-            <strong>Central Storm Shelter (Surrounded by Water & Food Stores)</strong>
+            <strong>{shelterSafe
+              ? 'Central Storm Shelter (Surrounded by Water & Food Stores)'
+              : 'Central Storm Shelter — shelter status requires verification'}</strong>
           </div>
           <div>
             <span className="muted" style={{ fontSize: '0.75rem' }}>Total Transit Exposure:</span>{' '}
-            <strong style={{ color: 'var(--status-steady)' }}>
+            <strong style={{ color: shelterSafe ? 'var(--status-steady)' : 'var(--nasa-red)' }}>
               {evacuationRoute.estimatedTransitDoseMsv.toFixed(4)} mSv
             </strong>
           </div>
@@ -594,7 +867,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           )}
         </div>
 
-        {/* Turn-by-turn list */}
         <ol className="evac-steps-list">
           {evacuationRoute.turnByTurn.map((step) => (
             <li key={step.step} className={`evac-step-item${step.isHotzone ? ' is-hotzone' : ''}`}>
@@ -615,7 +887,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           ))}
         </ol>
 
-        {/* 5-minute Shelter Accountability Trigger if in RED mode */}
         {vehicleAssessment.status === 'RED' && (
           <div style={{ padding: '12px', background: 'rgba(255, 105, 77, 0.15)', border: '1px solid var(--nasa-red)', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -642,7 +913,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
 
       {/* Cumulative Career & 30-Day Budget Tracking */}
       <section className="radiation-gauges-grid" aria-labelledby="budgets-heading">
-        {/* Career Effective Dose Gauge */}
         <div className="gauge-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 id="budgets-heading" style={{ margin: 0, fontSize: '1.05rem' }}>
@@ -673,7 +943,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="gauge-track">
             <div
               className="gauge-fill"
@@ -705,7 +974,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             <span style={{ color: 'var(--nasa-red)', fontWeight: 700 }}>600 (100%)</span>
           </div>
 
-          {/* Milestone Warning Box */}
           <div
             style={{
               padding: '10px',
@@ -726,7 +994,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           </div>
         </div>
 
-        {/* Rolling 30-Day Cumulative Dose Gauge */}
         <div className="gauge-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Rolling 30-Day Cumulative Dose</h3>
@@ -755,7 +1022,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="gauge-track">
             <div
               className="gauge-fill"
@@ -779,7 +1045,6 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             <span style={{ color: 'var(--nasa-red)', fontWeight: 700 }}>250 mSv (Breach Threat)</span>
           </div>
 
-          {/* Active Dietary & Pharmacological Countermeasures */}
           <div
             style={{
               padding: '10px',
@@ -798,7 +1063,7 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '8px 0 2px' }}>
               <Pill size={15} color="var(--accent)" />
-              <strong style={{ fontSize: '0.85rem' }}>Prescribed Supplements:</strong>
+              <strong style={{ fontSize: '0.85rem' }}>Recommended Supplements:</strong>
             </div>
             <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
               Vitamin C, Vitamin E, Selenium, N-acetylcysteine (NAC), and Omega-3 fatty acids.
@@ -828,14 +1093,13 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           </span>
         </div>
 
-        {/* 6-hour hysteresis progress */}
         <div className="hysteresis-progress-wrap">
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
             <span>Consecutive Stabilized Hours:</span>
             <strong>
-              {activePresetKey === 'RECOVERY'
+              {activeScenarioKey === 'RECOVERY'
                 ? (recoveryState?.hoursBelowThreshold ?? 3.5).toFixed(1)
-                : activePresetKey === 'GREEN'
+                : activeScenarioKey === 'GREEN'
                 ? '6.0 (Complete)'
                 : '0.0 (Event Active)'}{' '}
               / 6.0 Hours
@@ -846,9 +1110,9 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
               className="hysteresis-fill"
               style={{
                 width: `${
-                  activePresetKey === 'RECOVERY'
+                  activeScenarioKey === 'RECOVERY'
                     ? ((recoveryState?.hoursBelowThreshold ?? 3.5) / 6) * 100
-                    : activePresetKey === 'GREEN'
+                    : activeScenarioKey === 'GREEN'
                     ? 100
                     : 0
                 }%`,
@@ -857,13 +1121,12 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
           </div>
         </div>
 
-        {/* Biometric assay cards */}
         <div className="assay-cards-grid">
           <div className="assay-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong>24-Hour Lymphocyte Assay</strong>
-              <span className={`badge ${assay24Done || activePresetKey === 'RECOVERY' ? 'status-steady' : ''}`}>
-                {assay24Done || activePresetKey === 'RECOVERY' ? '✓ Completed' : 'Pending'}
+              <span className={`badge ${assay24Done || activeScenarioKey === 'RECOVERY' ? 'status-steady' : ''}`}>
+                {assay24Done || activeScenarioKey === 'RECOVERY' ? '✓ Completed' : 'Pending'}
               </span>
             </div>
             <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
@@ -873,9 +1136,9 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
               type="button"
               className="button button-xs button-secondary"
               onClick={() => setAssay24Done(true)}
-              disabled={assay24Done || activePresetKey === 'RECOVERY'}
+              disabled={assay24Done || activeScenarioKey === 'RECOVERY'}
             >
-              {assay24Done || activePresetKey === 'RECOVERY' ? 'Result: 88% Baseline Lymphocytes' : 'Log 24h Finger-Prick Assay'}
+              {assay24Done || activeScenarioKey === 'RECOVERY' ? 'Result: 88% Baseline Lymphocytes' : 'Log 24h Finger-Prick Assay'}
             </button>
           </div>
 
@@ -914,7 +1177,7 @@ export function RadiationHazard({ scenario }: { scenario?: DemoScenario }) {
               className="button button-xs button-primary"
               onClick={() => {
                 setReopenPhasedDone(true);
-                handlePresetChange('GREEN');
+                selectScenario('GREEN');
               }}
             >
               Recalculate Budgets & Restore Access
