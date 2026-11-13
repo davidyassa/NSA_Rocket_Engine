@@ -85,6 +85,23 @@ const ruleDefinitions = {
     actionCardIds: ['record-and-monitor'],
     testCases: ['A single reading at its demo delta is marked as a change.'],
   },
+  'urgent-symptoms': {
+    ruleId: 'urgent-symptoms',
+    version: '1.0.0',
+    metricIds: [],
+    conditions: [
+      'Chest discomfort or shortness of breath is marked present on the current check-in.',
+      'Recommend Crew Medical Officer review without waiting for a personal baseline or a repeated trend.',
+      'Normal or missing measurements do not cancel this recommendation.',
+    ],
+    contextRequirements: ['A current symptom report.'],
+    priority: 95,
+    reason: 'A conservative prototype safety override keeps potentially concerning symptoms visible for onboard medical review; it does not identify a disease or replace the mission medical procedure.',
+    sourceRefs: ['demo-method', 'nasa-monitoring', 'nasa-eimo'],
+    reviewStatus: 'needs_clinical_review',
+    actionCardIds: ['crew-review'],
+    testCases: ['Either concerning symptom escalates even with normal vitals.', 'An unrelated entry problem does not cancel the escalation.'],
+  },
   'reported-symptoms': {
     ruleId: 'reported-symptoms',
     version: '1.0.0',

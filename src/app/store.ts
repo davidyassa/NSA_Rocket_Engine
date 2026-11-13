@@ -33,7 +33,7 @@ function captureOf(reading: HealthMeasurement): MeasurementCapture | null {
   };
 }
 
-function buildCheckin(entry: CheckinEntry, scenario: DemoScenario): DailyCheckin {
+export function buildCheckin(entry: CheckinEntry, scenario: DemoScenario): DailyCheckin {
   const { profile, missionContext, startSol } = scenario;
   const id = `${profile.id}:sol-${startSol}`;
   const observedAtUtc = utcAtSol(missionContext, startSol, 8 * 3600);

@@ -60,6 +60,10 @@ function reviewCheckin(checkin: DailyCheckin): ReviewedCheckin {
       issue = `${metadata.label} belongs to a different crew profile.`;
     } else if (unit !== metadata.unit) {
       issue = `${metadata.label} must use ${metadata.unitLabel}.`;
+    } else if (measurement.status === 'rejected_low_quality') {
+      issue = `${metadata.label} was rejected because its signal quality was insufficient. Repeat the measurement.`;
+    } else if (measurement.status === 'missing' || measurement.status === 'corrected') {
+      issue = `${metadata.label} is not an active measurement and was excluded from the assessment.`;
     }
     if (seen.has(metric)) {
       issue = `More than one ${metadata.label.toLowerCase()} reading was recorded for this sol.`;
@@ -309,14 +313,23 @@ export function evaluateCheckin(
   const symptomResult = assessSymptoms(checkin, recent);
   domainStatuses.symptoms = symptomResult.status;
   findings.push(...symptomResult.findings);
+  const urgentSymptoms = checkin.symptoms.filter(symptom => symptom.present
+    && (symptom.id === 'chest_discomfort' || symptom.id === 'shortness_of_breath'));
+  if (urgentSymptoms.length > 0) {
+    findings.push(finding(
+      'urgent-symptoms',
+      'observation',
+      `${urgentSymptoms.map(symptom => symptom.label).join(' and ')} reported. Crew Medical Officer review is recommended without waiting for a baseline or trend.`,
+    ));
+  }
   findings.sort((left, right) => RULES[right.ruleId].priority - RULES[left.ruleId].priority);
   const actionCardIds = [...new Set(findings.flatMap(({ ruleId }) => RULES[ruleId].actionCardIds))];
 
   let overallState: AssessmentState = 'no_concern_identified';
-  if (dataQualityWarnings.length > 0) {
-    overallState = 'remeasurement_recommended';
-  } else if (sleep && mood) {
+  if (urgentSymptoms.length > 0 || (sleep && mood)) {
     overallState = 'escalation_recommended';
+  } else if (dataQualityWarnings.length > 0) {
+    overallState = 'remeasurement_recommended';
   } else if (findings.some(f => f.kind === 'trend')) {
     overallState = 'attention_required';
   } else if (findings.some(f => f.kind === 'observation')) {
@@ -330,9 +343,9 @@ export function evaluateCheckin(
     findings,
     domainStatuses,
     dataQualityWarnings,
-    recommendedTier: sleep && mood ? 'crew_medical_officer' : 'self_care',
+    recommendedTier: urgentSymptoms.length > 0 || (sleep && mood) ? 'crew_medical_officer' : 'self_care',
     actionCardIds: actionCardIds.length > 0 ? actionCardIds : ['record-and-monitor'],
-    engineVersion: '1.2.0',
+    engineVersion: '1.3.0',
     overallState,
   };
 }
