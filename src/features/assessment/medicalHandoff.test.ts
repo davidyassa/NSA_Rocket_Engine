@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HERO_SCENARIO } from '../../scenarios';
 import { evaluateCheckin } from '../../engine';
+import { summarizeVigilance } from '../cognitive/pvtEngine';
 import {
   generateMedicalHandoffPackage,
   formatMedicalHandoffMarkdown,
@@ -8,6 +9,17 @@ import {
 } from './medicalHandoff';
 
 describe('Exploration Medical Handoff Package & Clinical Evidence Passport', () => {
+  it('includes only matching-sol vigilance results in the verified local handoff', () => {
+    const record = HERO_SCENARIO.history.at(-1)!;
+    const current = summarizeVigilance([250, 510, 'missed'], 'quick', record.sol)!;
+    const previous = { ...current, sol: record.sol - 1 };
+    const pkg = generateMedicalHandoffPackage(record, null, undefined, undefined, undefined, [previous, current]);
+
+    expect(pkg.vigilanceObservations).toEqual([current]);
+    expect(formatMedicalHandoffMarkdown(pkg)).toContain('Mean reaction time 380 ms · 2 lapses');
+    expect(verifyMedicalHandoffPackage(JSON.parse(JSON.stringify(pkg)))).toMatchObject({ valid: true });
+    expect(verifyMedicalHandoffPackage({ ...pkg, vigilanceObservations: [previous] })).toMatchObject({ valid: false });
+  });
   it('generates a complete, structured medical handoff package for Sol 43 check-in', () => {
     const history = HERO_SCENARIO.history;
     const latest = history[history.length - 1];

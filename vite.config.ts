@@ -113,6 +113,16 @@ export default defineConfig({
           '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb}',
           '**/+esm',
         ],
+        // The on-device voice model (~63 MB) is not part of the first load. It is
+        // downloaded when someone turns voice on, then cached for offline use.
+        globIgnores: ['**/vendor/whisper/**', '**/vendor/ort/**', '**/assets/ort-wasm*'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /\/vendor\/(whisper|ort)\//.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'sol-check-voice-model', cacheableResponse: { statuses: [0, 200] } },
+          },
+        ],
       },
     }),
   ],

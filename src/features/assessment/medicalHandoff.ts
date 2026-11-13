@@ -8,6 +8,7 @@ import {
 import { ACTION_CARDS } from '../../content';
 import { NASA_FIVE_HAZARDS } from '../hazards/hazardsData';
 import { measurementOriginLabel } from './groundSummary';
+import { sessionsForSol, vigilanceSessionSchema, VIGILANCE_MODES, type VigilanceSession } from '../cognitive/vigilance';
 
 const nullableString = z.string().nullable();
 const sourceSchema = z.enum([
@@ -64,6 +65,7 @@ export const medicalHandoffPackageSchema = z.object({
     reviewStatus: reviewStatusSchema,
   }).strict()),
   dataQualityWarnings: z.array(z.string()),
+  vigilanceObservations: z.array(vigilanceSessionSchema).optional(),
   localDraft: z.object({
     preparedBy: z.string().min(1),
     clinicianReviewStatus: z.literal('not_reviewed'),
@@ -92,7 +94,9 @@ export function generateMedicalHandoffPackage(
   astronautName = 'Maya Chen',
   communicationLatencyOneWayMin = 20,
   generatedAtUtc = new Date().toISOString(),
+  vigilance: readonly VigilanceSession[] = [],
 ): MedicalHandoffPackage {
+  const sessions = sessionsForSol(vigilance, record.sol);
   const content: HandoffContent = {
     schemaVersion: '1.1.0',
     generatedAtUtc,
@@ -147,6 +151,7 @@ export function generateMedicalHandoffPackage(
       }] : [];
     }),
     dataQualityWarnings: assessment?.dataQualityWarnings ?? [],
+    ...(sessions.length > 0 ? { vigilanceObservations: sessions.map((session) => vigilanceSessionSchema.parse(session)) } : {}),
   };
 
   return medicalHandoffPackageSchema.parse({
@@ -202,6 +207,13 @@ export function formatMedicalHandoffMarkdown(pkg: MedicalHandoffPackage): string
       observation.device ? `Device: ${observation.device}` : null,
     ].filter((detail): detail is string => detail !== null);
     lines.push(`- **${observation.indicator}:** ${observation.value} ${observation.unit} (${details.join('; ')})`);
+  }
+
+  if (pkg.vigilanceObservations?.length) {
+    lines.push('', '### Prototype vigilance results');
+    for (const session of pkg.vigilanceObservations) {
+      lines.push(`- ${VIGILANCE_MODES[session.mode].label} · Mean reaction time ${session.meanRtMs ?? 'unavailable'}${session.meanRtMs === null ? '' : ' ms'} · ${session.lapsesCount} lapses · ${session.validTrials}/${session.totalTrials} valid responses`);
+    }
   }
 
   lines.push('', '## 2. Reported symptoms');

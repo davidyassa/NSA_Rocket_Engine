@@ -1,0 +1,70 @@
+.voice-mode {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; grid-template-rows: auto 1fr auto auto auto; justify-items: center; align-items: center; gap: 12px;
+  padding: max(16px, var(--safe-top, 0px)) 16px max(20px, var(--safe-bottom, 0px));
+  background: var(--bg-base); color: var(--text-primary); overflow-y: auto;
+}
+.voice-close { justify-self: end; min-width: 44px; min-height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-control); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; }
+
+/* The orb: a spinning Mars globe that drops in, then reacts to the voice. */
+.voice-orb-stage {
+  --size: clamp(180px, 46vw, 260px);
+  position: relative; width: var(--size); height: var(--size);
+  animation: voice-orb-drop 1100ms cubic-bezier(.22, 1.2, .36, 1) both;
+}
+.voice-orb {
+  --level: 0;
+  position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+  transform: scale(calc(1 + var(--level) * .16));
+  transition: transform 90ms linear;
+  box-shadow: 0 28px 60px rgba(0, 0, 0, .45);
+}
+.voice-orb-surface {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 200%;
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22400%22%20height%3D%22200%22%20viewBox%3D%220%200%20400%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23d9774a%22/%3E%3Cstop%20offset%3D%22.5%22%20stop-color%3D%22%23b5482a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%238f3519%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%22400%22%20height%3D%22200%22%20fill%3D%22url%28%23g%29%22/%3E%3Cellipse%20cx%3D%22160%22%20cy%3D%2280%22%20rx%3D%2214%22%20ry%3D%2215%22%20fill%3D%22%236b2414%22%20opacity%3D%220.49%22/%3E%3Cellipse%20cx%3D%22265%22%20cy%3D%22116%22%20rx%3D%2219%22%20ry%3D%2213%22%20fill%3D%22%236b2414%22%20opacity%3D%220.49%22/%3E%3Cellipse%20cx%3D%22296%22%20cy%3D%22128%22%20rx%3D%2230%22%20ry%3D%2210%22%20fill%3D%22%236b2414%22%20opacity%3D%220.39%22/%3E%3Cellipse%20cx%3D%2281%22%20cy%3D%22135%22%20rx%3D%2214%22%20ry%3D%2212%22%20fill%3D%22%236b2414%22%20opacity%3D%220.51%22/%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%22141%22%20rx%3D%2211%22%20ry%3D%2215%22%20fill%3D%22%236b2414%22%20opacity%3D%220.56%22/%3E%3Cellipse%20cx%3D%22103%22%20cy%3D%22135%22%20rx%3D%2228%22%20ry%3D%226%22%20fill%3D%22%236b2414%22%20opacity%3D%220.52%22/%3E%3Cellipse%20cx%3D%2272%22%20cy%3D%22155%22%20rx%3D%2227%22%20ry%3D%2216%22%20fill%3D%22%236b2414%22%20opacity%3D%220.36%22/%3E%3Cellipse%20cx%3D%22138%22%20cy%3D%22123%22%20rx%3D%2225%22%20ry%3D%227%22%20fill%3D%22%236b2414%22%20opacity%3D%220.57%22/%3E%3Cellipse%20cx%3D%22318%22%20cy%3D%2288%22%20rx%3D%2214%22%20ry%3D%2212%22%20fill%3D%22%236b2414%22%20opacity%3D%220.45%22/%3E%3Cellipse%20cx%3D%22256%22%20cy%3D%22109%22%20rx%3D%2219%22%20ry%3D%225%22%20fill%3D%22%236b2414%22%20opacity%3D%220.38%22/%3E%3Cellipse%20cx%3D%22186%22%20cy%3D%22135%22%20rx%3D%2220%22%20ry%3D%2213%22%20fill%3D%22%236b2414%22%20opacity%3D%220.48%22/%3E%3Cellipse%20cx%3D%22329%22%20cy%3D%22127%22%20rx%3D%2218%22%20ry%3D%227%22%20fill%3D%22%236b2414%22%20opacity%3D%220.37%22/%3E%3Cellipse%20cx%3D%2243%22%20cy%3D%22150%22%20rx%3D%2231%22%20ry%3D%2213%22%20fill%3D%22%236b2414%22%20opacity%3D%220.38%22/%3E%3Cellipse%20cx%3D%22255%22%20cy%3D%2269%22%20rx%3D%2231%22%20ry%3D%2212%22%20fill%3D%22%236b2414%22%20opacity%3D%220.54%22/%3E%3Ccircle%20cx%3D%22238%22%20cy%3D%2294%22%20r%3D%227%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22362%22%20cy%3D%2271%22%20r%3D%225%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22282%22%20cy%3D%22128%22%20r%3D%225%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22183%22%20cy%3D%22166%22%20r%3D%224%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%2299%22%20cy%3D%22129%22%20r%3D%224%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22339%22%20cy%3D%2282%22%20r%3D%228%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22158%22%20cy%3D%22155%22%20r%3D%227%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%22281%22%20cy%3D%2268%22%20r%3D%224%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%2236%22%20cy%3D%2263%22%20r%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Ccircle%20cx%3D%2248%22%20cy%3D%2271%22%20r%3D%226%22%20fill%3D%22none%22%20stroke%3D%22%23e8a06f%22%20stroke-width%3D%221.5%22%20opacity%3D%22.45%22/%3E%3Crect%20width%3D%22400%22%20height%3D%2222%22%20fill%3D%22%23f3e6d8%22%20opacity%3D%22.85%22/%3E%3Crect%20y%3D%22186%22%20width%3D%22400%22%20height%3D%2214%22%20fill%3D%22%23f3e6d8%22%20opacity%3D%22.55%22/%3E%3C/svg%3E") repeat-x left center / 50% 100%;
+  animation: voice-orb-spin 18s linear infinite;
+}
+.voice-orb-shade {
+  position: absolute; inset: 0; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 236, 214, .55) 0%, rgba(255, 236, 214, 0) 34%),
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0) 52%, rgba(20, 6, 2, .75) 100%);
+}
+.voice-orb-ring {
+  position: absolute; inset: -14%; border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  transform: rotateX(72deg);
+  animation: voice-ring-spin 9s linear infinite;
+}
+.phase-loading .voice-orb { filter: saturate(.4) brightness(.8); }
+.phase-loading .voice-orb-ring, .phase-thinking .voice-orb-ring { border-style: dashed; animation-duration: 2.4s; }
+.phase-thinking .voice-orb-surface { animation-duration: 5s; }
+.phase-hearing .voice-orb-ring { border-color: var(--accent); }
+.phase-speaking .voice-orb { animation: voice-orb-talk 1.4s ease-in-out infinite; }
+.phase-error .voice-orb { filter: grayscale(1) brightness(.6); }
+
+@keyframes voice-orb-drop {
+  0% { transform: translateY(-70vh) scale(.7); opacity: 0; }
+  55% { transform: translateY(0) scale(1.08, .9); opacity: 1; }
+  72% { transform: translateY(-22px) scale(.97, 1.03); }
+  86% { transform: translateY(0) scale(1.02, .98); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes voice-orb-spin { to { transform: translateX(-50%); } }
+@keyframes voice-ring-spin { to { transform: rotateX(72deg) rotateZ(360deg); } }
+@keyframes voice-orb-talk { 50% { transform: scale(1.05); } }
+
+.voice-status { margin: 0; font-size: 1.25rem; font-weight: 600; text-align: center; }
+.voice-transcript { width: min(640px, 100%); display: grid; gap: 8px; min-height: 4.5em; }
+.voice-transcript p { margin: 0; line-height: 1.5; }
+.voice-transcript span { display: inline-block; min-width: 2.6em; font-weight: 700; color: var(--text-secondary); }
+.voice-sol { color: var(--text-primary); }
+.voice-you { color: var(--text-secondary); }
+.voice-sources { font-size: .875rem; color: var(--text-muted); }
+.voice-error { color: var(--text-primary); padding: 12px; border: 1px solid var(--status-trend); border-radius: 8px; background: var(--tint-trend); }
+.voice-controls { display: grid; justify-items: center; gap: 8px; }
+.voice-privacy { display: inline-flex; align-items: center; gap: 6px; font-size: .875rem; color: var(--text-secondary); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb-stage, .voice-orb-surface, .voice-orb-ring, .phase-speaking .voice-orb { animation: none; }
+}

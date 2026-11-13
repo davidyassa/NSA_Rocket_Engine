@@ -8,3 +8,6 @@ coverage/
 logs/
 bugtrace/
 *.textClipping
+
+# Internal AI prompts and working notes: kept locally, not published
+internal/

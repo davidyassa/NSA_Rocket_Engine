@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, ExternalLink, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
+  CORE_SYMPTOM_OPTIONS,
   METRIC_IDS,
   METRICS,
   SYMPTOM_OPTIONS,
@@ -14,34 +15,36 @@ import { MEASUREMENT_GUIDES, SOURCES } from '../../content';
 import { CameraPulseCheck, type CameraVitalsEstimate } from './CameraPulseCheck';
 import type { CameraPulseEstimate } from './pulseQuality';
 import { FIELD_HINTS, PLAIN_FIELD_LABEL } from '../../content/plainLanguage';
+import {
+  MOOD_QUESTIONS,
+  evaluateFullMoodAssessment,
+  type MoodMcqAnswers,
+  type MoodEvaluationContext,
+} from './moodAssessment';
 import './checkin.css';
 
 interface CheckinProps {
   sol: number;
   profile: AstronautProfile;
-  demoPrefill: CheckinEntry['values'];
+  demoPrefill?: CheckinEntry['values'];
   initialEntry?: CheckinEntry;
   onSubmit: (entry: CheckinEntry) => void;
 }
 
-/** One short page per measurement, then symptoms, then a review. */
+/** 8 sequential pages: Heart Rate (Pulse), Breathing & HRV, Blood Pressure, Temperature & Sugar, Sleep, Mood, Symptoms & Activity, Review & Save */
 const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: string }[] = [
-  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Type your resting pulse, or let the camera measure it for you.' },
-  { id: 'breath', title: 'Breathing & HRV', metrics: ['respiratory_rate', 'hrv_rmssd'], intro: 'Optional, about 45 seconds. The camera reads your breathing rate and heart rate variability from the same face scan. No camera? Count your breaths for 60 seconds.' },
-  { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic'], intro: 'Use the arm cuff, then type both numbers from the screen.' },
-  { id: 'stand', title: 'Stand-up test', metrics: ['bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Optional, about 3 minutes. Stand up and measure again to check how your body copes with gravity. Skip it if you feel unwell.' },
-  { id: 'temperature', title: 'Body temperature', metrics: ['body_temp'], intro: 'Use the thermometer and type the reading in °C.' },
-  { id: 'sugar', title: 'Blood sugar', metrics: ['blood_glucose'], intro: 'Use the finger-prick meter and type the number in mg/dL.' },
-  { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'How many hours did you actually sleep last night?' },
-  { id: 'mood', title: 'Mood', metrics: ['mood'], intro: 'Pick the number closest to how you feel right now.' },
-  { id: 'water', title: 'Water & exercise', metrics: ['fluid_intake', 'exercise_minutes'], intro: 'Your daily countermeasures: what you drank and how long you exercised.' },
-  { id: 'food', title: 'Food & weight', metrics: ['calorie_intake', 'body_mass'], intro: 'Optional. Far from Earth there is no resupply, so eating enough matters. Add up today’s food labels and weigh yourself.' },
-  { id: 'feel', title: 'How you feel', metrics: [], intro: 'Tick anything you noticed today. Leave it empty if you feel fine.' },
-  { id: 'review', title: 'Review & save', metrics: [], intro: 'Check your answers. Tap Edit to change anything.' },
+  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Page 1 of 8: Type your resting pulse, or start the camera to read it automatically.' },
+  { id: 'breath', title: 'Breathing & HRV', metrics: ['respiratory_rate', 'hrv_rmssd'], intro: 'Page 2 of 8: Camera-derived breathing rate and heart rate variability (HRV), or enter breath count manually.' },
+  { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic', 'bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Page 3 of 8: Use the arm cuff to record seated blood pressure (mmHg). Includes optional stand-up test.' },
+  { id: 'temp_sugar', title: 'Temperature & Sugar', metrics: ['body_temp', 'blood_glucose'], intro: 'Page 4 of 8: Core body temperature (°C) with thermometer and blood glucose (mg/dL) with finger-prick meter.' },
+  { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'Page 5 of 8: How many hours did you actually sleep last night?' },
+  { id: 'mood', title: 'Mood', metrics: ['mood'], intro: 'Page 6 of 8: Complete the 6-question psychological assessment. Score and clinical adjustments are computed live.' },
+  { id: 'feel', title: 'How you feel & Activity', metrics: ['fluid_intake', 'exercise_minutes', 'calorie_intake', 'body_mass'], intro: 'Page 7 of 8: Tick any symptoms noticed today, log your daily countermeasures (water, exercise, food, weight), and any notes.' },
+  { id: 'review', title: 'Review & save', metrics: [], intro: 'Page 8 of 8: Review all answers from Pages 1–7. Tap Edit to change anything, then save your check-in.' },
 ];
 const REVIEW_STEP = STEPS.length - 1;
 const FEEL_STEP = STEPS.findIndex(step => step.id === 'feel');
-const MEASUREMENT_STEPS = STEPS.filter(step => step.metrics.length > 0);
+const EXTRA_SYMPTOMS = SYMPTOM_OPTIONS.slice(CORE_SYMPTOM_OPTIONS.length);
 
 /** Symptom checkboxes grouped so related ones sit together. */
 const SYMPTOM_GROUPS: { title: string; ids: string[] }[] = [
@@ -107,16 +110,81 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   const [saveError, setSaveError] = useState('');
   const [capture, setCapture] = useState<CheckinEntry['capture']>(() => initialEntry?.capture ?? {});
   const formRef = useRef<HTMLFormElement>(null);
-  // Editing an existing check-in opens on the review page; a new one starts at heart rate.
   const [step, setStep] = useState(initialEntry ? REVIEW_STEP : 0);
-  const [reviewVisited, setReviewVisited] = useState(Boolean(initialEntry));
   const [focusTarget, setFocusTarget] = useState<string | null>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
 
+  // Standardized 6-question Crew Mood Assessment MCQ state
+  const [mcqAnswers, setMcqAnswers] = useState<MoodMcqAnswers>(() => {
+    const existing = initialEntry?.values?.mood;
+    if (existing && existing >= 1 && existing <= 5) {
+      return {
+        q1_emotional_state: existing,
+        q2_sleep_restfulness: existing,
+        q3_workload: existing,
+        q4_crew_connection: existing,
+        q5_focus_concentration: existing,
+        q6_physical_comfort: existing,
+      };
+    }
+    return {};
+  });
+  const [isManualMoodOverride, setIsManualMoodOverride] = useState(false);
+
+  // Cross-metric context evaluation
+  const sitSys = Number(draft.bp_systolic);
+  const standSys = Number(draft.bp_systolic_standing);
+  const sitDia = Number(draft.bp_diastolic);
+  const standDia = Number(draft.bp_diastolic_standing);
+  const sitHr = Number(draft.heart_rate);
+  const standHr = Number(draft.heart_rate_standing);
+
+  const hasOrthostatic = (
+    (!isNaN(sitSys) && !isNaN(standSys) && sitSys - standSys >= 20) ||
+    (!isNaN(sitDia) && !isNaN(standDia) && sitDia - standDia >= 10) ||
+    (!isNaN(sitHr) && !isNaN(standHr) && standHr - sitHr >= 30)
+  );
+
+  const moodEvaluationContext: MoodEvaluationContext = {
+    symptomIds,
+    sleepDuration: draft.sleep_duration ? Number(draft.sleep_duration) : undefined,
+    fluidIntakeLiters: draft.fluid_intake ? Number(draft.fluid_intake) : undefined,
+    exerciseMinutes: draft.exercise_minutes ? Number(draft.exercise_minutes) : undefined,
+    hasOrthostaticIntolerance: hasOrthostatic,
+    habitatCo2Mmhg: 1.2,
+    personalMedianBaseline: 4,
+  };
+
+  const moodAssessment = evaluateFullMoodAssessment(mcqAnswers, moodEvaluationContext);
+
+  useEffect(() => {
+    if (!isManualMoodOverride && moodAssessment.finalIntegerScore !== null && Object.keys(mcqAnswers).length > 0) {
+      const scoreStr = String(moodAssessment.finalIntegerScore);
+      if (draft.mood !== scoreStr) {
+        setDraft(prev => ({ ...prev, mood: scoreStr }));
+        setErrors(prev => {
+          if (!prev.mood) return prev;
+          const next = { ...prev };
+          delete next.mood;
+          return next;
+        });
+      }
+    }
+  }, [moodAssessment.finalIntegerScore, mcqAnswers, isManualMoodOverride, draft.mood]);
+
+  function handleSelectMcq(questionId: keyof MoodMcqAnswers, score: number) {
+    setIsManualMoodOverride(false);
+    const updated = { ...mcqAnswers, [questionId]: score };
+    setMcqAnswers(updated);
+    const evaluated = evaluateFullMoodAssessment(updated, moodEvaluationContext);
+    if (evaluated.finalIntegerScore !== null) {
+      edit('mood', String(evaluated.finalIntegerScore));
+    }
+  }
+
   function goTo(next: number, focusId?: string) {
     const clamped = Math.min(REVIEW_STEP, Math.max(0, next));
-    if (clamped === REVIEW_STEP) setReviewVisited(true);
     setStep(clamped);
     setFocusTarget(focusId ?? null);
   }
@@ -151,11 +219,26 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   }
 
   function fillDemo() {
-    setDraft(readingDraft(demoPrefill));
-    setPrefilled(METRIC_IDS.filter(metric => demoPrefill[metric] !== undefined));
+    if (!demoPrefill) return;
+    const filled = METRIC_IDS.filter(metric => demoPrefill[metric] !== undefined);
+    const values = readingDraft(demoPrefill);
+    setDraft(values);
+    setPrefilled(filled);
     setCapture({});
     setErrors({});
     setSaveError('');
+    if (demoPrefill.mood) {
+      const m = Number(demoPrefill.mood);
+      setMcqAnswers({
+        q1_emotional_state: m,
+        q2_sleep_restfulness: m,
+        q3_workload: m,
+        q4_crew_connection: m,
+        q5_focus_concentration: m,
+        q6_physical_comfort: m,
+      });
+      setIsManualMoodOverride(false);
+    }
     goTo(REVIEW_STEP);
   }
 
@@ -271,7 +354,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
-    if (submitter?.dataset.action !== 'save' && step !== REVIEW_STEP) {
+    if (submitter?.dataset.action !== 'save' && step < REVIEW_STEP) {
       next(); // Enter key or Next button
       return;
     }
@@ -291,8 +374,24 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
         captureForSubmit[metric] = capture[metric];
       }
     }
+    if (values.mood !== undefined && provenance.mood === 'user_entered') {
+      captureForSubmit.mood = {
+        capturedAtUtc: new Date().toISOString(),
+        source: 'self_report',
+        status: 'accepted',
+        signalQuality: moodAssessment.isComplete ? 1.0 : 0.6,
+        algorithm: 'NASA CHRA-M-04 standardized 6-question MCQ scoring engine',
+        device: 'crew terminal',
+        synthetic: false,
+      };
+    }
     try {
-      onSubmit({ values, symptomIds, note: note.trim(), provenance, capture: captureForSubmit });
+      const hasExtras = METRIC_IDS.some(metric => METRICS[metric].optional && values[metric] !== undefined)
+        || EXTRA_SYMPTOMS.some(({ id }) => symptomIds.includes(id));
+      onSubmit({
+        values, symptomIds, note: note.trim(), provenance, capture: captureForSubmit,
+        assessmentScope: hasExtras ? 'extended' : 'core',
+      });
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Could not save this check-in. Try again.');
     }
@@ -321,7 +420,13 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
         <p className="reading-hint" id={`${id}-hint`}>{FIELD_HINTS[metric]}</p>
         <div className="reading-control">
           {metric === 'mood' ? (
-            <select {...fieldProps} onChange={event => edit(metric, event.target.value)}>
+            <select
+              {...fieldProps}
+              onChange={event => {
+                setIsManualMoodOverride(true);
+                edit(metric, event.target.value);
+              }}
+            >
               <option value="">Not measured</option>
               {moodChoices.map((choice, index) => (
                 <option key={choice} value={index + 1}>{choice}</option>
@@ -333,7 +438,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
               type="text"
               inputMode="decimal"
               autoComplete="off"
-              placeholder="—"
+              placeholder="Not measured"
               onChange={event => edit(metric, event.target.value)}
             />
           )}
@@ -356,12 +461,34 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     );
   }
 
+  function symptomOption({ id, label }: { id: string; label: string }) {
+    return (
+      <label key={id} className="symptom-option" htmlFor={`symptom-${id}`}>
+        <input id={`symptom-${id}`} type="checkbox" value={id} checked={symptomIds.includes(id)}
+          onChange={({ target: { checked } }) => setSymptomIds(previous => checked
+            ? [...previous, id]
+            : previous.filter(value => value !== id))} />
+        {label}
+      </label>
+    );
+  }
+
+  const noteField = (
+    <>
+      <label className="checkin-note-label" htmlFor="checkin-note">Anything else? <span>Optional</span></label>
+      <textarea id="checkin-note" rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
+    </>
+  );
   const current = STEPS[step];
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
   const displayValue = (metric: MetricId) => {
     const raw = draft[metric]?.trim();
     if (!raw) return null;
-    if (metric === 'mood') return moodChoices[Number(raw) - 1] ?? raw;
+    if (metric === 'mood') {
+      const choice = moodChoices[Number(raw) - 1] ?? raw;
+      const mcqSuffix = moodAssessment.rawMean !== null ? ` (MCQ: ${moodAssessment.rawMean}/5)` : '';
+      return `${choice}${mcqSuffix}`;
+    }
     return `${raw} ${METRICS[metric].unitLabel}`;
   };
 
@@ -370,21 +497,31 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
       <header className="page-intro checkin-intro">
         <div>
           <h1>Check-in</h1>
-          <p className="muted">Sol {sol}. One question at a time for {profile.displayName}. You can skip anything you did not measure.</p>
+          <p className="muted">Sol {sol} · {profile.displayName}. 8-step guided health check-in.</p>
         </div>
         <div className="checkin-intro-actions">
           {profile.isSynthetic && <span className="badge badge-synthetic">Synthetic crew profile</span>}
-          <button className="button button-sm button-secondary" type="button" onClick={fillDemo}>
-            Fill demo readings
-          </button>
+          {demoPrefill && (
+            <button className="button button-sm button-secondary" type="button" onClick={fillDemo}>
+              Fill demo readings
+            </button>
+          )}
+          <span className="badge badge-subtle" style={{ fontSize: '0.85rem' }}>
+            Page {step + 1} of {STEPS.length}
+          </span>
         </div>
       </header>
 
       <form ref={formRef} className="checkin-wizard" noValidate onSubmit={submit}>
         <nav className="wizard-progress" aria-label="Check-in steps">
-          <p className="wizard-progress-label">
-            Step {step + 1} of {STEPS.length} · <strong>{current.title}</strong>
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 4px' }}>
+            <p className="wizard-progress-label" style={{ margin: 0 }}>
+              Page <strong>{step + 1}</strong> of <strong>{STEPS.length}</strong> · <strong>{current.title}</strong>
+            </p>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontFamily: 'var(--mono)' }}>
+              {progress}%
+            </span>
+          </div>
           <div className="wizard-progress-track" role="progressbar" aria-label="Check-in progress"
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
             <div className="wizard-progress-fill" style={{ width: `${progress}%` }} />
@@ -417,70 +554,272 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
             hidden={index !== step}
             aria-labelledby={`step-title-${item.id}`}
           >
-            <h2 id={`step-title-${item.id}`} ref={index === step ? stepHeading : undefined} tabIndex={-1}>{item.title}</h2>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+              <h2 id={`step-title-${item.id}`} ref={index === step ? stepHeading : undefined} tabIndex={-1}>{item.title}</h2>
+              <span className="badge badge-subtle" style={{ fontSize: '0.85rem' }}>Page {index + 1} of {STEPS.length}</span>
+            </div>
             <p className="wizard-intro">{item.intro}</p>
 
-            {item.metrics.length > 0 && (
+            {/* Page 1: Heart rate */}
+            {item.id === 'heart' && (
               <fieldset className="checkin-metric">
-                {item.metrics.length > 1 && <legend className="sr-only">{item.title}</legend>}
-                <div className={item.metrics.length > 1 ? 'pressure-grid' : undefined}>
-                  {item.metrics.map(readingField)}
+                <legend className="sr-only">Heart rate</legend>
+                <div className="reading-field">
+                  {readingField('heart_rate')}
                 </div>
-                {/* The camera only runs while the heart-rate page is open. */}
-                {item.id === 'heart' && index === step && (
+                {index === step && (
                   <CameraPulseCheck onAcceptEstimate={acceptCameraEstimate} />
                 )}
-                {item.id === 'breath' && index === step && (
-                  <CameraPulseCheck mode="breathing" onAcceptVitals={acceptCameraVitals} />
-                )}
-                {item.id === 'breath' && (capture.respiratory_rate?.source === 'camera_estimate' || capture.hrv_rmssd?.source === 'camera_estimate') && (
+                {capture.heart_rate?.source === 'camera_estimate' && (
                   <p className="checkin-capture-note">
-                    These values came from the camera. Typing a new number replaces it with your own entry.
+                    ✓ Heart rate captured from camera. Typing a new number replaces it with manual entry.
                   </p>
                 )}
-                {item.id === 'heart' && capture.heart_rate?.source === 'camera_estimate' && (
-                  <p className="checkin-capture-note">
-                    This value came from the camera. Typing a new number replaces it with your own entry.
-                  </p>
-                )}
-                <MeasurementGuide metric={item.metrics[0]} label={item.metrics.length > 1 ? item.title : METRICS[item.metrics[0]].label} />
+                <MeasurementGuide metric="heart_rate" label="Heart rate" />
               </fieldset>
             )}
 
-            {item.id === 'feel' && (
-              <div className="checkin-context">
-                {SYMPTOM_GROUPS.map(group => (
-                <fieldset className="symptom-group" key={group.title}>
-                <legend>{group.title}</legend>
-                <div className="symptom-list">
-                  {SYMPTOM_OPTIONS.filter(symptom => group.ids.includes(symptom.id)).map(symptom => (
-                    <label key={symptom.id} className="symptom-option" htmlFor={`symptom-${symptom.id}`}>
-                      <input
-                        id={`symptom-${symptom.id}`}
-                        type="checkbox"
-                        value={symptom.id}
-                        checked={symptomIds.includes(symptom.id)}
-                        onChange={event => {
-                          const checked = event.target.checked;
-                          setSymptomIds(previous => checked
-                            ? [...previous, symptom.id]
-                            : previous.filter(id => id !== symptom.id));
-                        }}
-                      />
-                      {symptom.label}
-                    </label>
-                  ))}
+            {/* Page 2: Breathing & HRV */}
+            {item.id === 'breath' && (
+              <fieldset className="checkin-metric">
+                <legend className="sr-only">Breathing and HRV</legend>
+                <div className="pressure-grid">
+                  {readingField('respiratory_rate')}
+                  {readingField('hrv_rmssd')}
                 </div>
-                </fieldset>
-                ))}
-                <label className="checkin-note-label" htmlFor="checkin-note">Anything else? <span>Optional</span></label>
-                <textarea id="checkin-note" rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
+                {index === step && (
+                  <CameraPulseCheck mode="breathing" onAcceptVitals={acceptCameraVitals} />
+                )}
+                {(capture.respiratory_rate?.source === 'camera_estimate' || capture.hrv_rmssd?.source === 'camera_estimate') && (
+                  <p className="checkin-capture-note">
+                    ✓ Vitals captured from camera. Typing a new number replaces it with manual entry.
+                  </p>
+                )}
+                <MeasurementGuide metric="respiratory_rate" label="Breathing rate" />
+              </fieldset>
+            )}
+
+            {/* Page 3: Blood pressure & stand-up test */}
+            {item.id === 'pressure' && (
+              <fieldset className="checkin-metric">
+                <legend className="sr-only">Blood pressure</legend>
+                <div className="pressure-grid">
+                  {readingField('bp_systolic')}
+                  {readingField('bp_diastolic')}
+                </div>
+                <MeasurementGuide metric="bp_systolic" label="Blood pressure" />
+
+                <details className="checkin-extra-symptoms" style={{ marginTop: '1.2rem' }} open={Boolean(draft.bp_systolic_standing || draft.bp_diastolic_standing || draft.heart_rate_standing) || undefined}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--accent)' }}>Optional: Stand-up (orthostatic) test</summary>
+                  <p className="wizard-intro" style={{ margin: '0.4rem 0 0.8rem', fontSize: '0.88rem' }}>
+                    Stand up for 3 minutes, then re-measure blood pressure and pulse to test cardiovascular adaptation to gravity.
+                  </p>
+                  <div className="pressure-grid">
+                    {readingField('bp_systolic_standing')}
+                    {readingField('bp_diastolic_standing')}
+                    {readingField('heart_rate_standing')}
+                  </div>
+                </details>
+              </fieldset>
+            )}
+
+            {/* Page 4: Temperature & Sugar */}
+            {item.id === 'temp_sugar' && (
+              <fieldset className="checkin-metric">
+                <legend className="sr-only">Temperature and Blood Sugar</legend>
+                <div className="pressure-grid">
+                  <div>
+                    {readingField('body_temp')}
+                    <MeasurementGuide metric="body_temp" label="Body temperature" />
+                  </div>
+                  <div>
+                    {readingField('blood_glucose')}
+                    <MeasurementGuide metric="blood_glucose" label="Blood sugar" />
+                  </div>
+                </div>
+              </fieldset>
+            )}
+
+            {/* Page 5: Sleep */}
+            {item.id === 'sleep' && (
+              <fieldset className="checkin-metric">
+                <legend className="sr-only">Sleep</legend>
+                <div className="reading-field">
+                  {readingField('sleep_duration')}
+                </div>
+                <MeasurementGuide metric="sleep_duration" label="Sleep duration" />
+              </fieldset>
+            )}
+
+            {/* Page 6: Mood */}
+            {item.id === 'mood' && (
+              <div className="checkin-metric">
+                <div className="mood-mcq-container">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '0.4rem' }}>
+                    <p className="wizard-intro" style={{ margin: 0 }}>
+                      Standardized Crew Psychological &amp; Behavioral Assessment (6 questions)
+                    </p>
+                    <span className={`badge ${moodAssessment.isComplete ? 'badge-steady' : 'badge-subtle'}`}>
+                      {moodAssessment.isComplete ? '6 of 6 answered' : `${Object.keys(mcqAnswers).length} of 6 answered`}
+                    </span>
+                  </div>
+
+                  {MOOD_QUESTIONS.map(q => {
+                    const selectedScore = mcqAnswers[q.id];
+                    return (
+                      <fieldset key={q.id} className="mood-question-card">
+                        <legend className="sr-only">Question {q.number}: {q.title}</legend>
+                        <div className="mood-question-header">
+                          <span className="mood-q-badge">Q{q.number}</span>
+                          <h3>{q.title}</h3>
+                        </div>
+                        <p className="mood-question-prompt">{q.prompt}</p>
+
+                        <div className="mood-options-list" role="radiogroup" aria-label={`Options for ${q.title}`}>
+                          {q.options.map(option => {
+                            const isSelected = selectedScore === option.score;
+                            return (
+                              <button
+                                key={option.score}
+                                type="button"
+                                role="radio"
+                                aria-checked={isSelected}
+                                className={`mood-option-item${isSelected ? ' is-selected' : ''}`}
+                                onClick={() => handleSelectMcq(q.id, option.score)}
+                              >
+                                <span className="mood-option-score">{option.score}</span>
+                                <span className="mood-option-label">{option.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                    );
+                  })}
+
+                  {/* Clinical Scoring & Cross-Metric Evaluation Panel */}
+                  <div className="mood-evaluation-panel" aria-live="polite">
+                    <div className="mood-eval-header">
+                      <h3 className="mood-eval-title">
+                        <span>Clinical Scoring &amp; Cross-Metric Engine</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>(NASA CHRA-M-04)</span>
+                      </h3>
+                      <span className={`badge ${moodAssessment.isProvisional ? 'badge-warning' : 'badge-steady'}`}>
+                        {moodAssessment.isProvisional ? 'Provisional (Incomplete Data)' : 'Validated Assessment'}
+                      </span>
+                    </div>
+
+                    <div className="mood-scores-summary">
+                      <div className="mood-score-box">
+                        <span className="mood-score-box-label">Step 1: Base MCQ</span>
+                        <span className="mood-score-box-value">
+                          {moodAssessment.rawMean !== null ? `${moodAssessment.rawMean} / 5` : '—'}
+                        </span>
+                        <span className="mood-score-box-sub">
+                          {moodAssessment.baseClassification || 'Pending answers'}
+                        </span>
+                      </div>
+
+                      <div className="mood-score-box">
+                        <span className="mood-score-box-label">Step 2: Adjusted Score</span>
+                        <span className="mood-score-box-value" style={{ color: 'var(--accent)' }}>
+                          {moodAssessment.adjustedScore !== null ? `${moodAssessment.adjustedScore} / 5` : '—'}
+                        </span>
+                        <span className="mood-score-box-sub">
+                          {moodAssessment.modifiers.length > 0 ? `${moodAssessment.modifiers.length} clinical adjustment(s)` : 'No cross-metric penalty'}
+                        </span>
+                      </div>
+
+                      <div className="mood-score-box">
+                        <span className="mood-score-box-label">Final Integer Grade</span>
+                        <span className="mood-score-box-value" style={{ color: 'var(--status-steady)' }}>
+                          {moodAssessment.finalIntegerScore !== null ? `${moodAssessment.finalIntegerScore} / 5` : '—'}
+                        </span>
+                        <span className="mood-score-box-sub">
+                          {moodAssessment.finalClassification || 'Synced to log'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mood-modifiers-section">
+                      <h4 className="mood-modifiers-heading">Clinical Cross-Metric Rules</h4>
+                      {moodAssessment.modifiers.length > 0 ? (
+                        <div className="mood-modifiers-list">
+                          {moodAssessment.modifiers.map(mod => (
+                            <div
+                              key={mod.ruleId}
+                              className={`mood-modifier-badge${mod.ruleId === 'urgent-symptoms' ? ' is-critical' : mod.cmoReview ? ' is-cmo' : ''}`}
+                            >
+                              <div>
+                                <strong>{mod.name}:</strong> {mod.adjustmentDescription}
+                                {mod.cmoReview && (
+                                  <span style={{ display: 'block', fontSize: '0.8rem', marginTop: '2px', fontWeight: 600 }}>
+                                    ⚠ Flagged for Flight Surgeon / CMO Review
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mood-clean-note">
+                          ✓ No cross-metric risk factors detected. Standard psychosocial baseline applied.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {errors.mood && (
+                    <span className="reading-error" role="alert" style={{ display: 'block', marginTop: '0.5rem' }}>
+                      {errors.mood}
+                    </span>
+                  )}
+
+                  {/* Direct Override / Manual Sync details */}
+                  <details style={{ marginTop: '0.6rem' }}>
+                    <summary style={{ cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      Direct reading override / quick select
+                    </summary>
+                    <div style={{ marginTop: '0.6rem' }}>
+                      {readingField('mood')}
+                    </div>
+                  </details>
+
+                  <MeasurementGuide metric="mood" label="Mood" />
+                </div>
               </div>
             )}
 
+            {/* Page 7: How you feel & Activity */}
+            {item.id === 'feel' && (
+              <div className="checkin-context">
+                <fieldset className="checkin-metric" style={{ marginBottom: '1.2rem', padding: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius)' }}>
+                  <legend style={{ fontWeight: 650, color: 'var(--text-primary)', padding: '0 4px' }}>Daily Countermeasures &amp; Nutrition</legend>
+                  <div className="pressure-grid" style={{ marginTop: '0.4rem' }}>
+                    {readingField('fluid_intake')}
+                    {readingField('exercise_minutes')}
+                    {readingField('calorie_intake')}
+                    {readingField('body_mass')}
+                  </div>
+                </fieldset>
+
+                <h3 style={{ margin: '1rem 0 0.5rem', fontSize: '1.15rem' }}>Symptoms</h3>
+                {SYMPTOM_GROUPS.map(group => (
+                  <fieldset className="symptom-group" key={group.title}>
+                    <legend>{group.title}</legend>
+                    <div className="symptom-list">
+                      {SYMPTOM_OPTIONS.filter(symptom => group.ids.includes(symptom.id)).map(symptomOption)}
+                    </div>
+                  </fieldset>
+                ))}
+                {noteField}
+              </div>
+            )}
+
+            {/* Page 8: Review & save */}
             {item.id === 'review' && (
               <dl className="review-list">
-                {MEASUREMENT_STEPS.map(page => (
+                {STEPS.filter(page => page.metrics.length > 0).map(page => (
                   <div key={page.id} className={page.metrics.some(metric => errors[metric]) ? 'has-error' : undefined}>
                     <dt>{page.title}</dt>
                     <dd>
@@ -492,15 +831,15 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
                   </div>
                 ))}
                 <div>
-                  <dt>How you feel</dt>
+                  <dt>Symptoms &amp; Notes</dt>
                   <dd>
                     {symptomIds.length
                       ? SYMPTOM_OPTIONS.filter(option => symptomIds.includes(option.id)).map(option => option.label).join(', ')
-                      : <span className="muted">Nothing ticked</span>}
+                      : <span className="muted">No symptoms reported</span>}
                     {note.trim() && <span className="review-note">Note: {note.trim()}</span>}
                   </dd>
                   <button type="button" className="button button-sm button-ghost" onClick={() => goTo(FEEL_STEP)}>
-                    <Pencil size={14} aria-hidden="true" /> Edit<span className="sr-only"> how you feel</span>
+                    <Pencil size={14} aria-hidden="true" /> Edit<span className="sr-only"> symptoms and notes</span>
                   </button>
                 </div>
               </dl>
@@ -509,25 +848,24 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
         ))}
 
         <div className="wizard-nav">
-          {Object.keys(errors).length > 0 && <p className="reading-error">Please check the highlighted number before going on.</p>}
+          {Object.keys(errors).length > 0 && <p className="reading-error">Please check the highlighted readings above.</p>}
           {saveError && <p className="reading-error" role="alert">{saveError}</p>}
           <div className="wizard-nav-buttons">
             <button className="button button-secondary" type="button" onClick={() => goTo(step - 1)} disabled={step === 0}>
               <ArrowLeft size={16} aria-hidden="true" /> Back
             </button>
-            {step < REVIEW_STEP && current.metrics.length > 0 && (
+            {step < REVIEW_STEP && (
               <button className="button button-ghost" type="button" onClick={skip} aria-label="Skip, not measured today">Skip</button>
             )}
-            {step < REVIEW_STEP && (
-              <button className={`button ${reviewVisited ? 'button-secondary' : 'button-primary'}`} type="submit" data-action="next">
-                Next <ArrowRight size={16} aria-hidden="true" />
+            {step < REVIEW_STEP ? (
+              <button className="button button-primary" type="submit" data-action="next">
+                {step === REVIEW_STEP - 1 ? 'Review entries' : 'Next'} <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            ) : (
+              <button className="button button-primary" type="submit" data-action="save" style={{ fontWeight: 700, padding: '0.65rem 1.4rem' }}>
+                <Check size={18} aria-hidden="true" /> Save and assess check-in
               </button>
             )}
-            {/* Always in the page so a fix made on any page can be saved straight away. */}
-            <button className="button button-primary" type="submit" data-action="save"
-              hidden={step !== REVIEW_STEP && !reviewVisited}>
-              Save and assess <ArrowRight size={16} aria-hidden="true" />
-            </button>
           </div>
         </div>
       </form>

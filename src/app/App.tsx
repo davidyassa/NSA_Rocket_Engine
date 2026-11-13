@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Activity, BookOpen, Brain, ChartNoAxesCombined, ClipboardList, Database, Ellipsis, LayoutGrid, MessagesSquare, Radiation, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { CheckinEntry } from '../contracts';
 import rocketEngineMark from '../ui/assets/nasa/rocket-engine.webp';
@@ -10,6 +10,9 @@ import { Checkin } from '../features/checkin/Checkin';
 import { CognitiveLab } from '../features/cognitive/CognitiveLab';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { NasaHazards } from '../features/hazards/NasaHazards';
+import { RadiationHazard } from '../features/radiation/RadiationHazard';
+import { DistanceHazard } from '../features/hazards/DistanceHazard';
+import { IsolationHazard } from '../features/hazards/IsolationHazard';
 import { Timeline } from '../features/timeline/Timeline';
 import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
@@ -18,24 +21,34 @@ import { DemoData } from './DemoData';
 import { RouteErrorBoundary, lazyWithReload } from './lazyRoute';
 import { confirmTap } from './native';
 import { GLOSSARY } from '../content/plainLanguage';
-import { entryFromCheckin, useMissionStore } from './store';
+import { activeSol, entryFromCheckin, useMissionStore } from './store';
+import { useFollowUpStore } from '../features/followups/useFollowUpStore';
+import { AskSol } from '../features/assistant/AskSol';
 
 const Trends = lazyWithReload(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
 
 const navigation = [
   { to: '/', label: 'Dashboard', Icon: LayoutGrid },
+  { to: '/hazards/radiation', label: 'Radiation monitor', Icon: Radiation },
   { to: '/check-in', label: 'Sol check-in', Icon: ClipboardList },
   { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
-  { to: '/hazards', label: 'NASA 5 hazards', Icon: ShieldAlert },
+  { to: '/hazards', label: 'Hazards', Icon: ShieldAlert },
   { to: '/assessment', label: 'Assessment', Icon: Activity },
   { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
   { to: '/trends', label: 'Trends', Icon: ChartNoAxesCombined },
   { to: '/timeline', label: 'Timeline', Icon: RouteIcon },
+  { to: '/assistant', label: 'Ask Sol', Icon: MessagesSquare },
   { to: '/demo', label: 'Demo and data', Icon: Database },
 ];
 
 /** Phone bottom bar: Dashboard · Assessment · Check-in (centre) · Timeline · More (CMO, trends, cognitive, hazards, demo). */
 const bottomNavigation = ['/', '/assessment', '/check-in', '/timeline'] as const;
+const routeLabels: Record<string, string> = {
+  '/hazards/radiation': 'Space radiation monitoring',
+  '/radiation': 'Space radiation monitoring',
+  '/hazards/isolation': 'Isolation and confinement',
+  '/hazards/distance': 'Distance from Earth',
+};
 
 export function App() {
   const { pathname } = useLocation();
@@ -45,6 +58,11 @@ export function App() {
   const saveCheckin = useMissionStore((state) => state.saveCheckin);
   const loadScenario = useMissionStore((state) => state.loadScenario);
   const resetDemo = useMissionStore((state) => state.resetDemo);
+  const advanceSol = useMissionStore((state) => state.advanceSol);
+  const saveVigilance = useMissionStore((state) => state.saveVigilance);
+  const saveIsolationPlan = useMissionStore((state) => state.saveIsolationPlan);
+  const syncFollowUps = useFollowUpStore((state) => state.syncWithAssessment);
+  const resetFollowUps = useFollowUpStore((state) => state.resetTasks);
   const [resetError, setResetError] = useState('');
   const [revision, setRevision] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -52,7 +70,11 @@ export function App() {
   const glossaryDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
 
-  const { scenario, prefill } = DEMO_OPTIONS[mission.scenarioId];
+  const { scenarioId } = mission;
+  const { scenario: seed, prefill } = DEMO_OPTIONS[scenarioId];
+  const sol = activeSol(mission);
+  const scenario = useMemo(() => ({ ...seed, startSol: sol }), [seed, sol]);
+  const vigilance = mission.vigilance?.[scenarioId] ?? [];
   const records = useMemo(
     () => [...scenario.history, ...(mission.entries[mission.scenarioId] ?? [])],
     [scenario, mission.entries, mission.scenarioId],
@@ -70,7 +92,7 @@ export function App() {
     [latest, records, scenario],
   );
   const isLogged = latest?.sol === scenario.startSol;
-  const section = navigation.find((item) => item.to === pathname)?.label ?? 'Dashboard';
+  const section = routeLabels[pathname] ?? navigation.find((item) => item.to === pathname)?.label ?? 'Dashboard';
   const { profile, startSol } = scenario;
   const initials = profile.displayName.split(' ').map((part) => part[0]).join('');
 
@@ -80,6 +102,10 @@ export function App() {
     if (pathname !== '/') main.current?.focus({ preventScroll: true });
     setMoreOpen(false);
   }, [pathname, section]);
+
+  useEffect(() => {
+    if (latest && assessment && latest.sol >= seed.startSol) syncFollowUps(latest, assessment, scenarioId);
+  }, [latest, assessment, scenarioId, seed.startSol, syncFollowUps]);
 
   function submit(entry: CheckinEntry) {
     saveCheckin(entry);
@@ -101,6 +127,7 @@ export function App() {
   function confirmReset() {
     try {
       resetDemo();
+      resetFollowUps();
       setRevision((value) => value + 1);
       resetDialog.current?.close();
       navigate('/');
@@ -146,17 +173,10 @@ export function App() {
 
       <div className="work-area">
         <header className="topbar">
-          <div className="breadcrumbs">
-            <Link to="/" className="mobile-wordmark" aria-label="Sol Check dashboard"><img src={rocketEngineMark} alt="" /></Link>
-            <span className="breadcrumb-root">Mission</span><ChevronRight size={13} aria-hidden="true" /><strong>{section}</strong>
-          </div>
-          <div className="topbar-meta">
-            <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
-              <BookOpen size={16} aria-hidden="true" /> <span>Words explained</span>
-            </button>
-            <span className="topbar-sol">SOL {startSol}</span>
-            <span className="badge badge-synthetic"><span className="badge-dot" /> Synthetic demo</span>
-          </div>
+          <Link to="/" className="mobile-wordmark" aria-label="Sol Check dashboard"><img src={rocketEngineMark} alt="" /></Link>
+          <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
+            <BookOpen size={16} aria-hidden="true" /> <span>Words explained</span>
+          </button>
         </header>
         <main className="main-content" data-route={pathname} id="main-content" ref={main} tabIndex={-1}>
           {warning && <p className="storage-warning" role="alert">{warning}</p>}
@@ -164,27 +184,40 @@ export function App() {
             <Route path="/" element={<Dashboard scenario={scenario} records={records} latest={latest} assessment={assessment} />} />
             <Route path="/check-in" element={
               <Checkin
-                key={`${mission.scenarioId}:${revision}`}
+                key={`${scenarioId}:${sol}:${revision}`}
                 sol={startSol}
                 profile={profile}
-                demoPrefill={prefill}
+                demoPrefill={sol === seed.startSol ? prefill : undefined}
                 initialEntry={isLogged && latest ? entryFromCheckin(latest) : undefined}
                 onSubmit={submit}
               />
             } />
-            <Route path="/cognitive" element={<CognitiveLab currentSol={startSol} />} />
+            <Route path="/cognitive" element={<CognitiveLab key={`${scenarioId}:${sol}:${revision}`} currentSol={sol}
+              history={vigilance} onSave={(session) => saveVigilance(scenarioId, session)} />} />
             <Route path="/hazards" element={<NasaHazards />} />
-            <Route path="/assessment" element={<Assessment key={`${mission.scenarioId}:${revision}`} assessment={assessment} records={records} mission={scenario.missionContext} />} />
-            <Route path="/cmo" element={<CrewMedicalOfficer scenario={scenario} latest={latest} assessment={assessment} records={records} />} />
+            <Route path="/hazards/radiation" element={<RadiationHazard scenario={scenario} />} />
+            <Route path="/radiation" element={<Navigate to="/hazards/radiation" replace />} />
+            <Route path="/space-radiation" element={<Navigate to="/hazards/radiation" replace />} />
+            <Route path="/hazards/distance" element={<DistanceHazard scenario={scenario} />} />
+            <Route path="/hazards/isolation" element={<IsolationHazard key={`${scenarioId}:${sol}:${revision}`}
+              scenario={scenario} current={isLogged ? latest : null} assessment={isLogged ? assessment : null} records={records}
+              vigilance={vigilance} plans={mission.isolationPlans?.[scenarioId]}
+              onSavePlan={(plan) => saveIsolationPlan(scenarioId, sol, plan)}
+              onAdvance={() => { advanceSol(scenarioId, sol); navigate('/check-in'); }} />} />
+            <Route path="/assessment" element={<Assessment key={`${scenarioId}:${revision}`} assessment={assessment} records={records}
+              mission={scenario.missionContext} scenarioId={scenarioId} vigilance={vigilance} />} />
+            <Route path="/cmo" element={<CrewMedicalOfficer key={`${scenarioId}:${sol}:${revision}`} scenario={scenario}
+              scenarioId={scenarioId} latest={latest} assessment={assessment} records={records} vigilance={vigilance} />} />
             <Route path="/trends" element={
               <RouteErrorBoundary name="Trends">
                 <Suspense fallback={<p role="status">Loading trends…</p>}>
-                  <Trends key={mission.scenarioId} records={records} />
+                  <Trends key={scenarioId} records={records} vigilance={vigilance} sol={sol} />
                 </Suspense>
               </RouteErrorBoundary>
             } />
             <Route path="/timeline" element={<Timeline key={mission.scenarioId} scenario={scenario} records={records} />} />
             <Route path="/demo" element={<DemoData scenario={scenario} records={records} scenarioId={mission.scenarioId} onLoad={switchScenario} />} />
+            <Route path="/assistant" element={<AskSol scenario={scenario} records={records} latest={latest} assessment={assessment} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <footer className="workspace-footer">
@@ -246,7 +279,7 @@ export function App() {
           <X size={20} />
         </button>
         <h2 id="reset-title">Reset demo?</h2>
-        <p>This clears local demo check-ins from all three scenarios and restores the Sol 43 scenario on this device.</p>
+        <p>This clears demo check-ins, vigilance results, countermeasure plans, and follow-up tasks from this device. The demo returns to Sol 43.</p>
         {resetError && <p role="alert" className="storage-warning">{resetError}</p>}
         <div className="dialog-actions">
           <button type="button" className="button button-secondary" autoFocus onClick={() => resetDialog.current?.close()}>Cancel</button>

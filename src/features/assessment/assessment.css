@@ -6,29 +6,23 @@
   margin-top: 0.85rem;
 }
 
-.assessment-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
-  align-items: start;
-  gap: 1.2rem;
-}
+.assessment-vigilance { display: grid; gap: 0.45rem; margin-block: 1rem; }
 
 .assessment-findings,
 .assessment-actions {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
   gap: 0.85rem;
 }
 
-.assessment-findings > h2,
-.assessment-actions > h2 {
+.assessment-findings > h2 {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 650;
 }
 
-.assessment-symptoms,
-.assessment-version {
+.assessment-symptoms {
   margin: 0;
   font-size: 0.88rem;
 }
@@ -71,93 +65,19 @@
   font-weight: 650;
 }
 
-.assessment-evidence {
-  margin-top: 0.8rem;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 0.8rem;
-}
-
-.assessment-rule {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.3rem;
-  margin: 0;
-}
-
-.assessment-rule dt {
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-}
-
-.assessment-rule dd {
-  margin: 0.18rem 0 0;
-}
-
-.assessment-rule code {
-  overflow-wrap: anywhere;
-}
-
-.assessment-evidence p {
-  line-height: 1.55;
-}
-
-.assessment-evidence h4 {
-  margin: 0.9rem 0 0.45rem;
-  font-size: 0.94rem;
-  font-weight: 650;
-}
-
-.assessment-baselines,
-.assessment-conditions,
 .assessment-action ol {
   margin: 0.55rem 0 0;
   padding-left: 1.2rem;
   line-height: 1.5;
-}
-
-.assessment-baseline-readings {
-  margin: 0.25rem 0 0.55rem;
-}
-
-.assessment-conditions,
-.assessment-baselines,
-.assessment-warnings {
-  list-style: disc;
-}
-
-.assessment-action ol {
   list-style: decimal;
 }
 
-
-.assessment-action li + li {
-  margin-top: 0.35rem;
-}
-
-.assessment-action .assessment-ladder {
-  display: grid;
-  gap: 0.35rem;
-  margin-top: 0.9rem;
-  padding: 0;
-  list-style: none;
-}
-
-.assessment-ladder li {
-  display: grid;
-  gap: 0.13rem;
-  margin: 0;
-  padding: 0.55rem 0.7rem;
-  border-left: 1px solid var(--line);
-  font-size: 0.87rem;
-}
-
-.assessment-ladder li + li { margin-top: 0; }
-.assessment-ladder li[aria-current='step'] { border-left-color: var(--accent); background: var(--accent-soft); }
-.assessment-ladder li span { color: var(--muted); }
+.assessment-action li + li { margin-top: 0.35rem; }
 
 .assessment-warnings {
   margin: 0;
   padding-left: 2rem;
+  list-style: disc;
 }
 
 .assessment-table-wrap {
@@ -313,12 +233,6 @@
 .ground-timing p { margin: 0.65rem 0; line-height: 1.45; }
 .ground-timing .assessment-why { margin-top: 0.55rem; }
 
-@media (max-width: 1080px) {
-  .assessment-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 680px) {
   .ground-summary-grid { grid-template-columns: 1fr; }
 }
@@ -334,7 +248,6 @@
 .kit-note { margin: 8px 0 0; font-size: 0.875rem; color: var(--text-secondary); }
 .kit-status { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 0.8125rem; white-space: nowrap; }
 .kit-expired { color: var(--status-trend); background: var(--tint-trend); }
-.kit-potency { color: var(--status-check); background: var(--tint-check); }
 .kit-low, .kit-soon { color: var(--status-change); background: var(--tint-change); }
 .kit-ok { color: var(--status-steady); background: var(--tint-steady); }
 .kit-panel h2 { margin: 0 0 4px; font-size: 1.16rem; }
@@ -348,3 +261,45 @@
 .kit-card-facts div { display: grid; }
 .kit-card-facts dt { color: var(--text-muted); font-size: 0.8125rem; }
 .kit-card-facts dd { margin: 0; }
+
+.assessment-reading-preview {
+  margin-top: 0.8rem;
+}
+.assessment-reading-preview h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+.assessment-baseline-preview {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+.assessment-reading-preview .assessment-why .assessment-table-wrap {
+  margin-top: 0.5rem;
+}
+.assessment-support {
+  margin-top: 1rem;
+  padding: 1rem;
+  scroll-margin-top: calc(var(--topbar-height) + var(--safe-top) + 12px);
+}
+.assessment-support > summary {
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 650;
+}
+.assessment-support > .assessment-actions {
+  margin-top: 0.75rem;
+}
+.assessment-support .assessment-action h3 {
+  margin-top: 0;
+}
+.assessment-review-note {
+  margin: 0;
+  color: var(--status-change);
+  font-weight: 650;
+}
+
+@media (max-width: 480px) {
+  .assessment-reading-preview .assessment-table { white-space: normal; }
+  .assessment-reading-preview .assessment-table :is(td, th) { padding-inline: 0.3rem; }
+}

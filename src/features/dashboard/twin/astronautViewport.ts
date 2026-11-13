@@ -470,7 +470,7 @@ export class AstronautViewport {
   private handleContextLost = (event: Event) => {
     event.preventDefault();
     this.running = false;
-    this.callbacks.onError('The 3D view lost its graphics context. The 2D figure remains available.');
+    this.callbacks.onError('The model lost its graphics context.');
   };
 
   /** Mesh tagged with solcheck_domain under the pointer, else the nearest hotspot within reach. */

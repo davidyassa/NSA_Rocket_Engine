@@ -90,7 +90,7 @@
   -webkit-font-smoothing: antialiased;
 }
 
-body { margin: 0; min-width: 320px; background: var(--bg-base); color: var(--text-primary); }
+body { margin: 0; background: var(--bg-base); color: var(--text-primary); }
 h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; color: var(--text-primary); }
 button { cursor: pointer; font: inherit; }
 button:disabled { cursor: not-allowed; }
@@ -239,10 +239,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   background: color-mix(in srgb, var(--bg-base) 88%, transparent);
   backdrop-filter: blur(8px);
 }
-.breadcrumbs, .topbar-meta { display: flex; align-items: center; gap: 10px; }
-.breadcrumbs { color: var(--text-secondary); font-size: 0.9rem; }
-.breadcrumbs strong { color: var(--text-primary); font-weight: 600; }
-.topbar-sol { color: var(--text-secondary); font: 500 0.8rem var(--mono); letter-spacing: 0.08em; }
 .main-content { max-width: 1200px; margin: 0 auto; padding: 28px clamp(16px, 3vw, 40px) 16px; }
 .main-content:focus { outline: none; }
 .workspace-footer {
@@ -396,7 +392,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   .app-shell { display: block; padding-bottom: 76px; }
   .sidebar { display: none; }
   .topbar { padding-inline: 16px; }
-  .topbar-sol { display: none; }
   .main-content { padding: 20px 16px 12px; }
   .page-intro { margin-bottom: 18px; }
   .bottom-nav {
@@ -549,6 +544,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* Plain-language helpers */
 .glossary-button {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -562,7 +558,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   font-weight: 600;
 }
 .glossary-button:hover { border-color: var(--accent); }
-@media (max-width: 480px) { .glossary-button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } }
 .glossary-dialog { width: min(620px, calc(100% - 32px)); max-height: min(80vh, 720px); overflow: auto; }
 .glossary-list { display: grid; gap: 12px; margin: 0 0 20px; }
 .glossary-list dt { color: var(--accent); font-weight: 600; }
@@ -626,7 +621,7 @@ p, li, dd, figcaption, blockquote { text-wrap: pretty; }
 a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
 /* Numbers in readings and tables line up (tabular figures) */
 .domain-value, .data-table .num, .review-list dd, .twin-hud-value, .mission-stats strong, .camera-result-number,
-.camera-pulse-result-val, .trend-summary dd, .crew-figure-reading-val, .topbar-sol, .wizard-progress-label {
+.camera-pulse-result-val, .trend-summary dd, .crew-figure-reading-val, .wizard-progress-label {
   font-variant-numeric: tabular-nums;
 }
 
@@ -635,6 +630,7 @@ a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
 .main-content[data-route='/cmo'] { --route-photo: url('./assets/nasa/crew-flight.webp'); }
 .main-content[data-route='/cognitive'] { --route-photo: url('./assets/nasa/crew-lab.webp'); }
 .main-content[data-route='/hazards'] { --route-photo: url('./assets/nasa/hazards-environment.webp'); }
+.main-content[data-route='/hazards/isolation'] { --route-photo: url('./assets/nasa/hazards-isolation.webp'); }
 .main-content[data-route='/trends'] { --route-photo: url('./assets/nasa/crew-orbit.webp'); }
 .main-content[data-route='/timeline'] { --route-photo: url('./assets/nasa/lunar-flyby.webp'); }
 .main-content[data-route='/demo'] { --route-photo: url('./assets/nasa/team-console.webp'); }
@@ -665,18 +661,28 @@ a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
     border: 1px solid var(--border-control);
     border-radius: 9px;
   }
-  .breadcrumbs { min-width: 0; gap: 7px; }
-  .breadcrumbs strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar-meta { flex: none; }
-  .breadcrumb-root, .breadcrumbs > svg { display: none; }
   .main-content[data-route]:not([data-route='/']) .page-intro {
     background-image: linear-gradient(90deg, #1a1614f8 12%, #1a1614e8 58%, #1a161484), var(--route-photo);
   }
 }
 
+@media (max-width: 1023px) {
+  .more-sheet[data-open='true'] {
+    inset: auto max(8px, var(--safe-right)) calc(76px + var(--safe-bottom)) max(8px, var(--safe-left));
+    max-height: calc(100vh - 90px - var(--safe-top) - var(--safe-bottom));
+    max-height: calc(100dvh - 90px - var(--safe-top) - var(--safe-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+  .sidebar { overflow-y: auto; }
+  .topbar, .main-content { padding-inline-start: max(16px, var(--safe-left)); padding-inline-end: max(16px, var(--safe-right)); }
+  .sidebar { padding-inline-start: max(8px, var(--safe-left)); }
+}
+
 @media (max-width: 360px) {
   .topbar { gap: 7px; padding-inline: 12px; }
-  .topbar-meta { gap: 6px; }
-  .topbar-meta .badge { font-size: 0.71rem; }
   .bottom-nav a, .bottom-nav button { font-size: 0.73rem; }
 }

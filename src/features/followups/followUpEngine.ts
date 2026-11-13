@@ -1,4 +1,5 @@
 import type { DailyCheckin, MetricId, RiskAssessment } from '../../contracts';
+import type { ScenarioId } from '../../scenarios';
 
 export type FollowUpStatus =
   | 'open'
@@ -19,6 +20,7 @@ export interface AuditEntry {
 export interface FollowUpTask {
   id: string;
   astronautId: string;
+  scenarioId?: ScenarioId;
   sol: number;
   title: string;
   description: string;
@@ -38,19 +40,21 @@ export interface FollowUpTask {
 export function generateFollowUpTasks(
   checkin: DailyCheckin,
   assessment: RiskAssessment,
-  existingTasks: readonly FollowUpTask[] = []
+  existingTasks: readonly FollowUpTask[] = [],
+  scenarioId?: ScenarioId,
 ): FollowUpTask[] {
   const tasks: FollowUpTask[] = [...existingTasks];
   const nowUtc = checkin.submittedAtUtc;
 
   function upsertTask(taskData: Omit<FollowUpTask, 'updatedAtUtc' | 'auditTrail'>) {
-    const existingIndex = tasks.findIndex(t => t.id === taskData.id);
+    const existingIndex = tasks.findIndex(t => t.id === taskData.id && t.astronautId === taskData.astronautId);
     if (existingIndex >= 0) {
       // Preserve status and audit history if already existing
       return;
     }
     tasks.push({
       ...taskData,
+      scenarioId,
       updatedAtUtc: nowUtc,
       auditTrail: [
         {
@@ -63,6 +67,7 @@ export function generateFollowUpTasks(
     });
   }
 
+  const combined = assessment.findings.find((finding) => finding.ruleId === 'combined-sleep-mood');
   // 1. Sustained lower trend or urgent symptoms -> CMO review task
   if (assessment.recommendedTier === 'crew_medical_officer') {
     upsertTask({
@@ -70,12 +75,12 @@ export function generateFollowUpTasks(
       astronautId: checkin.astronautId,
       sol: checkin.sol,
       title: 'Crew Medical Officer Clinical Review',
-      description: 'Review sustained lower trend in sleep duration and mood following shelter protocol.',
-      reason: 'Rule combined-sleep-mood triggered escalation to Crew Medical Officer.',
+      description: combined ? 'Review sustained lower sleep and mood, including any saved vigilance results.' : 'Review the check-in findings and reported symptoms.',
+      reason: combined?.summary ?? 'Assessment recommends onboard medical review.',
       priority: 'urgent',
       assignedRole: 'crew_medical_officer',
       status: 'awaiting_medical_review',
-      ruleId: 'combined-sleep-mood',
+      ruleId: combined?.ruleId,
       createdAtUtc: nowUtc,
     });
   }
@@ -98,20 +103,20 @@ export function generateFollowUpTasks(
     });
   }
 
-  // 3. Persistent fatigue symptom -> Rest scheduling task
+  // 3. Fatigue or a combined sleep and mood trend -> rest and vigilance follow-up
   const hasFatigue = checkin.symptoms.some(s => s.id === 'fatigue' && s.present);
-  if (hasFatigue) {
+  if (hasFatigue || combined) {
     upsertTask({
       id: `task-fatigue-sol-${checkin.sol}`,
       astronautId: checkin.astronautId,
       sol: checkin.sol,
       title: 'Fatigue & Sleep Hygiene Protocol',
-      description: 'Schedule additional rest cycle and complete psychomotor vigilance self-assessment.',
-      reason: 'Fatigue symptom reported on current sol check-in.',
+      description: 'Plan the next sleep opportunity and complete a vigilance check in Cognitive Lab.',
+      reason: hasFatigue ? 'Fatigue reported at check-in.' : 'Sleep and mood both met the sustained lower-trend rule.',
       priority: 'medium',
       assignedRole: 'astronaut',
       status: 'open',
-      ruleId: 'reported-symptoms',
+      ruleId: hasFatigue ? 'reported-symptoms' : combined?.ruleId,
       createdAtUtc: nowUtc,
     });
   }

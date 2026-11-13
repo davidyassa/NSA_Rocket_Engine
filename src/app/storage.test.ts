@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SCENARIO_ID, HERO_SCENARIO } from '../scenarios';
 import { createStorageRepository, emptyMission } from './storage';
+import { summarizeVigilance } from '../features/cognitive/pvtEngine';
+import { emptyIsolationPlan } from '../features/hazards/isolationPlan';
 
 const key = 'sol-check:demo';
 
@@ -18,6 +20,22 @@ function fixtureStorage(): Storage {
 
 describe('demo storage', () => {
   const checkin = HERO_SCENARIO.history[0];
+
+  it('preserves sol progress, vigilance, and plans by scenario when reloaded', () => {
+    const storage = fixtureStorage();
+    const repository = createStorageRepository(storage);
+    const session = summarizeVigilance([225, 250, 500], 'quick', 43)!;
+    const mission = {
+      ...emptyMission,
+      activeSols: { [DEFAULT_SCENARIO_ID]: 44 },
+      vigilance: { [DEFAULT_SCENARIO_ID]: [session] },
+      isolationPlans: { [DEFAULT_SCENARIO_ID]: { 43: { ...emptyIsolationPlan, sleepAt: '22:00', wakeAt: '06:00' } } },
+    };
+    repository.save(mission);
+    expect(createStorageRepository(storage).load()).toEqual(mission);
+    repository.reset();
+    expect(createStorageRepository(storage).load()).toBeNull();
+  });
 
   it('migrates the original saved check-ins into the hero scenario', () => {
     const storage = fixtureStorage();

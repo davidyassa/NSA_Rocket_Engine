@@ -8,6 +8,7 @@ import {
   type MetricId,
 } from '../contracts';
 import { evaluateCheckin, metricBaseline, RULES, validateCheckinMeasurements } from './index';
+import { CORE_RULES } from './rules';
 
 function checkin(
   sol: number,
@@ -210,6 +211,17 @@ describe('explainable assessment', () => {
     expect(assessment.dataQualityWarnings[0]).toContain('signal quality was insufficient');
     expect(assessment.domainStatuses.cardiovascular).toBe('check_entry');
     expect(metricBaseline('heart_rate', current, history)).toBeNull();
+  });
+
+  it('keeps optional findings out of a core assessment even when the history contains optional readings', () => {
+    const history = [39, 40, 41, 42].map(sol => checkin(sol, { exercise_minutes: 20 }, { fatigue: true }));
+    const latest = checkin(43, { exercise_minutes: 20 }, { fatigue: true });
+    expect(evaluateCheckin(latest, history).findings.some(item => item.ruleId === 'countermeasure-adherence')).toBe(true);
+
+    const core = evaluateCheckin({ ...latest, assessmentScope: 'core' }, history);
+    expect(core.domainStatuses.symptoms).toBe('sustained_trend');
+    expect(core.findings.every(({ ruleId }) => Object.hasOwn(CORE_RULES, ruleId))).toBe(true);
+    expect(Object.keys(CORE_RULES)).toHaveLength(8);
   });
 
   it('publishes a valid reviewable rule definition for each rule', () => {

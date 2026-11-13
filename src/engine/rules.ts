@@ -1,4 +1,6 @@
-import { METRIC_IDS, METRICS, type MetricId, type RuleDefinition } from '../contracts';
+import { CORE_METRIC_IDS, METRICS, type MetricId, type RuleDefinition } from '../contracts';
+
+export { CORE_METRIC_IDS } from '../contracts';
 
 export const BASELINE_LOOKBACK_SOLS = 14;
 export const MIN_BASELINE_READINGS = 5;
@@ -24,9 +26,6 @@ export const DEMO_DELTAS: Readonly<Record<MetricId, number>> = {
   calorie_intake: 300,
   body_mass: 1,
 };
-
-/** The seven daily readings that use the generic baseline / trend rules. Optional readings have dedicated rules. */
-export const CORE_METRIC_IDS = METRIC_IDS.filter((metric) => !METRICS[metric].optional);
 
 /** Stand-up test thresholds (consensus definition of orthostatic hypotension; adult heart-rate rise on standing). */
 export const ORTHOSTATIC = { systolicDrop: 20, diastolicDrop: 10, heartRateRise: 30 } as const;
@@ -55,11 +54,11 @@ const deltaLabels = CORE_METRIC_IDS.map((metric) => {
 const deltaCondition = `The demo deltas by metric are ${deltaLabels.join(', ')}.`;
 const baselineSources = ['demo-method', 'nasa-monitoring'];
 
-const ruleDefinitions = {
+export const CORE_RULES = {
   'entry-quality': {
     ruleId: 'entry-quality',
     version: '1.0.0',
-    metricIds: [...METRIC_IDS],
+    metricIds: [...CORE_METRIC_IDS],
     conditions: [
       'Check the recorded value, the fixed unit, the astronaut ID, and that each metric has one reading.',
       'If either blood pressure value is entered, both values must be usable and systolic must exceed diastolic.',
@@ -122,7 +121,7 @@ const ruleDefinitions = {
     conditions: [
       'Chest discomfort or shortness of breath is marked present on the current check-in.',
       'Recommend Crew Medical Officer review without waiting for a personal baseline or a repeated trend.',
-      'Normal or missing measurements do not cancel this recommendation.',
+      'The recommendation applies even when measurements are missing or show no change.',
     ],
     contextRequirements: ['A current symptom report.'],
     priority: 110,
@@ -130,7 +129,7 @@ const ruleDefinitions = {
     sourceRefs: ['demo-method', 'nasa-monitoring', 'nasa-eimo'],
     reviewStatus: 'needs_clinical_review',
     actionCardIds: ['crew-review'],
-    testCases: ['Either concerning symptom escalates even with normal vitals.', 'An unrelated entry problem does not cancel the escalation.'],
+    testCases: ['Either symptom escalates even without a change in measurements.', 'An unrelated entry problem does not cancel the escalation.'],
   },
   'reported-symptoms': {
     ruleId: 'reported-symptoms',
@@ -177,6 +176,9 @@ const ruleDefinitions = {
     actionCardIds: [],
     testCases: ['Missing readings and insufficient history produce separate reasons for data unavailable.'],
   },
+} satisfies Record<string, RuleDefinition>;
+
+const optionalRuleDefinitions = {
   'orthostatic-check': {
     ruleId: 'orthostatic-check',
     version: '1.0.0',
@@ -360,7 +362,7 @@ const ruleDefinitions = {
     ],
     contextRequirements: ['Exercise plus fluid or food logs over the last 5 sols.'],
     priority: 40,
-    reason: 'Low gravity pulls calcium from bone; too little loading, food and water together multiply bone-loss and kidney-stone risk (a cross-hazard “risk multiplier”).',
+    reason: 'The optional comparison shows where changes in exercise, food intake and fluid intake overlap in the same window.',
     sourceRefs: ['nasa-exercise', 'renal-stones-astronauts', 'iss-body-mass'],
     reviewStatus: 'demo_heuristic',
     actionCardIds: ['protect-bones-kidneys'],
@@ -368,5 +370,5 @@ const ruleDefinitions = {
   },
 } satisfies Record<string, RuleDefinition>;
 
-export type RuleId = keyof typeof ruleDefinitions;
-export const RULES: Readonly<Record<string, RuleDefinition>> = ruleDefinitions;
+export type RuleId = keyof typeof CORE_RULES | keyof typeof optionalRuleDefinitions;
+export const RULES: Readonly<Record<string, RuleDefinition>> = { ...CORE_RULES, ...optionalRuleDefinitions };

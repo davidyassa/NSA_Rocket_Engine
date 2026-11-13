@@ -1,5 +1,6 @@
 import {
   HEALTH_DOMAINS,
+  CORE_SYMPTOM_OPTIONS,
   METRICS,
   measurementValueError,
   type AssessmentContext,
@@ -410,7 +411,7 @@ function assessKidneyStone(current: ReviewedCheckin, recent: readonly ReviewedCh
   if (!present(current.checkin, 'flank_pain')) return null;
   const { readings, count } = countRecent('fluid_intake', recent, (value) => value < FLUID_TARGET_L);
   const context = count > 0 ? ` Fluid intake was below ${FLUID_TARGET_L} L on ${count} of the last ${TREND_LOOKBACK_SOLS} sols.` : '';
-  return finding('kidney-stone-screen', 'observation', `Side or lower-back pain, or blood in urine, reported: possible kidney stone. Crew Medical Officer check today.${context}`, readings.map(({ id }) => id));
+  return finding('kidney-stone-screen', 'observation', `Side or lower-back pain, or blood in urine, was reported. Crew Medical Officer review is recommended.${context}`, readings.map(({ id }) => id));
 }
 
 function assessBoneKidneyCompound(recent: readonly ReviewedCheckin[]): Finding | null {
@@ -424,7 +425,37 @@ function assessBoneKidneyCompound(recent: readonly ReviewedCheckin[]): Finding |
   ].filter(Boolean);
   if (!partners.length) return null;
   const ids = [...exercise.readings, ...(fluid.count >= 2 ? fluid.readings : []), ...(food.count >= 2 ? food.readings : [])].map(({ id }) => id);
-  return finding('bone-kidney-compound', 'contextual_association', `Short exercise on ${exercise.count} of the last ${TREND_LOOKBACK_SOLS} sols together with ${partners.join(' and ')}: these multiply bone-loss and kidney-stone risk. This is a risk context, not a measurement of bone or kidneys.`, ids);
+  return finding('bone-kidney-compound', 'contextual_association', `Short exercise on ${exercise.count} of the last ${TREND_LOOKBACK_SOLS} sols occurred alongside ${partners.join(' and ')}. These are recorded routine and intake changes.`, ids);
+}
+
+function assessOptionalReadings(
+  current: ReviewedCheckin,
+  prior: readonly ReviewedCheckin[],
+  recent: readonly ReviewedCheckin[],
+  context: AssessmentContext | undefined,
+  domainStatuses: RiskAssessment['domainStatuses'],
+) {
+  const { checkin } = current;
+  if (current.issues.has('bp_systolic_standing') || current.issues.has('heart_rate_standing')) {
+    domainStatuses.cardiovascular = 'check_entry';
+  }
+  const orthostatic = assessOrthostatic(current);
+  if (orthostatic && statusPriority.change_from_baseline > statusPriority[domainStatuses.cardiovascular]) {
+    domainStatuses.cardiovascular = 'change_from_baseline';
+  }
+  const bodyMass = assessBodyMass(current, prior);
+  const kidney = assessKidneyStone(current, recent);
+  const crisis = present(checkin, 'feeling_hopeless')
+    ? finding('behavioral-crisis', 'observation', 'Feeling hopeless or unable to cope reported. Crew Medical Officer support now; do not wait for Earth or for a trend.')
+    : null;
+  const findings = [
+    orthostatic, assessHydration(current, recent), assessExercise(current, recent), assessMotionSickness(checkin),
+    assessSans(checkin), assessCo2(recent, context), assessBreathing(current), assessHrv(current, prior),
+    assessEnergy(current, recent), bodyMass?.finding, kidney, crisis, assessBoneKidneyCompound(recent),
+  ].filter((result): result is Finding => result != null);
+  const needsMedicalOfficer = Boolean(orthostatic || kidney || crisis || bodyMass?.cmo)
+    || present(checkin, 'vision_changes') || present(checkin, 'vomiting');
+  return { findings, needsMedicalOfficer };
 }
 
 export function evaluateCheckin(
@@ -433,7 +464,12 @@ export function evaluateCheckin(
   context?: AssessmentContext,
 ): RiskAssessment {
   const prior = priorCheckins(checkin, history);
-  const current = reviewCheckin(checkin);
+  const isCore = checkin.assessmentScope === 'core';
+  const current = reviewCheckin(isCore ? {
+    ...checkin,
+    measurements: checkin.measurements.filter(({ metric }) => !METRICS[metric].optional),
+    symptoms: checkin.symptoms.filter(({ id }) => CORE_SYMPTOM_OPTIONS.some(option => option.id === id)),
+  } : checkin);
   const recent = [...prior.filter(({ checkin: record }) => record.sol > checkin.sol - TREND_LOOKBACK_SOLS), current];
   const domainStatuses = Object.fromEntries(HEALTH_DOMAINS.map((domain) => [domain, 'no_change_detected'])) as Record<HealthDomain, DomainStatus>;
   const findings: Finding[] = [];
@@ -441,7 +477,7 @@ export function evaluateCheckin(
   const lowerTrends = new Map<MetricId, Finding>();
 
   if (dataQualityWarnings.length > 0) {
-    const inputIds = checkin.measurements.filter(({ metric }) => current.issues.has(metric)).map(({ id }) => id);
+    const inputIds = current.checkin.measurements.filter(({ metric }) => current.issues.has(metric)).map(({ id }) => id);
     findings.push(finding('entry-quality', 'data_quality', dataQualityWarnings.join(' '), inputIds));
   }
 
@@ -478,10 +514,10 @@ export function evaluateCheckin(
     }
   }
 
-  const symptomResult = assessSymptoms(checkin, recent);
+  const symptomResult = assessSymptoms(current.checkin, recent);
   domainStatuses.symptoms = symptomResult.status;
   findings.push(...symptomResult.findings);
-  const urgentSymptoms = checkin.symptoms.filter(symptom => symptom.present
+  const urgentSymptoms = current.checkin.symptoms.filter(symptom => symptom.present
     && (symptom.id === 'chest_discomfort' || symptom.id === 'shortness_of_breath'));
   if (urgentSymptoms.length > 0) {
     findings.push(finding(
@@ -490,44 +526,9 @@ export function evaluateCheckin(
       `${urgentSymptoms.map(symptom => symptom.label).join(' and ')} reported. Crew Medical Officer review is recommended without waiting for a baseline or trend.`,
     ));
   }
-  // Entry problems in the optional readings (e.g. a reversed standing pair) mark the cardiovascular area for re-entry.
-  if (current.issues.has('bp_systolic_standing') || current.issues.has('heart_rate_standing')) {
-    domainStatuses.cardiovascular = 'check_entry';
-  }
-  const orthostatic = assessOrthostatic(current);
-  if (orthostatic) {
-    findings.push(orthostatic);
-    if (statusPriority.change_from_baseline > statusPriority[domainStatuses.cardiovascular]) domainStatuses.cardiovascular = 'change_from_baseline';
-  }
-  const hydration = assessHydration(current, recent);
-  if (hydration) findings.push(hydration);
-  const exercise = assessExercise(current, recent);
-  if (exercise) findings.push(exercise);
-  const motionSickness = assessMotionSickness(checkin);
-  if (motionSickness) findings.push(motionSickness);
-  const sans = assessSans(checkin);
-  if (sans) findings.push(sans);
-  const co2 = assessCo2(recent, context);
-  if (co2) findings.push(co2);
-  const breathing = assessBreathing(current);
-  if (breathing) findings.push(breathing);
-  const hrv = assessHrv(current, prior);
-  if (hrv) findings.push(hrv);
-  const energy = assessEnergy(current, recent);
-  if (energy) findings.push(energy);
-  const bodyMass = assessBodyMass(current, prior);
-  if (bodyMass) findings.push(bodyMass.finding);
-  const kidney = assessKidneyStone(current, recent);
-  if (kidney) findings.push(kidney);
-  const crisis = present(checkin, 'feeling_hopeless')
-    ? finding('behavioral-crisis', 'observation', 'Feeling hopeless or unable to cope reported. Crew Medical Officer support now; do not wait for Earth or for a trend.')
-    : null;
-  if (crisis) findings.push(crisis);
-  const compound = assessBoneKidneyCompound(recent);
-  if (compound) findings.push(compound);
-  const needsMedicalOfficer = urgentSymptoms.length > 0 || Boolean(sleep && mood) || Boolean(orthostatic)
-    || present(checkin, 'vision_changes') || present(checkin, 'vomiting')
-    || Boolean(kidney) || Boolean(crisis) || Boolean(bodyMass?.cmo);
+  const optional = isCore ? null : assessOptionalReadings(current, prior, recent, context, domainStatuses);
+  if (optional) findings.push(...optional.findings);
+  const needsMedicalOfficer = urgentSymptoms.length > 0 || Boolean(sleep && mood) || optional?.needsMedicalOfficer;
 
   findings.sort((left, right) => RULES[right.ruleId].priority - RULES[left.ruleId].priority);
   const actionCardIds = [...new Set(findings.flatMap(({ ruleId }) => RULES[ruleId].actionCardIds))];

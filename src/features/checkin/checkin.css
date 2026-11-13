@@ -48,6 +48,12 @@
   margin: 0;
 }
 
+.checkin-readings h2 { margin: 0; font-size: 1.3rem; }
+.checkin-extra-symptoms, .checkin-camera-link { margin-top: 1rem; }
+.checkin-extra-symptoms summary { cursor: pointer; }
+.checkin-extra-symptoms .symptom-list { margin-top: 0.4rem; }
+.wizard-nav-buttons .button:only-child { margin-right: 0; }
+
 .checkin-metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -330,3 +336,221 @@
 }
 .symptom-group { margin: 0 0 14px; padding: 0; border: 0; }
 .symptom-group legend { margin-bottom: 6px; color: var(--text-secondary); font-weight: 600; font-size: 0.95rem; }
+
+/* Crew Mood Assessment MCQ Specification & Scoring Engine */
+.mood-mcq-container {
+  display: grid;
+  gap: 1.4rem;
+  margin-top: 0.5rem;
+}
+
+.mood-question-card {
+  background: var(--bg-surface, #111a2e);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 0.65rem;
+  padding: 1.1rem;
+  transition: border-color 0.15s ease;
+}
+
+.mood-question-card:focus-within {
+  border-color: var(--accent, #38bdf8);
+}
+
+.mood-question-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.mood-q-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 0.35rem;
+  background: var(--tint-accent, rgba(56, 189, 248, 0.15));
+  color: var(--accent, #38bdf8);
+  font: 700 0.8rem var(--mono);
+}
+
+.mood-question-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.mood-question-prompt {
+  margin: 0.2rem 0 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.mood-options-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.mood-option-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle, #1e293b);
+  background: var(--bg-base, #0b1120);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.mood-option-item:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  border-color: var(--line, #334155);
+}
+
+.mood-option-item.is-selected {
+  background: var(--tint-accent, rgba(56, 189, 248, 0.12));
+  border-color: var(--accent, #38bdf8);
+  box-shadow: 0 0 0 1px var(--accent, #38bdf8);
+}
+
+.mood-option-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--bg-surface, #1e293b);
+  color: var(--text-secondary);
+  font: 700 0.82rem var(--mono);
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.mood-option-item.is-selected .mood-option-score {
+  background: var(--accent, #38bdf8);
+  color: #0b1120;
+}
+
+.mood-option-label {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.mood-evaluation-panel {
+  background: var(--bg-surface, #111a2e);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 0.65rem;
+  padding: 1.2rem;
+  margin-top: 0.5rem;
+}
+
+.mood-eval-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle, #1e293b);
+}
+
+.mood-eval-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mood-scores-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+
+.mood-score-box {
+  background: var(--bg-base, #0b1120);
+  padding: 0.8rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-subtle, #1e293b);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mood-score-box-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.mood-score-box-value {
+  font: 700 1.5rem var(--mono);
+  color: var(--text-primary);
+}
+
+.mood-score-box-sub {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.mood-modifiers-section {
+  margin-top: 0.9rem;
+}
+
+.mood-modifiers-heading {
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.5rem;
+}
+
+.mood-modifiers-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mood-modifier-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.4rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.mood-modifier-badge.is-critical {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.mood-modifier-badge.is-cmo {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.mood-clean-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--status-steady, #34d399);
+}
+

@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { MissionMedia } from '../features/media/MissionGallery';
 import type { DailyCheckin, DemoScenario } from '../contracts';
 import { RADLAB_CSV_URL, RADLAB_MANIFEST, RADLAB_SOURCE } from '../data/nasa';
+import { RealCrewData } from '../features/realdata/RealCrewData';
 import { DEMO_OPTIONS, SCENARIO_IDS, type ScenarioId } from '../scenarios';
 import { buildRecordExport, parseAndValidateExport, type RecordExport } from './recordExport';
 import { isNativeApp } from './native';
@@ -72,7 +73,8 @@ export function DemoData({
   records?: readonly DailyCheckin[];
 }) {
   const [searchParams] = useSearchParams();
-  const mediaRequested = searchParams.get('view') === 'media';
+  const view = searchParams.get('view');
+  const mediaTarget = view === 'iss' ? 'iss-model' : view === 'media' ? 'mission-media' : null;
   const [error, setError] = useState('');
   const [exportMessage, setExportMessage] = useState('');
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -81,14 +83,14 @@ export function DemoData({
   const activeRecords = records ?? activeScenario.history;
 
   useEffect(() => {
-    if (!mediaRequested) return;
+    if (!mediaTarget) return;
     const frame = window.requestAnimationFrame(() => {
-      const gallery = document.getElementById('mission-media');
+      const gallery = document.getElementById(mediaTarget);
       gallery?.focus({ preventScroll: true });
       gallery?.scrollIntoView({ block: 'start' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [mediaRequested]);
+  }, [mediaTarget]);
 
   function load(id: ScenarioId) {
     try {
@@ -150,7 +152,7 @@ export function DemoData({
     <div className="demo-data">
       <header className="page-intro">
         <h1>Demo and data</h1>
-        <p>Switch between synthetic crew histories, export local records, and inspect the Mars radiation archive.</p>
+        <p>Switch between synthetic crew histories, see Sol Check tested on real astronaut blood data, export local records, and inspect the Mars radiation archive.</p>
         <Link to="/demo?view=media" className="text-link">Browse mission imagery <ArrowRight size={16} aria-hidden="true" /></Link>
       </header>
 
@@ -184,6 +186,8 @@ export function DemoData({
           })}
         </div>
       </section>
+
+      <RealCrewData />
 
       {/* Local Record Export Panel */}
       <section className="panel demo-export-panel" aria-labelledby="export-heading">

@@ -50,7 +50,7 @@
   background: #17110fd9;
   font-size: 0.73rem;
 }
-.mission-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; }
+.mission-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 14px; }
 .mission-stats > div {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -65,8 +65,6 @@
 .mission-stats svg { grid-row: 1 / 3; color: var(--accent); }
 .mission-stats span { color: var(--text-secondary); font-size: 0.82rem; }
 .mission-stats strong { font: 600 1.2rem/1.25 var(--font-display); letter-spacing: -0.02em; }
-.mission-stat-label-wrap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 7px; }
-.mission-stats .streak-origin { font-size: 0.68rem; color: var(--text-muted); }
 .dashboard-health { margin-top: 32px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 9px; margin-bottom: 12px; }
 .section-title h2 { margin: 0; font-size: 1.44rem; font-weight: 670; letter-spacing: -0.035em; }
@@ -92,57 +90,9 @@
 .domain-origin { margin-top: 5px; color: var(--muted); font-size: 0.8rem; }
 
 .routine-reminder-panel {
-  margin-top: 16px;
-  padding: 18px 20px;
-}
-.routine-reminder-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-.routine-reminder-title {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-.routine-reminder-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent-dark);
-  flex-shrink: 0;
-}
-.routine-reminder-title h2 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 670;
-  color: var(--ink);
-  letter-spacing: -0.02em;
-}
-.routine-reminder-timing {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: 0.79rem;
-}
-.routine-reminder-desc {
-  margin: 0 0 14px;
-  font-size: 0.86rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
-.routine-checklist-wrap {
-  padding: 14px 0 0;
-  margin-bottom: 14px;
-  border-top: 1px solid var(--border-subtle);
+  padding: 14px;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  background: var(--tint-accent);
 }
 .routine-checklist-header {
   display: flex;
@@ -158,11 +108,12 @@
   gap: 7px;
   color: var(--ink);
 }
-.routine-checklist-lead h3 {
+.routine-checklist-lead h2 {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 650;
 }
+.routine-checklist-lead svg { color: var(--accent); }
 .routine-checklist-count {
   font: 500 0.8rem var(--font-body);
   color: var(--muted);
@@ -179,13 +130,9 @@
   gap: 8px;
 }
 .routine-checklist-item {
-  display: flex;
-  align-items: center;
-  padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg-surface);
-  transition: background 0.15s ease, border-color 0.15s ease;
 }
 .routine-checklist-item.is-checked {
   background: var(--bg-raised);
@@ -193,67 +140,16 @@
 }
 .routine-checklist-label {
   display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  align-items: center;
+  min-height: 40px;
+  gap: 8px;
+  padding: 4px 8px;
   cursor: pointer;
-  width: 100%;
+  font-size: 0.86rem;
+  font-weight: 550;
 }
-.routine-checklist-checkbox {
-  margin-top: 3px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.routine-checklist-label strong {
-  display: block;
-  font-size: 0.84rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-.routine-checklist-hint {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--muted);
-  line-height: 1.3;
-}
-.routine-reminder-footer {
-  display: flex;
-  justify-content: flex-start;
-}
-.badge-steady {
-  border-color: var(--border-subtle);
-  background: var(--bg-raised);
-  color: var(--status-steady);
-}
-.badge-watch {
-  border-color: color-mix(in srgb, var(--status-trend) 40%, transparent);
-  background: var(--bg-raised);
-  color: var(--accent);
-}
-
-.domain-card-interactive {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.domain-card-interactive:hover {
-  border-color: color-mix(in srgb, var(--status-trend) 40%, transparent);
-}
-.domain-card-interactive:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: var(--accent);
-}
-.domain-card-arrow {
-  margin-left: auto;
-  color: var(--muted);
-  opacity: 0.7;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-}
-.domain-card-interactive:hover .domain-card-arrow {
-  opacity: 1;
-  transform: translateX(2px);
-}
+.routine-checklist-label input { flex: none; accent-color: var(--accent); }
+.routine-checklist-label:has(input:disabled) { cursor: default; }
 
 .crew-figure-card {
   margin-top: 14px;
@@ -283,23 +179,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 0;
-}
-.crew-figure-svg {
-  width: 100%;
-  max-width: 165px;
-  height: auto;
-}
-.silhouette-base {
-  fill: var(--bg-raised);
-  stroke: var(--border-subtle);
-  stroke-width: 1.5;
-}
-.silhouette-limb {
-  stroke: var(--border-subtle);
-  stroke-width: 9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  min-width: 0;
+  overflow: hidden;
 }
 .figure-region-target {
   cursor: pointer;
@@ -309,32 +190,6 @@
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
-}
-.figure-region-target:focus-visible .region-shape {
-  stroke: var(--accent);
-  stroke-width: 2.5;
-  fill: color-mix(in srgb, var(--accent) 20%, transparent);
-}
-.region-shape {
-  fill: color-mix(in srgb, var(--accent) 9%, transparent);
-  stroke: var(--accent);
-  stroke-width: 1.5;
-  stroke-dasharray: 3 2;
-  transition: fill 0.2s ease, stroke-width 0.2s ease;
-}
-.region-pin {
-  fill: var(--accent);
-  transition: r 0.2s ease;
-}
-.figure-region-target.is-active .region-shape,
-.figure-region-target:hover .region-shape {
-  fill: color-mix(in srgb, var(--accent) 27%, transparent);
-  stroke-width: 2.5;
-  stroke-dasharray: none;
-}
-.figure-region-target.is-active .region-pin,
-.figure-region-target:hover .region-pin {
-  r: 5;
 }
 .crew-figure-list {
   list-style: none;
@@ -422,15 +277,7 @@
   transform: translateX(2px);
 }
 
-@media (max-width: 767px) {
-  .mission-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .mission-stats > div:nth-child(2n+1) { border-left: 0; }
-  .mission-stats > div:nth-child(n+3) { border-top: 1px solid var(--line); }
-}
 @media (max-width: 810px) {
-  .routine-checklist-items {
-    grid-template-columns: 1fr;
-  }
   .crew-figure-layout {
     grid-template-columns: 1fr;
     justify-items: center;
@@ -479,8 +326,7 @@
 .domain-origin-badge { margin: 6px 0 0 8px; vertical-align: middle; }
 
 /* ───────── 3D crew digital twin host ───────── */
-.crew-figure-visual-wrap.is-3d { padding: 0; overflow: hidden; background: transparent; }
-.crew-figure-fallback { margin: 0 0 12px; color: var(--status-change); font-size: 0.9rem; }
+.crew-figure-unavailable { margin: 0 0 12px; color: var(--status-change); font-size: 0.9rem; }
 .twin { width: 100%; }
 .twin-viewport {
   position: relative;
@@ -599,13 +445,8 @@
 .habitat-air-note { margin: 0 0 10px; font-size: 0.9rem; }
 .habitat-air-table td.status-change { color: var(--status-change); }
 
-.dashboard-overview {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(245px, 1fr);
-  gap: 14px;
-  margin-top: 14px;
-}
-.recent-readings, .dashboard-flags { min-width: 0; padding: clamp(16px, 2.2vw, 25px); }
+.dashboard-recent { margin-top: 18px; }
+.recent-readings { min-width: 0; padding: clamp(16px, 2.2vw, 25px); }
 .recent-readings-header, .recent-readings-controls, .chart-heading {
   display: flex;
   align-items: center;
@@ -613,7 +454,7 @@
 }
 .recent-readings-header { justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; }
 .chart-heading svg { color: var(--accent); flex: none; }
-.chart-heading h2, .dashboard-flags h2, .dashboard-intel-image h2 {
+.chart-heading h2, .dashboard-intel-image h2 {
   margin: 0;
   font-size: 1.17rem;
   letter-spacing: -0.025em;
@@ -680,22 +521,11 @@
 .reading-sol { display: block; margin-top: 7px; text-align: center; color: var(--text-secondary); font: 400 0.74rem var(--mono); }
 .reading-chart-source { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 13px 0 0; color: var(--text-secondary); font-size: 0.79rem; }
 .reading-chart-empty { color: var(--text-secondary); }
-.dashboard-flags {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  background: radial-gradient(ellipse at 100% 0%, #4b3125 0%, var(--bg-surface) 65%);
-}
-.dashboard-flags .flags-title { width: 100%; }
-.dashboard-flags .round-link { margin-left: auto; }
-.flag-total { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin: 11px 0 4px; }
-.flag-total strong { font: 540 clamp(3.5rem, 5.6vw, 5.35rem)/1.05 var(--font-display); letter-spacing: -0.06em; }
-.flag-total span { font-size: 0.85rem; color: var(--text-secondary); }
-.flag-summary { margin: 5px 0 15px; }
-.dashboard-flags .text-link { margin-top: auto; }
 .domain-card {
   --domain-glow: var(--status-neutral);
-  min-height: 140px;
+  position: relative;
+  min-height: 155px;
+  padding-bottom: 44px;
   background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--domain-glow) 14%, var(--bg-surface)), var(--bg-surface) 72%);
 }
 .domain-card[data-tone='steady'] { --domain-glow: var(--status-steady); }
@@ -703,7 +533,23 @@
 .domain-card[data-tone='trend'] { --domain-glow: var(--status-trend); }
 .domain-card[data-tone='check'] { --domain-glow: var(--status-check); }
 .domain-card .domain-icon { color: var(--domain-glow); }
-.domain-value { font-family: var(--font-display); font-size: clamp(1.02rem, 1.8vw, 1.45rem); }
+.domain-card .domain-value {
+  font: 700 clamp(1.2rem, 2.25vw, 1.8rem)/1.18 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.domain-card .domain-status { font-size: 0.88rem; font-weight: 750; }
+.domain-info-link {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--accent);
+}
+.domain-info-link:hover { background: var(--tint-accent); }
 .domain-icon { border-radius: 50%; }
 .dashboard-intel-image {
   --intel-photo: url('../../ui/assets/nasa/crew-lab.webp');
@@ -739,7 +585,6 @@
 .mission-explore-actions .button { font-size: 0.88rem; }
 
 @media (max-width: 767px) {
-  .dashboard-overview { grid-template-columns: 1fr; }
   .mission-hero {
     min-height: 390px;
     align-items: flex-end;
@@ -760,6 +605,46 @@
 }
 @media (max-width: 420px) {
   .domain-title { flex-wrap: wrap; gap: 6px; }
-  .domain-card-arrow { display: none; }
   .dashboard-quick-intel-grid { grid-template-columns: 1fr; }
+}
+
+.dashboard-start {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+.dashboard-start .mission-hero:only-child { grid-column: 1 / -1; }
+.dashboard-start .mission-hero { min-height: 210px; }
+.dashboard-start .mission-hero-content { padding: clamp(16px, 2.6vw, 32px); }
+.dashboard-start .mission-hero h1 { font-size: clamp(2.4rem, 4.3vw, 4.1rem); }
+.dashboard-start .mission-habitat { margin-bottom: 8px; }
+.dashboard-start .mission-scenario { margin: 8px 0 13px; }
+.dashboard-health-summary {
+  margin-top: 14px;
+  padding: 14px 18px;
+  background: var(--bg-raised);
+}
+.dashboard-health-summary ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style: disc;
+}
+.dashboard-health-summary li + li { margin-top: 5px; }
+.dashboard-health-summary p { margin: 5px 0 0; }
+.dashboard-health-summary .muted { font-size: 0.83rem; }
+@media (max-width: 730px) {
+  .dashboard-start { grid-template-columns: 1fr; gap: 10px; }
+  .dashboard-start .mission-hero { min-height: 166px; }
+  .dashboard-start .mission-hero h1 { font-size: clamp(2rem, 8vw, 3.3rem); }
+  .dashboard-start .mission-photo-credit { font-size: 0.63rem; bottom: 7px; right: 7px; }
+  .routine-checklist-label { min-height: 34px; }
+}
+@media (max-width: 380px) {
+  .dashboard-start .mission-photo-credit { display: none; }
+}
+
+@media (max-width: 730px) {
+  .dashboard .crew-figure-subtitle { display: none; }
+  .dashboard .twin-viewport { aspect-ratio: 1; }
 }

@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, ArrowUpRight, Images, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { mediaCatalog, mediaCategories, type MediaCategory } from './mediaCatalog';
+import { StationModel } from './StationModel';
 import './mission-media.css';
 
 const PAGE_SIZE = 12;
@@ -52,6 +53,8 @@ export function MissionMedia() {
           </select>
         </label>
       </header>
+
+      <StationModel />
 
       <ul className="mission-media-grid">
         {assets.slice(0, limit).map((asset, index) => (

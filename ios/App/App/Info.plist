@@ -4,6 +4,8 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Sol Check uses the camera only on this device to estimate your pulse. No video or face data is saved or sent.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sol Check listens only while voice mode is open, so you can talk to Ask Sol. Speech is turned into text on this device; no audio is saved or sent.</string>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleLightContent</string>
   <key>CAPACITOR_DEBUG</key>

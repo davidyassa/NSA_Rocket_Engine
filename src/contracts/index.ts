@@ -1,8 +1,12 @@
 import { z } from 'zod';
 
-export const METRIC_IDS = [
+export const CORE_METRIC_IDS = [
   'heart_rate', 'bp_systolic', 'bp_diastolic', 'body_temp',
   'blood_glucose', 'sleep_duration', 'mood',
+] as const;
+
+export const METRIC_IDS = [
+  ...CORE_METRIC_IDS,
   // Optional readings added from the crew-health gap review:
   'heart_rate_standing', 'bp_systolic_standing', 'bp_diastolic_standing', // stand-up (orthostatic) test
   'fluid_intake', 'exercise_minutes', // hydration and the muscle/bone countermeasure
@@ -68,7 +72,7 @@ export const METRICS: Record<MetricId, MetricInfo> = {
   body_mass: { label: 'Body mass', unit: 'kg', unitLabel: 'kg', domain: 'metabolic', optional: true },
 };
 
-export const SYMPTOM_OPTIONS = [
+export const CORE_SYMPTOM_OPTIONS = [
   { id: 'headache', label: 'Headache' },
   { id: 'dizziness', label: 'Dizziness' },
   { id: 'fatigue', label: 'Fatigue' },
@@ -77,6 +81,10 @@ export const SYMPTOM_OPTIONS = [
   { id: 'chest_discomfort', label: 'Chest discomfort' },
   { id: 'digestive_discomfort', label: 'Digestive discomfort' },
   { id: 'muscle_ache', label: 'Muscle ache' },
+] as const;
+
+export const SYMPTOM_OPTIONS = [
+  ...CORE_SYMPTOM_OPTIONS,
   // Space motion sickness and balance
   { id: 'vertigo', label: 'Spinning or vertigo' },
   { id: 'vomiting', label: 'Vomiting' },
@@ -169,6 +177,7 @@ export const dailyCheckinSchema = z.object({
   submittedAtUtc: utc,
   measurements: z.array(healthMeasurementSchema),
   symptoms: z.array(symptomSchema),
+  assessmentScope: z.enum(['core', 'extended']).optional(),
   note: z.string().max(500),
 });
 export const environmentalSampleSchema = z.object({
@@ -277,7 +286,7 @@ export const demoScenarioSchema = z.object({
 export const auditEventSchema = z.object({
   id: z.string().min(1),
   atUtc: utc,
-  type: z.enum(['checkin_saved', 'demo_reset']),
+  type: z.enum(['checkin_saved', 'ground_draft_prepared', 'demo_reset']),
   refId: z.string().min(1),
 });
 
@@ -315,6 +324,7 @@ export type CheckinEntry = {
   note: string;
   provenance: Partial<Record<MetricId, 'user_entered' | 'synthetic_demo'>>;
   capture: Partial<Record<MetricId, MeasurementCapture>>;
+  assessmentScope?: DailyCheckin['assessmentScope'];
 };
 
 export interface StorageRepository<T> {

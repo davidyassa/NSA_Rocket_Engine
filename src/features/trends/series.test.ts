@@ -33,3 +33,17 @@ describe('trend series', () => {
     expect(points[1]).toMatchObject({ value: null, provenance: null, hasEntryError: true });
   });
 });
+
+describe('reported symptom trends', () => {
+  it('distinguishes a review with no symptoms from missing reviews and check-ins', () => {
+    const none = { id: 'headache', label: 'Headache', present: false };
+    const records = [
+      { ...sleepCheckin(1, 8), symptoms: [none] },
+      sleepCheckin(2, 8),
+      { ...sleepCheckin(4, 8), symptoms: [{ ...none, present: true }] },
+    ];
+    const points = buildTrendSeries('symptoms', records);
+    expect(points.map(({ value, baseline }) => [value, baseline]))
+      .toEqual([[0, null], [null, null], [null, null], [1, null]]);
+  });
+});

@@ -11,8 +11,13 @@
 ## 2. NASA Source Verification & Eligibility Status
 * **Challenge Resources Page:** `https://www.spaceappschallenge.org/2026/challenges/health-monitoring-software/?tab=resources`
 * **Organizer Source Requirement Discussion:** `https://github.com/nasa/spaceapps/discussions/1827`
-* **Current Status:** The Resources tab on the 2026 challenge page currently displays a placeholder prior to the hackathon window. The Global Awards source requirement is therefore marked **MANUAL PENDING** until the official list is finalized by organizers.
-* **Verified NASA Data Source:**
+* **Comprehensive Academic & Provenance Catalog:** See [docs/real-datasets-and-citations.md](real-datasets-and-citations.md) for the complete academic report, mathematical RCV derivations, SHA-256 hashes, and peer-reviewed citations.
+* **Current Status:** Met. Sol Check uses two real NASA Open Science Data Repository (OSDR) datasets, listed below. Re-check the 2026 Resources tab once organizers publish the final list and add any newly required source.
+* **Verified NASA Data Source 1 (crew health): SpaceX Inspiration4 complete blood count, OSD-569**
+  * **Study:** `https://osdr.nasa.gov/bio/repo/data/studies/OSD-569` · file `LSDS-7_Complete_Blood_Count_CBC.upload_SUBMITTED.csv` (four crew, 3 pre-flight + 4 post-flight time points).
+  * **Where Sol Check uses it:** **Demo and data → Tested on real astronaut data**. Sol Check's personal-baseline method runs on the real data: 0 of 20 day-after-return values fall outside the lab's population range, yet 4 are real changes from the crew member's own pre-flight baseline (reference change value from published biological variation), all back to usual by the next visit. The data-quality gate catches 2 entry errors in the published file.
+  * **Files:** `src/data/nasa/osd-569-cbc.csv` (untouched source, SHA-256 in the manifest), `src/data/nasa/inspiration4-cbc.json`, analysis in `src/data/nasa/inspiration4.ts` with tests. Re-import or verify: `node scripts/nasa/import-osdr-cbc.mjs --verify`.
+* **Verified NASA Data Source 2 (environment):**
   * **Repository:** NASA Open Science Data Repository (OSDR) RadLab (`https://visualization.osdr.nasa.gov/radlab/gui/`)
   * **Instrument:** Mars Science Laboratory (MSL) Curiosity Rover Radiation Assessment Detector (`MSL-RAD-Surface`).
   * **Dataset Period:** 4–17 September 2017 solar particle event (1,220 raw surface observations, 330 hourly medians, 6 missing hours).
@@ -152,15 +157,14 @@ npx vite preview --port 4173
 ## 7. Optional Camera Pulse Check Demonstration & Fallback Policy
 * **Posture:** The Camera pulse check is strictly an **experimental, view-only on-device estimate**.
 * **Live Test Steps:**
-  1. On `#/check-in`, click **"📷 Camera pulse check (optional)"**.
-  2. Read the consent disclosures (strictly on-device WebAssembly processing, volatile memory only, no cloud transmission).
-  3. Click **"I consent · Start camera"**.
-  4. Position face within the frame under steady, even lighting.
-  5. The video stream will detect the face and analyze optical pulse variations.
-  6. Click **"Stop"** to finish.
-  7. Notice that the estimate is labeled **"Not a diagnosis"** and **never alters the manual input field, saved medical records, personal baselines, or clinical risk assessment**.
-* **Manual Fallback Rule:** If lighting conditions or camera drivers in the judging room produce a "Signal too weak" reading, click **"Close"** or **"Cancel"** and use the manual check-in field. State clearly to judges: *"The camera pulse check is an experimental opt-in tool running 100% on-device WebAssembly inference; clinical check-in retains manual sensor entry to guarantee dependability."*
+  1. On `#/check-in` (step 1, Heart rate), click **"Measure with camera (optional)"**.
+  2. Read the four setup steps and the privacy line (video stays on the device; nothing is recorded or sent).
+  3. Click **"I’m ready · Start camera"** and follow the one-line coaching (face in the oval, light, distance).
+  4. The result appears automatically inside the oval after about 15 seconds of clear signal, with plain-language meaning.
+  5. Click **"Use … in my check-in"** to copy it into the heart-rate field (tagged `camera_estimate` with signal quality and algorithm), or **Done** to discard it.
+  6. Step 2 (Breathing & HRV) offers the same camera check for breathing rate and heart rate variability (about 45 seconds).
+* **Manual Fallback Rule:** If lighting conditions or camera drivers in the judging room produce a "We couldn’t get a clear reading" result, click **"Close"** or **"Cancel"** and use the manual check-in field. State clearly to judges: *"The camera pulse check is an experimental opt-in tool running 100% on-device WebAssembly inference; clinical check-in retains manual sensor entry to guarantee dependability."*
 * **Manual Acceptance Status:**
-  * Real-camera hardware scan with live subject: **MANUAL PENDING** (perform on judging laptop).
-  * Reference pulse sensor comparison: **MANUAL PENDING** (perform if pulse oximeter hardware is available).
-  * First-time participant elapsed time: **MANUAL PENDING** (time live rehearsal with stopwatch).
+  * Bench test with a known pulse (82/67/104 bpm at 24/15/30 fps): **DONE**, exact match, about 15 s each. See `docs/validation/README.md`.
+  * Real-camera scan with live subjects vs a fingertip pulse oximeter (5–10 people): **TO DO**. Protocol, CSV template and `node scripts/validate-camera.mjs` report are ready in `docs/validation/`.
+  * First-time participant elapsed time: **TO DO** (time a live rehearsal with a stopwatch).

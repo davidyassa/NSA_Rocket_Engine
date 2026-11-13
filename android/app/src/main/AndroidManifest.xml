@@ -34,6 +34,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Optional camera pulse check: live video only, processed on device, never saved or sent. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Ask Sol voice mode: speech is turned into text on the device -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 </manifest>

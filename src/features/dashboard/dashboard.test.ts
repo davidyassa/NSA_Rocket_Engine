@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HEALTH_DOMAINS } from '../../contracts';
 import { DOMAIN_TARGETS } from './CrewBodyFigure';
+import { missedPreviousSol } from './MissedCheckin';
+
 
 describe('dashboard domain navigation', () => {
   it('defines an accessible navigation target for every health domain', () => {
@@ -20,5 +22,13 @@ describe('dashboard domain navigation', () => {
     expect(DOMAIN_TARGETS.sleep.path).toBe('/trends?metric=sleep_duration');
     expect(DOMAIN_TARGETS.behavioral.path).toBe('/trends?metric=mood');
     expect(DOMAIN_TARGETS.symptoms.path).toBe('/assessment');
+  });
+});
+
+describe('missed check-in warning', () => {
+  it('warns for a missing previous sol without treating the current sol as missed', () => {
+    expect(missedPreviousSol(1, [])).toBeNull();
+    expect(missedPreviousSol(43, [{ sol: 42 }])).toBeNull();
+    expect(missedPreviousSol(44, [{ sol: 42 }, { sol: 44 }])).toBe(43);
   });
 });

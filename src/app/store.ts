@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import {
-  dailyCheckinSchema, METRIC_IDS, METRICS, SYMPTOM_OPTIONS, utcAtSol,
+  CORE_SYMPTOM_OPTIONS, dailyCheckinSchema, METRIC_IDS, METRICS, SYMPTOM_OPTIONS, utcAtSol,
 } from '../contracts';
-import type { CheckinEntry, DailyCheckin, DemoScenario, HealthMeasurement, MeasurementCapture } from '../contracts';
+import type { AuditEvent, CheckinEntry, DailyCheckin, DemoScenario, HealthMeasurement, MeasurementCapture } from '../contracts';
 import { validateCheckinMeasurements } from '../engine';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
 import { createStorageRepository, emptyMission } from './storage';
 import type { StoredMission } from './storage';
+import type { VigilanceSession } from '../features/cognitive/vigilance';
+import type { IsolationPlan } from '../features/hazards/isolationPlan';
 
 const storage = () => createStorageRepository(window.localStorage);
 
@@ -38,10 +40,15 @@ function captureOf(reading: HealthMeasurement): MeasurementCapture | null {
   };
 }
 
-export function buildCheckin(entry: CheckinEntry, scenario: DemoScenario): DailyCheckin {
-  const { profile, missionContext, startSol } = scenario;
-  const id = `${profile.id}:sol-${startSol}`;
-  const observedAtUtc = utcAtSol(missionContext, startSol, 8 * 3600);
+export function activeSol(mission: StoredMission) {
+  const { startSol } = DEMO_OPTIONS[mission.scenarioId].scenario;
+  return Math.max(startSol, mission.activeSols?.[mission.scenarioId] ?? startSol);
+}
+
+export function buildCheckin(entry: CheckinEntry, scenario: DemoScenario, sol = scenario.startSol): DailyCheckin {
+  const { profile, missionContext } = scenario;
+  const id = `${profile.id}:sol-${sol}`;
+  const observedAtUtc = utcAtSol(missionContext, sol, 8 * 3600);
   const measurements = METRIC_IDS.flatMap((metric) => {
     const value = entry.values[metric];
     if (value === undefined) return [];
@@ -61,8 +68,10 @@ export function buildCheckin(entry: CheckinEntry, scenario: DemoScenario): Daily
   });
 
   const checkin: DailyCheckin = {
-    id, astronautId: profile.id, sol: startSol, submittedAtUtc: observedAtUtc, measurements,
-    symptoms: SYMPTOM_OPTIONS.map(({ id, label }) => ({ id, label, present: entry.symptomIds.includes(id) })),
+    id, astronautId: profile.id, sol, submittedAtUtc: observedAtUtc, measurements,
+    symptoms: (entry.assessmentScope === 'core' ? CORE_SYMPTOM_OPTIONS : SYMPTOM_OPTIONS)
+      .map(({ id, label }) => ({ id, label, present: entry.symptomIds.includes(id) })),
+    ...(entry.assessmentScope ? { assessmentScope: entry.assessmentScope } : {}),
     note: entry.note.trim(),
   };
   const issues = validateCheckinMeasurements(checkin);
@@ -86,6 +95,7 @@ export function entryFromCheckin(checkin: DailyCheckin): CheckinEntry {
   return {
     values, provenance, capture, note: checkin.note,
     symptomIds: checkin.symptoms.filter((symptom) => symptom.present).map((symptom) => symptom.id),
+    ...(checkin.assessmentScope ? { assessmentScope: checkin.assessmentScope } : {}),
   };
 }
 
@@ -94,6 +104,10 @@ type MissionStore = {
   warning: string | null;
   loadScenario(scenarioId: ScenarioId): void;
   saveCheckin(entry: CheckinEntry): void;
+  recordGroundDraft(checkinId: string): void;
+  advanceSol(scenarioId: ScenarioId, sol: number): void;
+  saveVigilance(scenarioId: ScenarioId, session: VigilanceSession): void;
+  saveIsolationPlan(scenarioId: ScenarioId, sol: number, plan: IsolationPlan): void;
   toggleChecklistItem(itemId: string, sol: number): void;
   resetDemo(): void;
 };
@@ -141,10 +155,13 @@ export const useMissionStore = create<MissionStore>((set, get) => ({
   },
   saveCheckin(entry) {
     const scenarioId = get().mission.scenarioId;
-    const checkin = buildCheckin(entry, DEMO_OPTIONS[scenarioId].scenario);
     try {
       const repository = storage();
       const current = repository.load() ?? emptyMission;
+      if (current.scenarioId !== scenarioId || activeSol(current) !== activeSol(get().mission)) {
+        throw new Error('The active mission changed.');
+      }
+      const checkin = buildCheckin(entry, DEMO_OPTIONS[scenarioId].scenario, activeSol(current));
       const mission: StoredMission = {
         ...current,
         scenarioId,
@@ -161,6 +178,62 @@ export const useMissionStore = create<MissionStore>((set, get) => ({
     } catch {
       throw new Error('This check-in could not be saved on this device. Your entries are still in the form.');
     }
+  },
+  recordGroundDraft(checkinId) {
+    const repository = storage();
+    const current = repository.load() ?? emptyMission;
+    if (current.scenarioId !== get().mission.scenarioId) throw new Error('The active mission changed.');
+    const event: AuditEvent = {
+      id: crypto.randomUUID(),
+      atUtc: new Date().toISOString(),
+      type: 'ground_draft_prepared',
+      refId: `${current.scenarioId}/${checkinId}`,
+    };
+    const mission = { ...current, audit: [...current.audit, event].slice(-100) };
+    repository.save(mission);
+    set({ mission, warning: null });
+  },
+  advanceSol(scenarioId, sol) {
+    const repository = storage();
+    const current = repository.load() ?? emptyMission;
+    if (current.scenarioId !== scenarioId || activeSol(current) !== sol
+      || !current.entries[scenarioId]?.some((record) => record.sol === sol)) {
+      throw new Error('Save the current check-in before opening the next sol.');
+    }
+    const mission = { ...current, activeSols: { ...current.activeSols, [scenarioId]: sol + 1 } };
+    repository.save(mission);
+    set({ mission, warning: null });
+  },
+  saveVigilance(scenarioId, session) {
+    const repository = storage();
+    const current = repository.load() ?? get().mission;
+    const baseMission = current.scenarioId === scenarioId ? current : { ...current, scenarioId };
+    const history = baseMission.vigilance?.[scenarioId] ?? [];
+    const mission = {
+      ...baseMission,
+      vigilance: {
+        ...baseMission.vigilance,
+        [scenarioId]: [...history.filter((item) => item.sol !== session.sol || item.mode !== session.mode), session],
+      },
+    };
+    repository.save(mission);
+    set({ mission, warning: null });
+  },
+  saveIsolationPlan(scenarioId, sol, plan) {
+    const repository = storage();
+    const current = repository.load() ?? emptyMission;
+    if (current.scenarioId !== scenarioId || activeSol(current) !== sol) {
+      throw new Error('The active sol changed. Open Hazard 2 for the current sol.');
+    }
+    const mission = {
+      ...current,
+      isolationPlans: {
+        ...current.isolationPlans,
+        [scenarioId]: { ...current.isolationPlans?.[scenarioId], [sol]: plan },
+      },
+    };
+    repository.save(mission);
+    set({ mission, warning: null });
   },
   resetDemo() {
     try {

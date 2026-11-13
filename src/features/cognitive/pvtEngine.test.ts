@@ -1,55 +1,48 @@
 import { describe, expect, it } from 'vitest';
-import { evaluatePvtTrials, type PvTrialResult } from './pvtEngine';
+import { summarizeVigilance } from './pvtEngine';
+import { vigilanceBaseline, vigilanceSessionSchema, type VigilanceSession } from './vigilance';
 
-describe('NASA Brief Psychomotor Vigilance Task (PVT-B) Engine', () => {
-  it('correctly assesses optimal cognitive performance with 0 lapses and fast reaction times', () => {
-    const trials: PvTrialResult[] = [
-      { trialIndex: 1, reactionTimeMs: 215, isFalseStart: false, isLapse: false, timestamp: 1 },
-      { trialIndex: 2, reactionTimeMs: 228, isFalseStart: false, isLapse: false, timestamp: 2 },
-      { trialIndex: 3, reactionTimeMs: 210, isFalseStart: false, isLapse: false, timestamp: 3 },
-      { trialIndex: 4, reactionTimeMs: 235, isFalseStart: false, isLapse: false, timestamp: 4 },
-      { trialIndex: 5, reactionTimeMs: 222, isFalseStart: false, isLapse: false, timestamp: 5 },
-    ];
+describe('Vigilance results', () => {
+  it('applies the selected lapse threshold and excludes missed and early responses from the mean', () => {
+    const trials = [354, 355, 499, 500, 'early', 'missed'] as const;
+    const timed = summarizeVigilance(trials, 'timed', 43);
+    const standard = summarizeVigilance(trials, 'standard', 43);
 
-    const summary = evaluatePvtTrials(trials, 43, 220);
-    expect(summary.sol).toBe(43);
-    expect(summary.validTrials).toBe(5);
-    expect(summary.lapsesCount).toBe(0);
-    expect(summary.falseStartsCount).toBe(0);
-    expect(summary.performanceTier).toBe('optimal');
-    expect(summary.meanRtMs).toBeGreaterThan(210);
-    expect(summary.meanRtMs).toBeLessThan(230);
-    expect(summary.vigilanceScore).toBeGreaterThanOrEqual(90);
+    expect(vigilanceSessionSchema.parse(timed)).toMatchObject({
+      sol: 43, meanRtMs: 427, lapsesCount: 4, validTrials: 4, totalTrials: 6, missedCount: 1, falseStartsCount: 1,
+    });
+    expect(standard?.lapsesCount).toBe(2);
+    expect(summarizeVigilance(['early', 'missed'], 'quick', 43)).toBeNull();
   });
 
-  it('detects significant fatigue when lapses and substantial reaction-time prolongation occur', () => {
-    const trials: PvTrialResult[] = [
-      { trialIndex: 1, reactionTimeMs: 340, isFalseStart: false, isLapse: false, timestamp: 1 },
-      { trialIndex: 2, reactionTimeMs: 560, isFalseStart: false, isLapse: true, timestamp: 2 },
-      { trialIndex: 3, reactionTimeMs: 380, isFalseStart: false, isLapse: false, timestamp: 3 },
-      { trialIndex: 4, reactionTimeMs: 620, isFalseStart: false, isLapse: true, timestamp: 4 },
-      { trialIndex: 5, reactionTimeMs: 390, isFalseStart: false, isLapse: false, timestamp: 5 },
+  it('compares the latest usable session on each distinct prior sol in the same mode', () => {
+    const current = summarizeVigilance([250, 500, 250], 'quick', 45)!;
+    const session = (sol: number, meanRtMs: number, extra: Partial<VigilanceSession> = {}) => ({
+      ...current, sol, meanRtMs, ...extra,
+    });
+    const prior = [
+      session(30, 900),
+      session(41, 220),
+      session(42, 400, { mode: 'timed' }),
+      session(43, 260, { completedAt: '2026-11-13T08:00:00.000Z' }),
+      session(43, 240, { completedAt: '2026-11-13T09:00:00.000Z' }),
+      session(45, 700),
     ];
 
-    const summary = evaluatePvtTrials(trials, 43, 220);
-    expect(summary.validTrials).toBe(5);
-    expect(summary.lapsesCount).toBe(2);
-    expect(summary.performanceTier).toBe('significant_fatigue');
-    expect(summary.clinicalInterpretation).toContain('cognitive lapse');
-    expect(summary.vigilanceScore).toBeLessThan(70);
+    expect(vigilanceBaseline(prior, current)).toBeNull();
+    expect(vigilanceBaseline([...prior, session(44, 280, { lapsesCount: 2 })], current))
+      .toEqual({ meanRtMs: 240, lapsesCount: 1, count: 3 });
   });
 
-  it('correctly tracks false starts and excludes them from valid reaction time averages', () => {
-    const trials: PvTrialResult[] = [
-      { trialIndex: 1, reactionTimeMs: 45, isFalseStart: true, isLapse: false, timestamp: 1 },
-      { trialIndex: 2, reactionTimeMs: 230, isFalseStart: false, isLapse: false, timestamp: 2 },
-      { trialIndex: 3, reactionTimeMs: 240, isFalseStart: false, isLapse: false, timestamp: 3 },
-    ];
-
-    const summary = evaluatePvtTrials(trials, 43, 220);
-    expect(summary.totalTrials).toBe(3);
-    expect(summary.validTrials).toBe(2);
-    expect(summary.falseStartsCount).toBe(1);
-    expect(summary.meanRtMs).toBe(235);
+  it('summarizes quick 3-trial session with reaction times and false starts correctly', () => {
+    const trials = ['early', 240, 260, 250] as const;
+    const session = summarizeVigilance(trials, 'quick', 43);
+    expect(session).not.toBeNull();
+    expect(session?.validTrials).toBe(3);
+    expect(session?.falseStartsCount).toBe(1);
+    expect(session?.totalTrials).toBe(4);
+    expect(session?.meanRtMs).toBe(250);
+    expect(session?.lapsesCount).toBe(0);
+    expect(vigilanceSessionSchema.parse(session)).toBeDefined();
   });
 });

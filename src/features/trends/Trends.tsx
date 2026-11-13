@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { METRIC_IDS, METRICS } from '../../contracts';
@@ -7,6 +7,8 @@ import { BASELINE_LOOKBACK_SOLS, MIN_BASELINE_READINGS } from '../../engine/rule
 import { TOKENS } from '../../ui/tokens';
 import { buildTrendSeries } from './series';
 import type { TrendPoint } from './series';
+import { VigilanceReadings } from '../cognitive/VigilanceReadings';
+import type { VigilanceSession } from '../cognitive/vigilance';
 import './trends.css';
 
 const provenanceLabels: Record<Provenance, string> = {
@@ -38,14 +40,20 @@ function TrendDot({ cx, cy, payload }: { cx?: number | null; cy?: number | null;
   return <circle cx={cx} cy={cy} r={3.2} fill={TOKENS.bgSurface} stroke={readingColor} strokeWidth={1.6} />;
 }
 
-function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId }) {
-  const { label, unitLabel } = METRICS[metric];
+type ChartIndicator = MetricId | 'symptoms';
+
+function chartLabels(metric: ChartIndicator) {
+  return metric === 'symptoms' ? { label: 'Reported symptoms', unitLabel: 'reported' } : METRICS[metric];
+}
+
+function TrendChart({ points, metric }: { points: TrendPoint[]; metric: ChartIndicator }) {
+  const { label, unitLabel } = chartLabels(metric);
   const origins = new Set(points.flatMap((point) => point.provenance ? [point.provenance] : []));
   const hasBaseline = points.some((point) => point.baseline !== null);
   const mood = metric === 'mood';
 
   return (
-    <figure className="trend-figure" aria-label={`${label} readings and personal baseline by mission sol`}>
+    <figure className="trend-figure" aria-label={`${label} by mission sol`}>
       <figcaption className="trend-legend">
         {Array.from(origins).map((origin) => (
           <span key={origin}>
@@ -73,7 +81,7 @@ function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId
                   <div className="trend-tooltip">
                     <strong>Sol {point.sol}</strong>
                     <span>{readingLabel(point, unitLabel)}{point.provenance && ` · ${provenanceLabels[point.provenance]}`}</span>
-                    <span>Personal baseline · {baselineLabel(point, unitLabel)}</span>
+                    {metric !== 'symptoms' && <span>Personal baseline · {baselineLabel(point, unitLabel)}</span>}
                   </div>
                 );
               }} />
@@ -91,51 +99,25 @@ function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId
   );
 }
 
-export function Trends({ records }: { records: readonly DailyCheckin[] }) {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const queryMetric = searchParams.get('metric');
-  const validMetric = (queryMetric && METRIC_IDS.includes(queryMetric as MetricId)) ? (queryMetric as MetricId) : null;
-  const [metric, setMetric] = useState<MetricId>(validMetric ?? 'sleep_duration');
-  const [showAll, setShowAll] = useState(false);
+const indicators = [...METRIC_IDS, 'symptoms', 'vigilance'] as const;
+type Indicator = (typeof indicators)[number];
 
-  useEffect(() => {
-    if (validMetric && validMetric !== metric) {
-      setMetric(validMetric);
-    }
-  }, [validMetric, metric]);
-
+function IndicatorTrend({ metric, records, showAll, setShowAll }: {
+  metric: ChartIndicator;
+  records: readonly DailyCheckin[];
+  showAll: boolean;
+  setShowAll: (value: boolean) => void;
+}) {
   const series = useMemo(() => buildTrendSeries(metric, records), [metric, records]);
   const points = showAll ? series : series.slice(-BASELINE_LOOKBACK_SOLS);
   const latest = series.at(-1);
-  const { label, unitLabel } = METRICS[metric];
-
-  function chooseMetric(id: MetricId) {
-    setMetric(id);
-    setSearchParams({ metric: id });
-  }
+  const { label, unitLabel } = chartLabels(metric);
 
   return (
-    <div className="trends-page">
-      <header className="page-intro">
-        <h1>Trends</h1>
-        <p>Compare your check-ins with your personal baseline by mission sol.</p>
-      </header>
-
-      <fieldset className="trend-selector">
-        <legend>Indicator</legend>
-        <div className="trend-metrics">
-          {METRIC_IDS.map((id) => (
-            <label className="trend-metric" key={id}>
-              <input type="radio" name="trend-metric" value={id} checked={id === metric} onChange={() => chooseMetric(id)} />
-              <span>{METRICS[id].label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <section className="panel trend-panel" aria-labelledby="trend-indicator-title">
+    <>
+      <section className="panel trend-panel" aria-label={label}>
         <div className="trend-panel-heading">
-          <h2 id="trend-indicator-title">{label}</h2>
+          <h2>{label}</h2>
           {series.length > BASELINE_LOOKBACK_SOLS && (
             <label className="trend-range">
               <span>Range</span>
@@ -157,13 +139,13 @@ export function Trends({ records }: { records: readonly DailyCheckin[] }) {
                   {latest.provenance && <span className="badge">{provenanceLabels[latest.provenance]}</span>}
                 </dd>
               </div>
-              <div>
+              {metric !== 'symptoms' && <div>
                 <dt>Personal baseline</dt>
                 <dd>
                   <strong>{baselineLabel(latest, unitLabel)}</strong>
                   {latest.baselineCount !== null && <span className="muted">{latest.baselineCount} measured sols</span>}
                 </dd>
-              </div>
+              </div>}
             </dl>
             {points.some((point) => point.value !== null || point.baseline !== null) ? (
               <TrendChart points={points} metric={metric} />
@@ -172,32 +154,87 @@ export function Trends({ records }: { records: readonly DailyCheckin[] }) {
         ) : <p className="trend-empty">Save a check-in to start viewing trends.</p>}
       </section>
 
-      <p className="trend-method muted">
+      {metric === 'symptoms' ? (
+        <p className="trend-method muted">Counts come from the symptom review in each check-in. Missing reviews appear as gaps.</p>
+      ) : <p className="trend-method muted">
         Each baseline is the median of at least {MIN_BASELINE_READINGS} measured sols within the previous {BASELINE_LOOKBACK_SOLS} sols.
         {' '}Missing readings appear as gaps. The baseline is a personal reference for this demo.
-      </p>
+      </p>}
+    </>
+  );
+}
 
-      {points.length > 0 && (
-        <details className="panel trend-records">
-          <summary>View readings by sol <span className="muted">{points.length} sols</span></summary>
-          <div className="trend-table-wrap" tabIndex={0} role="region" aria-label={`${label} readings by sol`}>
-            <table className="trend-table data-table">
-              <caption className="sr-only">{label} readings and personal baseline</caption>
-              <thead><tr><th scope="col">Sol</th><th scope="col">Reading</th><th scope="col">Baseline</th><th scope="col">Origin</th></tr></thead>
-              <tbody>
-                {[...points].reverse().map((point) => (
-                  <tr key={point.sol}>
-                    <th scope="row">{point.sol}</th>
-                    <td>{readingLabel(point, unitLabel)}</td>
-                    <td>{baselineLabel(point, unitLabel)}</td>
-                    <td>{point.provenance ? provenanceLabels[point.provenance] : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      )}
+export function Trends({ records, vigilance, sol }: {
+  records: readonly DailyCheckin[];
+  vigilance: readonly VigilanceSession[];
+  sol: number;
+}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryMetric = searchParams.get('metric');
+  const metric = indicators.find((id) => id === queryMetric) ?? 'sleep_duration';
+  const [showAll, setShowAll] = useState(false);
+  const tabs = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const list = tabs.current;
+    const selected = list?.querySelector('[aria-selected="true"]');
+    if (!list || !selected) return;
+    const tab = selected.getBoundingClientRect();
+    const viewport = list.getBoundingClientRect();
+    if (tab.left < viewport.left) list.scrollLeft += tab.left - viewport.left;
+    if (tab.right > viewport.right) list.scrollLeft += tab.right - viewport.right;
+  }, [metric]);
+
+  function chooseMetric(id: Indicator) {
+    if (id !== metric) setSearchParams({ metric: id });
+  }
+
+  function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const lastIndex = indicators.length - 1;
+    const nextIndex = new Map([
+      ['ArrowLeft', index === 0 ? lastIndex : index - 1],
+      ['ArrowRight', index === lastIndex ? 0 : index + 1],
+      ['Home', 0],
+      ['End', lastIndex],
+    ]).get(event.key);
+
+    if (nextIndex === undefined) return;
+    event.preventDefault();
+    tabs.current?.querySelectorAll('button')[nextIndex]?.focus({ preventScroll: true });
+    chooseMetric(indicators[nextIndex]);
+  }
+
+  return (
+    <div className="trends-page">
+      <header className="page-intro">
+        <h1>Trends</h1>
+        <p>Compare your check-ins with your personal baseline by mission sol.</p>
+      </header>
+
+      <div className="trend-tabs" role="tablist" aria-label="Health indicators" ref={tabs}>
+        {indicators.map((id, index) => (
+          <button
+            type="button"
+            className="trend-tab"
+            id={`trend-tab-${id}`}
+            key={id}
+            role="tab"
+            aria-selected={id === metric}
+            aria-controls="trend-panel"
+            tabIndex={id === metric ? 0 : -1}
+            onClick={() => chooseMetric(id)}
+            onKeyDown={(event) => handleTabKey(event, index)}
+          >
+            {id === 'vigilance' ? 'Vigilance' : chartLabels(id).label}
+          </button>
+        ))}
+      </div>
+
+      <div id="trend-panel" role="tabpanel" aria-labelledby={`trend-tab-${metric}`} tabIndex={0}>
+        {metric === 'vigilance'
+          ? <VigilanceReadings sol={sol} history={vigilance} showHistory />
+          : <IndicatorTrend metric={metric} records={records} showAll={showAll} setShowAll={setShowAll} />}
+      </div>
     </div>
   );
 }

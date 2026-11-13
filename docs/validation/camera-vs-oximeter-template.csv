@@ -1,0 +1,5 @@
+participant,camera_bpm,reference_bpm,device,notes
+# One row per person. Take the camera reading and the fingertip oximeter reading at the same time, seated, after 2 minutes rest.
+# Example rows below are placeholders: delete them and enter real readings.
+P01,,,fingertip pulse oximeter,
+P02,,,fingertip pulse oximeter,

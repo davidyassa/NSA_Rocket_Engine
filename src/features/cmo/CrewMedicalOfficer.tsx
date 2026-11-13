@@ -1,30 +1,37 @@
 import { useState } from 'react';
-import { ArrowRight, UserCheck, CheckCircle2, Check } from 'lucide-react';
+import { ArrowRight, UserCheck, CheckCircle2, Check, Radiation } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DailyCheckin, RiskAssessment, DemoScenario } from '../../contracts';
 import { METRICS } from '../../contracts';
 import { FollowUpCenter } from '../followups/FollowUpCenter';
-import { useFollowUpStore } from '../followups/useFollowUpStore';
+import { tasksForScenario, useFollowUpStore } from '../followups/useFollowUpStore';
+import { VigilanceReadings } from '../cognitive/VigilanceReadings';
+import { sessionsForSol, type VigilanceSession } from '../cognitive/vigilance';
+import type { ScenarioId } from '../../scenarios';
 import { HandoffSimulator } from '../assessment/HandoffSimulator';
 import { generateMedicalHandoffPackage } from '../assessment/medicalHandoff';
 import { MedicalKitTable } from '../assessment/KitItems';
-import { radlabEventSol } from '../../sim';
 
 interface CrewMedicalOfficerProps {
   scenario: DemoScenario;
+  scenarioId: ScenarioId;
   latest: DailyCheckin | null;
   assessment: RiskAssessment | null;
   records: readonly DailyCheckin[];
+  vigilance: readonly VigilanceSession[];
 }
 
-export function CrewMedicalOfficer({ scenario, latest, assessment, records }: CrewMedicalOfficerProps) {
+export function CrewMedicalOfficer({ scenario, scenarioId, latest, assessment, records, vigilance }: CrewMedicalOfficerProps) {
   const [activeTab, setActiveTab] = useState<'triage' | 'actions' | 'kit' | 'quality' | 'telemetry'>('triage');
   const [cmoSignOff, setCmoSignOff] = useState<{ signed: boolean; timestamp?: string; notes?: string }>({ signed: false });
-  const [cmoNotes, setCmoNotes] = useState<string>('Reviewed Sol 43 sleep/mood delta following solar event. Prescribe oral hydration and rest duty cycle.');
+  const [cmoNotes, setCmoNotes] = useState('');
 
-  const { tasks, setTasks } = useFollowUpStore();
+  const { tasks: allTasks, setTasks } = useFollowUpStore();
+  const tasks = tasksForScenario(allTasks, scenarioId);
 
-  const handoffPkg = latest && assessment ? generateMedicalHandoffPackage(latest, assessment, scenario.profile.displayName) : null;
+  const handoffPkg = latest && assessment
+    ? generateMedicalHandoffPackage(latest, assessment, scenario.profile.displayName, scenario.missionContext.oneWayDelayMinutes, undefined, vigilance)
+    : null;
   const pendingTasksCount = tasks.filter(t => t.status !== 'resolved').length;
   const urgentTasksCount = tasks.filter(t => t.priority === 'urgent' && t.status !== 'resolved').length;
 
@@ -40,14 +47,27 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
     <div className="cmo-container" style={{ display: 'grid', gap: '16px' }}>
       <header className="page-intro">
         <div>
-          <h1>CMO Clinical Review</h1>
+          <h1>Crew Medical Officer console</h1>
           <p className="muted">
-            Independent clinical oversight for {scenario.profile.displayName} ({scenario.profile.role}) on Sol {scenario.startSol}.
-            Demonstrates onboard peer medical review when Earth Flight Surgeon is 20 light-minutes away.
+            Simulated onboard review for {scenario.profile.displayName} on Sol {scenario.startSol}.
+            The one-way delay to Earth is {scenario.missionContext.oneWayDelayMinutes} minutes in this scenario.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Link
+            to="/hazards/radiation"
+            className="badge"
+            style={{
+              background: 'var(--bg-raised)',
+              color: 'var(--accent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+              textDecoration: 'none',
+            }}
+          >
+            <Radiation size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            CARN Radiation Health Monitor
+          </Link>
           <span className="badge" style={{ background: 'var(--bg-raised)', color: 'var(--status-steady)', border: '1px solid color-mix(in srgb, var(--status-steady) 40%, transparent)' }}>
             <UserCheck size={13} style={{ display: 'inline', marginRight: '4px' }} />
             Role: Onboard Medical Officer
@@ -61,7 +81,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
       </header>
 
       {/* CMO Summary KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
         <div className="panel" style={{ padding: '12px 14px' }}>
           <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Check-in Status</span>
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650 }}>
@@ -95,9 +115,15 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650 }}>
             {scenario.missionContext.oneWayDelayMinutes} min One-Way
           </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>40 min round-trip reply</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            {scenario.missionContext.oneWayDelayMinutes * 2} min earliest simulated reply
+          </span>
         </div>
       </div>
+
+      {(sessionsForSol(vigilance, scenario.startSol).length > 0 || assessment?.findings.some(({ ruleId }) => ruleId === 'combined-sleep-mood')) && (
+        <VigilanceReadings sol={scenario.startSol} history={vigilance} showHistory />
+      )}
 
       {/* Navigation Sub-Tabs */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderBottom: '1px solid var(--line)', paddingBottom: '6px' }}>
@@ -123,7 +149,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
             aria-pressed={activeTab === 'kit'}
           onClick={() => setActiveTab('kit')}
         >
-          Medical kit
+          Supplies on board
         </button>
         <button
           type="button"
@@ -172,7 +198,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
 
           {/* CMO Formal Sign-Off Box */}
           <div className="cmo-signoff">
-            <h3 style={{ margin: '0 0 6px', fontSize: '0.98rem' }}>CMO Clinical Review & Prescriptions</h3>
+            <h3 style={{ margin: '0 0 6px', fontSize: '0.98rem' }}>CMO review notes</h3>
             <textarea
               value={cmoNotes}
               onChange={e => setCmoNotes(e.target.value)}
@@ -210,14 +236,14 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
       {activeTab === 'actions' && (
         <FollowUpCenter
           tasks={tasks}
-          onTasksChange={setTasks}
+          onTasksChange={(next) => setTasks(next, scenarioId)}
           currentUserRole="crew_medical_officer"
         />
       )}
 
       {/* Tab 3: Sensor & Data Quality */}
       {activeTab === 'kit' && (
-        <MedicalKitTable currentSol={latest?.sol ?? scenario.startSol} radiationSols={[radlabEventSol(scenario.missionContext)]} />
+        <MedicalKitTable currentSol={latest?.sol ?? scenario.startSol} />
       )}
 
       {activeTab === 'quality' && (

@@ -10,7 +10,7 @@ export type TrendPoint = {
   hasEntryError: boolean;
 };
 
-export function buildTrendSeries(metric: MetricId, records: readonly DailyCheckin[]): TrendPoint[] {
+export function buildTrendSeries(metric: MetricId | 'symptoms', records: readonly DailyCheckin[]): TrendPoint[] {
   const ordered = [...records].sort((left, right) => left.sol - right.sol
     || Date.parse(left.submittedAtUtc) - Date.parse(right.submittedAtUtc)
     || (left.id === right.id ? 0 : left.id < right.id ? -1 : 1));
@@ -23,6 +23,16 @@ export function buildTrendSeries(metric: MetricId, records: readonly DailyChecki
   return Array.from({ length: latest.sol - firstSol + 1 }, (_, offset) => {
     const sol = firstSol + offset;
     const checkin = recordsBySol.get(sol);
+    if (metric === 'symptoms') {
+      return {
+        sol,
+        value: checkin?.symptoms.length ? checkin.symptoms.filter(({ present }) => present).length : null,
+        baseline: null,
+        baselineCount: null,
+        provenance: null,
+        hasEntryError: false,
+      };
+    }
     const reading = checkin && usableMeasurement(checkin, metric);
     const baseline = metricBaseline(metric, checkin ?? { ...latest, sol }, profileRecords);
     return {

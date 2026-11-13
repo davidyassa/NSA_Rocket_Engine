@@ -1,10 +1,9 @@
-import { Check, Clock, PackageMinus, Radiation, XCircle, type LucideIcon } from 'lucide-react';
+import { Check, Clock, PackageMinus, XCircle, type LucideIcon } from 'lucide-react';
 import { KIT_STATUS_TEXT, MEDICAL_KIT, kitItemStatus, kitSummary, type KitStatus } from '../../content/medicalKit';
 
 /** Three channels for every status: icon, words and colour. */
 const STATUS_LOOK: Record<KitStatus, { Icon: LucideIcon; short: string; className: string }> = {
   expired: { Icon: XCircle, short: 'Expired', className: 'kit-status kit-expired' },
-  check_potency: { Icon: Radiation, short: 'Check potency', className: 'kit-status kit-potency' },
   low: { Icon: PackageMinus, short: 'Running low', className: 'kit-status kit-low' },
   expires_soon: { Icon: Clock, short: 'Expires soon', className: 'kit-status kit-soon' },
   ok: { Icon: Check, short: 'Available', className: 'kit-status kit-ok' },
@@ -15,43 +14,39 @@ function StatusBadge({ status }: { status: KitStatus }) {
   return <span className={className} title={KIT_STATUS_TEXT[status]}><Icon size={13} aria-hidden="true" /> {short}</span>;
 }
 
-/** Medical-kit items an action card relies on, with stock and expiry (no doses). */
-export function KitItemsList({ ids, currentSol, radiationSols }: { ids: readonly string[]; currentSol: number; radiationSols: readonly number[] }) {
+/** Non-drug supplies a suggestion mentions, with stock and expiry. */
+export function KitItemsList({ ids, currentSol }: { ids: readonly string[]; currentSol: number }) {
   const items = ids.flatMap((id) => (MEDICAL_KIT[id] ? [MEDICAL_KIT[id]] : []));
   if (!items.length) return null;
   return (
     <div className="kit-items">
-      <h4>In the medical kit</h4>
+      <h4>Supplies on board</h4>
       <ul>
-        {items.map((item) => {
-          const status = kitItemStatus(item, currentSol, radiationSols);
-          return (
-            <li key={item.id}>
-              <span className="kit-item-name">{item.name}{item.cmoOnly ? ' · medical officer only' : ''}</span>
-              <span className="kit-item-meta">{item.quantity} {item.unit} left</span>
-              <StatusBadge status={status} />
-            </li>
-          );
-        })}
+        {items.map((item) => (
+          <li key={item.id}>
+            <span className="kit-item-name">{item.name}</span>
+            <span className="kit-item-meta">{item.quantity} {item.unit} left</span>
+            <StatusBadge status={kitItemStatus(item, currentSol)} />
+          </li>
+        ))}
       </ul>
-      <p className="kit-note">No resupply from Earth. Take medicine only as your crew medical officer advises.</p>
+      <p className="kit-note">No resupply from Earth, so use supplies sparingly.</p>
     </div>
   );
 }
 
-/** Full onboard inventory for the Crew Medical Officer. */
-export function MedicalKitTable({ currentSol, radiationSols }: { currentSol: number; radiationSols: readonly number[] }) {
-  const summary = kitSummary(currentSol, radiationSols);
-  const order: KitStatus[] = ['expired', 'check_potency', 'low', 'expires_soon', 'ok'];
+/** Full list of non-drug supplies for the Crew Medical Officer. */
+export function MedicalKitTable({ currentSol }: { currentSol: number }) {
+  const summary = kitSummary(currentSol);
+  const order: KitStatus[] = ['expired', 'low', 'expires_soon', 'ok'];
   const rows = [...summary.items].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
   return (
     <section className="panel kit-panel" aria-labelledby="kit-title">
-      <h2 id="kit-title">Medical kit · Sol {currentSol}</h2>
+      <h2 id="kit-title">Supplies on board · Sol {currentSol}</h2>
       <p className="muted">
-        No resupply and no evacuation: advice is only useful if the kit can support it. {summary.expired} expired, {summary.checkPotency} to
-        check after the solar storm, {summary.low} running low, {summary.expiresSoon} expiring within 30 sols.
+        No resupply from Earth: {summary.expired} expired, {summary.low} running low, {summary.expiresSoon} expiring within 30 sols.
       </p>
-      <ul className="kit-grid" aria-label="Medical kit inventory">
+      <ul className="kit-grid" aria-label="Supplies on board">
         {rows.map(({ item, status }) => (
           <li key={item.id} className="kit-card">
             <div className="kit-card-head">
@@ -62,15 +57,14 @@ export function MedicalKitTable({ currentSol, radiationSols }: { currentSol: num
             <dl className="kit-card-facts">
               <div><dt>Left</dt><dd className="tabular">{item.quantity} {item.unit}</dd></div>
               <div><dt>Good until</dt><dd className="tabular">{item.expiresSol === null ? 'No expiry' : `Sol ${item.expiresSol}`}</dd></div>
-              {item.cmoOnly && <div><dt>Given by</dt><dd>Medical officer only</dd></div>}
             </dl>
             {status !== 'ok' && <p className="kit-card-why">{KIT_STATUS_TEXT[status]}</p>}
           </li>
         ))}
       </ul>
       <p className="kit-note">
-        Synthetic demo inventory. Medicines lose strength faster in space, partly from radiation, so radiation-sensitive items are flagged
-        for a check after a solar particle event. Sol Check never suggests doses or substitutes; the medical officer and flight surgeon decide.
+        Synthetic demo inventory of food, drinks and check-up equipment. Sol Check does not list, recommend or prescribe medicines;
+        any treatment is decided by the Crew Medical Officer and the flight surgeon.
       </p>
     </section>
   );

@@ -1,402 +1,403 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  evaluatePvtTrials,
-  PVT_CONFIG,
-  type PvTrialResult,
-  type PvtSessionSummary,
-} from './pvtEngine';
+import { Link } from 'react-router-dom';
+import { VigilanceReadings } from './VigilanceReadings';
+import { summarizeVigilance, type VigilanceTrial } from './pvtEngine';
+import { VIGILANCE_MODES, type VigilanceMode, type VigilanceSession } from './vigilance';
 import './cognitive.css';
 
-type PvtState = 'idle' | 'waiting' | 'stimulus' | 'feedback' | 'completed';
+type Stage = 'idle' | 'waiting' | 'stimulus' | 'feedback' | 'completed';
 
-export function CognitiveLab({ currentSol = 43 }: { currentSol?: number }) {
-  const [gameState, setGameState] = useState<PvtState>('idle');
-  const [trialsCount, setTrialsCount] = useState<number>(PVT_CONFIG.defaultTrialCount);
-  const [currentTrial, setCurrentTrial] = useState<number>(0);
-  const [displayMs, setDisplayMs] = useState<number>(0);
-  const [feedbackMsg, setFeedbackMsg] = useState<string>('');
-  const [feedbackType, setFeedbackType] = useState<'good' | 'lapse' | 'early'>('good');
-  const [results, setResults] = useState<PvTrialResult[]>([]);
-  const [summary, setSummary] = useState<PvtSessionSummary | null>(null);
+interface Run {
+  mode: VigilanceMode;
+  stage: 'waiting' | 'stimulus' | 'feedback';
+  trials: VigilanceTrial[];
+  shownAt: number;
+  deadline: number;
+  timer?: number;
+  durationTimer?: number;
+  frame?: number;
+}
 
-  const timerRef = useRef<number | null>(null);
-  const waitTimeoutRef = useRef<number | null>(null);
-  const stimulusStartRef = useRef<number>(0);
-  const isInputLockedRef = useRef<boolean>(false);
+const RESPONSE_WINDOW_MS = 2000;
 
-  // Teardown timers on unmount
+export function CognitiveLab({ currentSol, history, onSave }: {
+  currentSol: number;
+  history: readonly VigilanceSession[];
+  onSave: (session: VigilanceSession) => void;
+}) {
+  const [mode, setMode] = useState<VigilanceMode>('quick');
+  const [stage, setStage] = useState<Stage>('idle');
+  const [trialCount, setTrialCount] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const [notice, setNotice] = useState('');
+  const [result, setResult] = useState<VigilanceSession | null>(null);
+  const [unsaved, setUnsaved] = useState(false);
+  const runRef = useRef<Run | null>(null);
+  const target = useRef<HTMLButtonElement>(null);
+  const startButton = useRef<HTMLButtonElement>(null);
+  const lastActionRef = useRef<number>(0);
+  const active = stage === 'waiting' || stage === 'stimulus' || stage === 'feedback';
+
+  function clearRun() {
+    const run = runRef.current;
+    if (!run) return;
+    window.clearTimeout(run.timer);
+    window.clearTimeout(run.durationTimer);
+    if (run.frame !== undefined) window.cancelAnimationFrame(run.frame);
+    runRef.current = null;
+  }
+
+  function stop(message: string) {
+    clearRun();
+    setStage('idle');
+    setNotice(message);
+    if (!document.hidden) requestAnimationFrame(() => startButton.current?.focus({ preventScroll: true }));
+  }
+
   useEffect(() => {
+    function onVisibilityChange() {
+      if (document.hidden && runRef.current) stop('Session ended when the app went into the background. Start again when ready.');
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      if (timerRef.current) cancelAnimationFrame(timerRef.current);
-      if (waitTimeoutRef.current) clearTimeout(waitTimeoutRef.current);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearRun();
     };
   }, []);
 
-  // Keyboard response listener
+  // Global keyboard listener: Space and Enter immediately respond without needing focus on the button
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.code === 'Space' || e.code === 'Enter') {
-        e.preventDefault();
-        handleInteraction();
+    if (!active) return;
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.code === 'Space' || event.key === 'Enter') {
+        event.preventDefault(); // Stop window scrolling
+        if (!event.repeat) {
+          handleUserAction();
+        }
       }
     }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, currentTrial]);
+    window.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, { capture: true });
+  }, [active, stage]);
 
-  function startTest() {
-    setResults([]);
-    setSummary(null);
-    setCurrentTrial(0);
-    startTrial(1);
+  // Keep target button focused when test is active
+  useEffect(() => {
+    if (active && target.current) {
+      target.current.focus({ preventScroll: true });
+    }
+  }, [active, stage]);
+
+  useEffect(() => {
+    if (!active || mode !== 'timed') return;
+    const interval = window.setInterval(() => {
+      const run = runRef.current;
+      if (run) setSecondsLeft(Math.max(0, Math.ceil((run.deadline - performance.now()) / 1000)));
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [active, mode]);
+
+  function persist(session: VigilanceSession) {
+    try {
+      onSave(session);
+      setUnsaved(false);
+      setNotice(`Result saved on Sol ${currentSol} (mean: ${session.meanRtMs ?? '—'} ms · ${session.lapsesCount} lapses).`);
+    } catch (error) {
+      setUnsaved(true);
+      setNotice(error instanceof Error ? error.message : 'The result could not be saved. Try saving again.');
+    }
   }
 
-  function startTrial(trialNum: number) {
-    if (trialNum > trialsCount) {
-      finishTest(results);
+  function finish(run: Run) {
+    if (runRef.current !== run) return;
+    clearRun();
+    const session = summarizeVigilance(run.trials, run.mode, currentSol);
+    if (!session) {
+      stop('No valid reaction times were recorded (all responses were early or missed). Start a new session to try again.');
       return;
     }
 
-    setCurrentTrial(trialNum);
-    setGameState('waiting');
-    setDisplayMs(0);
-    isInputLockedRef.current = false;
+    setResult(session);
+    setStage('completed');
+    persist(session);
+    requestAnimationFrame(() => startButton.current?.focus({ preventScroll: true }));
+  }
 
-    // Random inter-stimulus interval (ISI)
-    const delay =
-      PVT_CONFIG.minIntervalMs +
-      Math.random() * (PVT_CONFIG.maxIntervalMs - PVT_CONFIG.minIntervalMs);
+  function playStimulusCue() {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      }
+    } catch {
+      // AudioContext unavailable or autoplay restricted
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(60); } catch {}
+    }
+  }
 
-    waitTimeoutRef.current = window.setTimeout(() => {
-      triggerStimulus();
+  function next(run: Run) {
+    const config = VIGILANCE_MODES[run.mode];
+    // In trial-based modes (quick, standard), complete the requested number of stimulus trials
+    const stimulusDone = run.trials.filter((t) => typeof t === 'number' || t === 'missed').length;
+    if ('trialCount' in config && (stimulusDone >= config.trialCount || run.trials.length >= config.trialCount + 4)) {
+      finish(run);
+      return;
+    }
+    run.stage = 'waiting';
+    run.shownAt = 0;
+    setStage('waiting');
+    const delay = config.minWaitMs + Math.random() * (config.maxWaitMs - config.minWaitMs);
+    run.timer = window.setTimeout(() => {
+      if (runRef.current !== run) return;
+      if (performance.now() >= run.deadline) {
+        finish(run);
+        return;
+      }
+      run.stage = 'stimulus';
+      setStage('stimulus');
+      playStimulusCue();
+      const now = performance.now();
+      run.shownAt = now;
+      run.frame = requestAnimationFrame((rafNow) => {
+        if (runRef.current !== run || run.stage !== 'stimulus') return;
+        run.shownAt = rafNow;
+      });
+      run.timer = window.setTimeout(() => record(run, 'missed'), RESPONSE_WINDOW_MS);
     }, delay);
   }
 
-  function triggerStimulus() {
-    stimulusStartRef.current = performance.now();
-    setGameState('stimulus');
-
-    function tick() {
-      const elapsed = Math.round(performance.now() - stimulusStartRef.current);
-      setDisplayMs(elapsed);
-      timerRef.current = requestAnimationFrame(tick);
+  function record(run: Run, trial: VigilanceTrial) {
+    if (runRef.current !== run || run.stage === 'feedback') return;
+    if (performance.now() >= run.deadline) {
+      finish(run);
+      return;
     }
-    timerRef.current = requestAnimationFrame(tick);
+    window.clearTimeout(run.timer);
+    if (run.frame !== undefined) window.cancelAnimationFrame(run.frame);
+    run.trials.push(trial);
+    run.stage = 'feedback';
+    setStage('feedback');
+    setTrialCount(run.trials.length);
+    setFeedback(
+      trial === 'early'
+        ? 'Too early · Wait for the signal'
+        : trial === 'missed'
+          ? 'Missed (> 2000 ms)'
+          : `${trial} ms${trial >= VIGILANCE_MODES[run.mode].lapseMs ? ' · Lapse' : ''}`,
+    );
+    run.timer = window.setTimeout(() => next(run), 650);
   }
 
-  function handleInteraction() {
-    if (isInputLockedRef.current) return;
-
-    if (gameState === 'waiting') {
-      // Premature click / False start
-      isInputLockedRef.current = true;
-      if (waitTimeoutRef.current) clearTimeout(waitTimeoutRef.current);
-
-      const earlyResult: PvTrialResult = {
-        trialIndex: currentTrial,
-        reactionTimeMs: 50,
-        isFalseStart: true,
-        isLapse: false,
-        timestamp: Date.now(),
-      };
-
-      setResults(prev => [...prev, earlyResult]);
-      setFeedbackMsg('FALSE START · Wait for counter to start');
-      setFeedbackType('early');
-      setGameState('feedback');
-
-      setTimeout(() => {
-        startTrial(currentTrial + 1);
-      }, 1500);
-    } else if (gameState === 'stimulus') {
-      // Valid or lapse reaction
-      isInputLockedRef.current = true;
-      if (timerRef.current) cancelAnimationFrame(timerRef.current);
-
-      const reactionTimeMs = Math.round(performance.now() - stimulusStartRef.current);
-      const isLapse = reactionTimeMs >= PVT_CONFIG.lapseThresholdMs;
-
-      const trialResult: PvTrialResult = {
-        trialIndex: currentTrial,
-        reactionTimeMs,
-        isFalseStart: false,
-        isLapse,
-        timestamp: Date.now(),
-      };
-
-      const updatedResults = [...results, trialResult];
-      setResults(updatedResults);
-
-      if (isLapse) {
-        setFeedbackMsg(`${reactionTimeMs} ms · Cognitive Lapse (> 500 ms)`);
-        setFeedbackType('lapse');
-      } else {
-        setFeedbackMsg(`${reactionTimeMs} ms`);
-        setFeedbackType('good');
-      }
-      setGameState('feedback');
-
-      setTimeout(() => {
-        if (currentTrial >= trialsCount) {
-          finishTest(updatedResults);
-        } else {
-          startTrial(currentTrial + 1);
-        }
-      }, 1200);
-    } else if (gameState === 'idle' || gameState === 'completed') {
-      startTest();
+  function respond() {
+    const run = runRef.current;
+    if (!run || run.stage === 'feedback') return;
+    const now = performance.now();
+    if (run.stage === 'waiting') {
+      record(run, 'early');
+      return;
+    }
+    const stimulusTime = run.shownAt || now;
+    const elapsed = Math.round(now - stimulusTime);
+    if (elapsed < VIGILANCE_MODES[run.mode].earlyMs) {
+      record(run, 'early');
+    } else if (elapsed >= RESPONSE_WINDOW_MS) {
+      record(run, 'missed');
+    } else {
+      record(run, elapsed);
     }
   }
 
-  function finishTest(finalResults: PvTrialResult[]) {
-    setGameState('completed');
-    const summaryData = evaluatePvtTrials(finalResults, currentSol, PVT_CONFIG.nominalBaselineRtMs);
-    setSummary(summaryData);
+  function handleUserAction() {
+    const now = performance.now();
+    if (now - lastActionRef.current < 60) return; // Prevent double events
+    lastActionRef.current = now;
+    respond();
   }
+
+  function start() {
+    const config = VIGILANCE_MODES[mode];
+    const started = performance.now();
+    const run: Run = {
+      mode, stage: 'waiting', trials: [], shownAt: 0,
+      deadline: 'durationMs' in config ? started + config.durationMs : Infinity,
+    };
+    runRef.current = run;
+    if ('durationMs' in config) run.durationTimer = window.setTimeout(() => finish(run), config.durationMs);
+    setNotice('');
+    setResult(null);
+    setTrialCount(0);
+    setSecondsLeft('durationMs' in config ? config.durationMs / 1000 : null);
+    next(run);
+  }
+
+  const activeConfig = VIGILANCE_MODES[mode];
+  const maxTrials = 'trialCount' in activeConfig ? activeConfig.trialCount : null;
 
   return (
     <div className="cognitive-container">
       <header className="page-intro">
-        <div>
-          <h1>Cognitive Performance Laboratory</h1>
-          <p className="muted">
-            Standard NASA Brief Psychomotor Vigilance Task (PVT-B) used aboard the ISS to detect
-            fatigue, sleep restriction, and circadian performance degradation.
-          </p>
-        </div>
+        <h1>Cognitive Lab</h1>
+        <p>Sol {currentSol} · Check sustained attention with a visual reaction-time task.</p>
+        <Link to="/hazards/isolation" className="text-link">Hazard 2 monitoring</Link>
       </header>
 
-      {/* Main Testing Arena */}
-      <section className="cognitive-arena-card" aria-label="PVT Test Arena">
-        <div className="pvt-progress-bar">
-          <span>
-            {gameState === 'idle'
-              ? 'Ready to test'
-              : gameState === 'completed'
-              ? 'Test completed'
-              : `Trial ${currentTrial} of ${trialsCount}`}
-          </span>
-          <div className="pvt-progress-track">
-            <div
-              className="pvt-progress-fill"
-              style={{
-                width: `${
-                  trialsCount > 0 ? Math.min(100, Math.round((currentTrial / trialsCount) * 100)) : 0
-                }%`,
-              }}
-            />
-          </div>
-          <span>Baseline: 220 ms</span>
-        </div>
+      <section className="panel cognitive-arena-card" aria-labelledby="vigilance-test-title">
+        <h2 id="vigilance-test-title">Vigilance check</h2>
 
-        <div
-          className={`pvt-target-box ${
-            gameState === 'idle'
-              ? 'idle'
-              : gameState === 'waiting'
-              ? 'waiting'
-              : gameState === 'stimulus'
-              ? 'active'
-              : gameState === 'feedback'
-              ? `feedback-${feedbackType}`
-              : 'idle'
-          }`}
-          onClick={handleInteraction}
-          role="button"
-          tabIndex={0}
-          aria-label="Reaction stimulus box"
-        >
-          {gameState === 'idle' && (
-            <div>
-              <h2>Click or press Spacebar to begin</h2>
-              <p className="pvt-instruction-hint">
-                As soon as numbers appear in the box, press <span className="pvt-key-badge">Spacebar</span> or tap immediately.
-              </p>
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
-                <span className="pvt-instruction-hint">Test length:</span>
-                <button
-                  type="button"
-                  className={`button button-sm button-secondary tab-toggle${trialsCount === 3 ? ' is-selected' : ''}`}
-            aria-pressed={trialsCount === 3}
-                  onClick={e => {
-                    e.stopPropagation();
-                    setTrialsCount(3);
-                  }}
-                >
-                  Quick (3 trials)
-                </button>
-                <button
-                  type="button"
-                  className={`button button-sm button-secondary tab-toggle${trialsCount === 6 ? ' is-selected' : ''}`}
-            aria-pressed={trialsCount === 6}
-                  onClick={e => {
-                    e.stopPropagation();
-                    setTrialsCount(6);
-                  }}
-                >
-                  Standard (6 trials)
-                </button>
-              </div>
-              <button
-                type="button"
-                className="button button-primary"
-                style={{ marginTop: '1rem' }}
-                onClick={e => {
-                  e.stopPropagation();
-                  startTest();
-                }}
-              >
-                Start {trialsCount}-trial test
-              </button>
+        {result && stage === 'completed' && !active && (
+          <div className="vigilance-completed-card" aria-live="polite">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <h3 style={{ margin: 0, color: 'var(--status-steady, #34d399)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>✓</span> Vigilance Check Completed (Sol {currentSol})
+              </h3>
+              <span className="badge badge-steady">Saved to Flight Log</span>
             </div>
-          )}
-
-          {gameState === 'waiting' && (
-            <div>
-              <p className="pvt-counter-display" style={{ opacity: 0.2 }}>
-                000
-              </p>
-              <p className="pvt-instruction-hint">Wait for stimulus... Do NOT click early</p>
-            </div>
-          )}
-
-          {gameState === 'stimulus' && (
-            <div>
-              <p className="pvt-counter-display">{displayMs} ms</p>
-              <p className="pvt-instruction-hint">PRESS NOW!</p>
-            </div>
-          )}
-
-          {gameState === 'feedback' && (
-            <div>
-              <p className="pvt-counter-display">{feedbackMsg}</p>
-              <p className="pvt-instruction-hint">Preparing next trial...</p>
-            </div>
-          )}
-
-          {gameState === 'completed' && summary && (
-            <div>
-              <h2>Session complete</h2>
-              <p className="pvt-instruction-hint">
-                Mean RT: <strong>{summary.meanRtMs} ms</strong> · Lapses:{' '}
-                <strong>{summary.lapsesCount}</strong> · Score:{' '}
-                <strong>{summary.vigilanceScore}/100</strong>
-              </p>
-              <button
-                type="button"
-                className="button button-secondary"
-                style={{ marginTop: '1rem' }}
-                onClick={e => {
-                  e.stopPropagation();
-                  startTest();
-                }}
-              >
-                Repeat test
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Live Trial Chips */}
-        {results.length > 0 && (
-          <div>
-            <span className="pvt-stat-label">Trials in this session:</span>
-            <div className="pvt-trial-history-list">
-              {results.map((r, i) => (
-                <span
-                  key={i}
-                  className={`pvt-trial-chip ${
-                    r.isFalseStart ? 'early' : r.isLapse ? 'lapse' : 'good'
-                  }`}
-                >
-                  #{r.trialIndex}: {r.isFalseStart ? 'Early' : `${r.reactionTimeMs}ms`}
+            <div className="vigilance-completed-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.8rem', margin: '0.9rem 0' }}>
+              <div className="mood-score-box">
+                <span className="mood-score-box-label">Mean Reaction Time</span>
+                <span className="mood-score-box-value" style={{ color: result.meanRtMs && result.meanRtMs < 355 ? 'var(--status-steady)' : 'var(--text-primary)' }}>
+                  {result.meanRtMs !== null ? `${result.meanRtMs} ms` : '—'}
                 </span>
-              ))}
+                <span className="mood-score-box-sub">
+                  {result.meanRtMs && result.meanRtMs < 300 ? 'Optimal alertness' : result.meanRtMs && result.meanRtMs < 500 ? 'Normal cognitive speed' : 'Slowed response'}
+                </span>
+              </div>
+              <div className="mood-score-box">
+                <span className="mood-score-box-label">Attention Lapses</span>
+                <span className="mood-score-box-value" style={{ color: result.lapsesCount === 0 ? 'var(--status-steady)' : 'var(--warning, #fbbf24)' }}>
+                  {result.lapsesCount}
+                </span>
+                <span className="mood-score-box-sub">
+                  {result.lapsesCount === 0 ? 'Zero lapses' : `${result.lapsesCount} lapse(s) (>500ms)`}
+                </span>
+              </div>
+              <div className="mood-score-box">
+                <span className="mood-score-box-label">False Starts</span>
+                <span className="mood-score-box-value">
+                  {result.falseStartsCount}
+                </span>
+                <span className="mood-score-box-sub">
+                  {result.falseStartsCount === 0 ? 'Perfect timing' : `${result.falseStartsCount} early tap(s)`}
+                </span>
+              </div>
             </div>
           </div>
         )}
-      </section>
 
-      {/* Results & NASA HRP Correlation Card */}
-      {summary && (
-        <section className="cognitive-arena-card">
-          <h2>Cognitive Readiness Evaluation (Sol {summary.sol})</h2>
-          <div className="pvt-summary-grid">
-            <div className="pvt-stat-tile">
-              <span className="pvt-stat-label">Mean reaction time</span>
-              <span className="pvt-stat-val">{summary.meanRtMs} ms</span>
-              <span
-                className={`pvt-stat-delta ${
-                  (summary.baselineDiffMs ?? 0) <= 20 ? 'good' : 'bad'
-                }`}
-              >
-                {(summary.baselineDiffMs ?? 0) >= 0 ? '+' : ''}
-                {summary.baselineDiffMs} ms vs nominal (220 ms)
-              </span>
-            </div>
-
-            <div className="pvt-stat-tile">
-              <span className="pvt-stat-label">Cognitive lapses (&gt;500ms)</span>
-              <span className="pvt-stat-val">{summary.lapsesCount}</span>
-              <span className="pvt-stat-label">Primary sleep loss marker</span>
-            </div>
-
-            <div className="pvt-stat-tile">
-              <span className="pvt-stat-label">Vigilance index</span>
-              <span className="pvt-stat-val">{summary.vigilanceScore} / 100</span>
-              <span className={`pvt-stat-delta ${summary.vigilanceScore >= 80 ? 'good' : 'bad'}`}>
-                Tier: {summary.performanceTier.replace('_', ' ').toUpperCase()}
-              </span>
-            </div>
-
-            <div className="pvt-stat-tile">
-              <span className="pvt-stat-label">Fastest / Slowest</span>
-              <span className="pvt-stat-val">
-                {summary.fastestRtMs} / {summary.slowestRtMs} ms
-              </span>
-              <span className="pvt-stat-label">Response stability</span>
-            </div>
-          </div>
-
-          <div
-            className="pvt-evidence-card"
-            style={{
-              borderColor:
-                summary.performanceTier === 'significant_fatigue'
-                  ? 'var(--nasa-red)'
-                  : summary.performanceTier === 'mild_fatigue'
-                  ? 'var(--status-trend)'
-                  : 'var(--status-steady)',
-            }}
-          >
-            <strong>Operational Assessment:</strong>
-            <p>{summary.clinicalInterpretation}</p>
-            <p className="muted" style={{ fontSize: '0.8rem' }}>
-              <strong>HRP Evidence Link:</strong> NASA Human Research Program Risk of Adverse
-              Cognitive or Behavioral Conditions (BHP-01). Cognitive lapses on PVT-B reliably
-              correlate with acute cumulative sleep loss (&lt; 6h) and anticipate operational errors
-              during robotic manipulation, piloting, and EVA.
+        {!active && (
+          <>
+            <fieldset className="vigilance-modes" disabled={unsaved}>
+              <legend>Test mode</legend>
+              {Object.entries(VIGILANCE_MODES).map(([id, config]) => (
+                <label key={id}><input type="radio" name="vigilance-mode" checked={mode === id}
+                  onChange={() => setMode(id as VigilanceMode)} /> {config.label}</label>
+              ))}
+            </fieldset>
+            <p className="muted">
+              Tap the target or press <strong>Space</strong> or <strong>Enter</strong> as soon as <strong>“Respond now”</strong> appears.
+              Use the same mode and input method for comparisons.
             </p>
-          </div>
-        </section>
-      )}
-
-      {/* NASA Context & Scientific Validation */}
-      <section className="pvt-evidence-card">
-        <h3>NASA Human Research Program Context: Psychomotor Vigilance</h3>
-        <p>
-          The Psychomotor Vigilance Test (PVT) was pioneered by Dr. David F. Dinges at the
-          University of Pennsylvania under NASA HRP grant funding. Unlike subjective sleepiness
-          scales where astronauts consistently underestimate their own impairment, the PVT measures
-          sustained attention and involuntary micro-sleeps without practice-learning effects.
-        </p>
-        <p>
-          <strong>Operational Thresholds:</strong> A nominal astronaut response time is 200–240 ms.
-          A lapse is strictly defined as any reaction time exceeding 500 ms. Two or more lapses in a
-          brief 3-minute battery signify a neurobehavioral deficit comparable to moderate blood
-          alcohol concentration or 24 hours of sustained wakefulness.
-        </p>
+            <div className="hazard-actions">
+              <button ref={startButton} className="button button-primary" type="button" onClick={start} disabled={unsaved}>
+                {result ? 'Run another check' : 'Start vigilance check'}
+              </button>
+              {history.length === 0 && !result && (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => {
+                    const sampleSession = summarizeVigilance([245, 270, 255], mode, currentSol);
+                    if (sampleSession) persist(sampleSession);
+                  }}
+                >
+                  Load sample test result
+                </button>
+              )}
+              {unsaved && result && (
+                <button className="button button-secondary" type="button" onClick={() => persist(result)}>
+                  Retry saving
+                </button>
+              )}
+            </div>
+          </>
+        )}
+        {active && (
+          <>
+            <div className="vigilance-progress">
+              <span>
+                <strong>{activeConfig.label}</strong> · {trialCount}{maxTrials ? ` of ${maxTrials}` : ''} trial{trialCount === 1 ? '' : 's'} recorded
+                {secondsLeft !== null && ` · ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')} left`}
+              </span>
+              <button type="button" className="button button-sm button-secondary" onClick={() => stop('Session ended.')}>
+                End session
+              </button>
+            </div>
+            <button
+              ref={target}
+              type="button"
+              className="vigilance-target"
+              data-stage={stage}
+              onTouchStart={(event) => {
+                event.preventDefault();
+                handleUserAction();
+              }}
+              onPointerDown={(event) => {
+                if (event.isPrimary && event.button === 0) handleUserAction();
+              }}
+              onClick={() => handleUserAction()}
+            >
+              {stage === 'stimulus' ? (
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: 'clamp(1.5rem, 5.5vw, 2.6rem)', fontWeight: 800, letterSpacing: '0.03em', display: 'block' }}>
+                    ⚡ RESPOND NOW ⚡
+                  </span>
+                  <small style={{ fontSize: '1rem', fontWeight: 600, display: 'block', marginTop: '6px' }}>
+                    Tap anywhere!
+                  </small>
+                </div>
+              ) : stage === 'feedback' ? (
+                <div style={{ textAlign: 'center' }}>
+                  <span style={{ fontSize: 'clamp(1.4rem, 4.5vw, 2.2rem)', fontWeight: 700, display: 'block' }}>
+                    {feedback}
+                  </span>
+                </div>
+              ) : (
+                <div className="vigilance-waiting-content">
+                  <div className="vigilance-radar-pulse" aria-hidden="true" />
+                  <span style={{ fontSize: '1.25rem', fontWeight: 650 }}>
+                    Ready... watching for signal
+                  </span>
+                  <small style={{ fontSize: '0.9rem', fontWeight: 400, opacity: 0.85, maxWidth: '22rem' }}>
+                    Do not tap yet. Tap or press Space as soon as the box flashes gold!
+                  </small>
+                </div>
+              )}
+            </button>
+          </>
+        )}
+        {notice && <p role={unsaved ? 'alert' : 'status'} className="muted" style={{ marginTop: '0.8rem' }}>{notice}</p>}
       </section>
+
+      {result && unsaved && <VigilanceReadings sol={currentSol} history={[result]} />}
+      <VigilanceReadings sol={currentSol} history={history} showHistory />
+      <details className="panel cognitive-arena-card">
+        <summary>Scoring and NASA evidence</summary>
+        <p>Quick and standard modes count responses of 500 ms or longer as lapses. The timed mode uses the 355 ms lapse and 130 ms early-response thresholds from the ISS study. Missed responses count as lapses and are excluded from mean reaction time.</p>
+        <p>Sol Check is a browser-based prototype. The medical team interprets these observations alongside sleep, mood, and symptoms.</p>
+        <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC8919197/" target="_blank" rel="noreferrer">Read the ISS reaction-time study</a>
+      </details>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { auditEventSchema, dailyCheckinSchema } from '../contracts';
 import type { StorageRepository } from '../contracts';
 import { DEFAULT_SCENARIO_ID, SCENARIO_IDS } from '../scenarios';
+import { vigilanceSessionSchema } from '../features/cognitive/vigilance';
+import { isolationPlanSchema } from '../features/hazards/isolationPlan';
 
 const storageKey = 'sol-check:demo';
 const schemaVersion = 3;
@@ -17,6 +19,9 @@ const stateSchemaV3 = z.object({
   scenarioId: scenarioIdSchema,
   entries: z.partialRecord(scenarioIdSchema, localCheckins),
   checklist: checklistSchema.optional().default({}),
+  activeSols: z.partialRecord(scenarioIdSchema, z.number().int().positive()).optional(),
+  vigilance: z.partialRecord(scenarioIdSchema, z.array(vigilanceSessionSchema)).optional(),
+  isolationPlans: z.partialRecord(scenarioIdSchema, z.record(z.string(), isolationPlanSchema)).optional(),
   audit: z.array(auditEventSchema),
 });
 

@@ -23,7 +23,7 @@ const statusLabels: Record<FollowUpStatus, { label: string; tone: string }> = {
   awaiting_measurement: { label: 'Awaiting Measurement', tone: 'watch' },
   awaiting_medical_review: { label: 'Awaiting CMO Review', tone: 'urgent' },
   resolved: { label: 'Resolved', tone: 'steady' },
-  escalated: { label: 'Escalated to Earth', tone: 'urgent' },
+  escalated: { label: 'Ground review requested', tone: 'urgent' },
 };
 
 export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astronaut' }: FollowUpCenterProps) {
@@ -61,7 +61,7 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
         </div>
 
         {/* Filter Tabs */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
           <button
             type="button"
             className={`button button-sm button-secondary tab-toggle${filter === 'active' ? ' is-selected' : ''}`}
@@ -173,13 +173,13 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
                       <CheckCircle2 size={12} /> {activeNoteTaskId === task.id ? 'Confirm Resolve' : 'Resolve Task'}
                     </button>
 
-                    {task.assignedRole === 'crew_medical_officer' && task.status !== 'escalated' && (
+                    {currentUserRole === 'crew_medical_officer' && task.assignedRole === 'crew_medical_officer' && task.status !== 'escalated' && (
                       <button
                         type="button"
                         className="button button-sm button-warning"
-                        onClick={() => handleStatusChange(task.id, 'escalated', 'Escalated to Earth Ground Flight Surgeon')}
+                        onClick={() => handleStatusChange(task.id, 'escalated', 'Requested a local draft for Ground Flight Surgeon review.')}
                       >
-                        <ArrowUpRight size={12} /> Escalate to Flight Surgeon
+                        <ArrowUpRight size={12} /> Request ground review
                       </button>
                     )}
                   </div>
@@ -187,13 +187,13 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
 
                 {/* Optional Note Input Form */}
                 {activeNoteTaskId === task.id && (
-                  <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                  <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     <input
                       type="text"
                       placeholder="Add completion / clinical note..."
                       value={noteInput}
                       onChange={e => setNoteInput(e.target.value)}
-                      style={{ flex: 1, fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}
+                      style={{ flex: '1 1 10rem', minWidth: 0, fontSize: '1rem', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}
                     />
                     <button
                       type="button"

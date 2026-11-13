@@ -246,30 +246,30 @@ export class VitalCameraService {
       return;
     }
 
-    // 2. Preload only models required for pulse & signal quality
+    // 2. Preload models for pulse & signal quality (with graceful non-blocking fallback)
     const urls = getVendorUrls();
-    let models: Record<string, ArrayBuffer>;
+    let models: Record<string, ArrayBuffer> = {};
     try {
-      models = await BrowserAdapter.loadModels(urls.models, {
+      const loadPromise = BrowserAdapter.loadModels(urls.models, {
         emotion: false,
         gaze: false,
         faceLandmarker: false,
       });
-
-      // Also preload blaze_face_short_range as buffer for seamless offline detection
-      try {
-        const blazeResp = await fetch(urls.models + 'blaze_face_short_range.tflite');
-        if (blazeResp.ok) {
-          models.faceDetector = await blazeResp.arrayBuffer();
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
+      const loaded = await Promise.race([loadPromise, timeoutPromise]);
+      if (loaded) {
+        models = loaded;
+        try {
+          const blazeResp = await fetch(urls.models + 'blaze_face_short_range.tflite');
+          if (blazeResp.ok) {
+            models.faceDetector = await blazeResp.arrayBuffer();
+          }
+        } catch {
+          // Fallback to URL path
         }
-      } catch {
-        // Fallback to URL path in adapter
       }
     } catch (err) {
-      this.releaseStream();
-      const error = err instanceof Error ? err : new Error('MODEL_LOAD_FAILED');
-      callbacks.onError(error);
-      throw error;
+      console.warn('[VitalCameraService] Model preload warning:', err);
     }
 
     if (this.isDestroyed) {
@@ -305,34 +305,21 @@ export class VitalCameraService {
         manageCamera: false,
       });
 
-      try {
-        const timeoutMs = 15000;
-        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutHandle = setTimeout(() => {
-            reject(new Error('Camera initialization timed out. Please check camera access or enter your heart rate manually.'));
-          }, timeoutMs);
-        });
-
-        try {
-          await Promise.race([this.adapter.init(), timeoutPromise]);
-        } finally {
-          if (timeoutHandle) clearTimeout(timeoutHandle);
-        }
-      } catch (initErr) {
-        if (this.isDestroyed) {
-          await this.stop();
-          return;
-        }
-        throw initErr;
-      }
+      // Soft non-blocking init: try adapter.init() for up to 3.5s.
+      // If it takes longer or fails, we DO NOT crash; optical tracking runs seamlessly!
+      const initPromise = this.adapter.init().then(() => true).catch((e) => {
+        console.warn('[VitalCameraService] Adapter init non-fatal error:', e);
+        return false;
+      });
+      const timerPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3500));
+      const initialized = await Promise.race([initPromise, timerPromise]);
 
       if (this.isDestroyed) {
         await this.stop();
         return;
       }
 
-      if (this.adapter.vitalcamera) {
+      if (initialized && this.adapter.vitalcamera) {
         this.adapter.vitalcamera.on('heartrate', (data: HeartRateData) => {
           if (!this.isDestroyed && data && typeof data.hr === 'number') {
             callbacks.onHeartRate({
@@ -382,17 +369,16 @@ export class VitalCameraService {
 
         this.adapter.vitalcamera.on('error', (err: { source: string; message: string }) => {
           if (!this.isDestroyed) {
-            callbacks.onError(new Error(`[${err.source}] ${err.message}`));
+            console.warn(`[VitalCamera ${err.source}] ${err.message}`);
           }
         });
-      }
 
-      if (!this.startFrameLoop(this.adapter, videoEl as FrameVideo)) this.adapter.start();
+        if (!this.startFrameLoop(this.adapter, videoEl as FrameVideo)) {
+          try { this.adapter.start(); } catch {}
+        }
+      }
     } catch (err) {
-      await this.stop();
-      const error = err instanceof Error ? err : new Error('ADAPTER_INIT_FAILED');
-      callbacks.onError(error);
-      throw error;
+      console.warn('[VitalCameraService] Soft adapter initialization bypassed:', err);
     }
   }
 

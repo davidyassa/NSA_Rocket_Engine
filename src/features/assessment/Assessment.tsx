@@ -1,10 +1,9 @@
 import { Check } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   METRICS,
   type DailyCheckin,
-  type EscalationTier,
   type Finding,
   type FindingKind,
   type HealthMeasurement,
@@ -16,16 +15,15 @@ import { ACTION_CARDS } from '../../content';
 import { RULES } from '../../engine';
 import { EvidenceSources } from './EvidenceSources';
 import { GroundCommunication } from './GroundCommunication';
-import { WhatIfSimulator } from './WhatIfSimulator';
 import { HandoffSimulator } from './HandoffSimulator';
 import { ORIGIN_META } from '../../ui/tokens';
 import { generateMedicalHandoffPackage, formatMedicalHandoffMarkdown } from './medicalHandoff';
 import { FollowUpCenter } from '../followups/FollowUpCenter';
-import { useFollowUpStore } from '../followups/useFollowUpStore';
-import type { FollowUpTask } from '../followups/followUpEngine';
-import { EvidencePassport } from './EvidencePassport';
+import { tasksForScenario, useFollowUpStore } from '../followups/useFollowUpStore';
+import { VigilanceReadings } from '../cognitive/VigilanceReadings';
+import { sessionsForSol, type VigilanceSession } from '../cognitive/vigilance';
+import type { ScenarioId } from '../../scenarios';
 import { KitItemsList } from './KitItems';
-import { radlabEventSol } from '../../sim';
 import { PLAIN_NEXT_STEP, plainFinding } from '../../content/plainLanguage';
 import './assessment.css';
 
@@ -33,14 +31,18 @@ interface AssessmentProps {
   assessment: RiskAssessment | null;
   records: readonly DailyCheckin[];
   mission: MissionContext;
+  scenarioId: ScenarioId;
+  vigilance: readonly VigilanceSession[];
 }
 
 type IndexedReading = { sol: number; measurement: HealthMeasurement };
 
-function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; assessment: RiskAssessment }) {
+function MedicalHandoffSection({ record, assessment, mission, vigilance }: {
+  record: DailyCheckin; assessment: RiskAssessment; mission: MissionContext; vigilance: readonly VigilanceSession[];
+}) {
   const [downloadMsg, setDownloadMsg] = useState('');
 
-  const pkg = generateMedicalHandoffPackage(record, assessment);
+  const pkg = generateMedicalHandoffPackage(record, assessment, undefined, mission.oneWayDelayMinutes, undefined, vigilance);
 
   function downloadJson() {
     const jsonStr = JSON.stringify(pkg, null, 2);
@@ -70,8 +72,7 @@ function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; a
     <div className="panel assessment-action">
       <h3>Evidence Passport & Flight Surgeon Handoff</h3>
       <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem' }}>
-        Traceable clinical evidence package prepared autonomously under a simulated 20-minute one-way
-        communication delay.
+        Local evidence package for a simulated {mission.oneWayDelayMinutes}-minute one-way communication delay.
       </p>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0.5rem 0' }}>
         <button type="button" className="button button-secondary" onClick={downloadJson}>
@@ -109,30 +110,10 @@ const reviewLabels: Record<ReviewStatus, string> = {
   needs_clinical_review: 'Needs clinical review',
 };
 
-const tierLabels: Record<EscalationTier, string> = {
-  self_care: 'Self-care',
-  crew_medical_officer: 'Crew Medical Officer',
-  ground_flight_surgeon: 'Ground Flight Surgeon',
-};
+const hiddenActions = new Set(['record-and-monitor', 'crew-review', 'exercise-plan', 'co2-check']);
+const previewLength = 4;
 
-const escalationSteps = [
-  { tier: 'self_care', text: 'Record or verify your check-in.' },
-  { tier: 'crew_medical_officer', text: 'Ask the onboard officer to review the check-in.' },
-  { tier: 'ground_flight_surgeon', text: 'Prepare a ground summary if the officer requests one.' },
-] as const satisfies readonly { tier: EscalationTier; text: string }[];
-
-function ReadingTable({ ids, readings }: {
-  ids: readonly string[];
-  readings: ReadonlyMap<string, IndexedReading>;
-}) {
-  const inputs = [...new Set(ids)]
-    .flatMap(id => {
-      const reading = readings.get(id);
-      return reading ? [reading] : [];
-    })
-    .sort((first, second) => first.sol - second.sol);
-
-  if (!inputs.length) return <p className="muted">Measurement inputs unavailable for this finding.</p>;
+function ReadingTable({ inputs }: { inputs: readonly IndexedReading[] }) {
   return (
     <div className="assessment-table-wrap" tabIndex={0} role="region" aria-label="Recorded readings">
       <table className="assessment-table data-table">
@@ -161,76 +142,69 @@ function ReadingTable({ ids, readings }: {
   );
 }
 
-function FindingCard({ finding, readings, assessment, tasks }: {
-  finding: Finding;
-  readings: ReadonlyMap<string, IndexedReading>;
-  assessment: RiskAssessment;
-  tasks?: FollowUpTask[];
-}) {
+function FindingCard({ finding, readings }: { finding: Finding; readings: ReadonlyMap<string, IndexedReading> }) {
+  const inputs = [...new Set(finding.inputMeasurementIds)]
+    .flatMap((id) => {
+      const reading = readings.get(id);
+      return reading ? [reading] : [];
+    })
+    .sort((first, second) => second.sol - first.sol);
+  const summary = finding.kind === 'data_unavailable' || finding.kind === 'data_quality'
+    ? finding.summary : plainFinding(finding);
   const rule = RULES[finding.ruleId];
+
   return (
     <article className={`panel assessment-finding assessment-finding--${finding.kind}`}>
       <span className="badge assessment-kind">{findingLabels[finding.kind]}</span>
-      <h3>{plainFinding(finding)}</h3>
-      <p className="finding-technical"><span>Technical:</span> {finding.summary}</p>
-      <details className="assessment-why">
-        <summary aria-label={`Why this finding? ${finding.summary}`}>Why this finding?</summary>
-        <div className="assessment-evidence">
-          <dl className="assessment-rule">
-            <div>
-              <dt>Rule</dt>
-              <dd><code>{finding.ruleId}</code>{rule && ` · v${rule.version}`}</dd>
-            </div>
-            <div>
-              <dt>Review status</dt>
-              <dd>{reviewLabels[finding.reviewStatus]}</dd>
-            </div>
-          </dl>
-          {rule && <p>{rule.reason}</p>}
-          {rule && rule.conditions.length > 0 && (
-            <ul className="assessment-conditions">
-              {rule.conditions.map(condition => <li key={condition}>{condition}</li>)}
-            </ul>
-          )}
-
-          {finding.baselineUsed.length > 0 && (
-            <>
-              <h4>Personal baseline</h4>
-              <ul className="assessment-baselines">
-                {finding.baselineUsed.map(baseline => (
-                  <li key={baseline.metric}>
-                    <strong>{METRICS[baseline.metric].label}</strong>{' · '}
-                    {baseline.median} {METRICS[baseline.metric].unitLabel} median ·{' '}
-                    {baseline.count} readings over {baseline.lookbackSols} prior sols
-                    <details className="assessment-baseline-readings">
-                      <summary>Baseline readings for {METRICS[baseline.metric].label.toLowerCase()}</summary>
-                      <ReadingTable ids={baseline.inputMeasurementIds} readings={readings} />
-                    </details>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
+      <h3>{summary}</h3>
+      {finding.baselineUsed.length > 0 && (
+        <p className="assessment-baseline-preview">
+          Personal baseline · {finding.baselineUsed.map(({ metric, median, count }) =>
+            `${METRICS[metric].label} ${median} ${METRICS[metric].unitLabel} (${count} readings)`).join(' · ')}
+        </p>
+      )}
+      {inputs.length > 0 && (
+        <div className="assessment-reading-preview">
           <h4>Readings used</h4>
-          <ReadingTable ids={finding.inputMeasurementIds} readings={readings} />
-          <h4>Evidence sources</h4>
-          <EvidenceSources ids={finding.sourceRefs} />
-
-          <EvidencePassport
-            finding={finding}
-            readings={readings}
-            assessment={assessment}
-            tasks={tasks}
-          />
+          <ReadingTable inputs={inputs.slice(0, previewLength)} />
+          {inputs.length > previewLength && (
+            <details className="assessment-why">
+              <summary>Show {inputs.length - previewLength} more readings</summary>
+              <ReadingTable inputs={inputs.slice(previewLength)} />
+            </details>
+          )}
         </div>
+      )}
+      <details className="assessment-why">
+        <summary>Why this finding?</summary>
+        <p><code>{finding.ruleId}</code> · {reviewLabels[finding.reviewStatus]}</p>
+        {rule && (
+          <>
+            <p>{rule.reason}</p>
+            <ul>{rule.conditions.map(condition => <li key={condition}>{condition}</li>)}</ul>
+          </>
+        )}
+        <EvidenceSources ids={finding.sourceRefs} />
       </details>
     </article>
   );
 }
 
-export function Assessment({ assessment, records, mission }: AssessmentProps) {
+export function Assessment({ assessment, records, mission, scenarioId, vigilance }: AssessmentProps) {
   const findingsHeading = useRef<HTMLHeadingElement>(null);
+  const followUp = useRef<HTMLDetailsElement>(null);
+  const [searchParams] = useSearchParams();
+  const showFollowUp = searchParams.get('view') === 'follow-up';
+  useEffect(() => {
+    if (!showFollowUp || !followUp.current) return;
+    const section = followUp.current;
+    section.open = true;
+    const frame = requestAnimationFrame(() => {
+      section.querySelector('summary')?.focus({ preventScroll: true });
+      section.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [showFollowUp, assessment?.checkinId]);
   const record = records.find(entry => entry.id === assessment?.checkinId);
   const readings = new Map<string, IndexedReading>();
   for (const entry of records) {
@@ -238,20 +212,20 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
       readings.set(measurement.id, { sol: entry.sol, measurement });
     }
   }
-  const cards = assessment?.actionCardIds.flatMap(id => ACTION_CARDS[id] ? [ACTION_CARDS[id]] : []) ?? [];
+  const cards = assessment?.actionCardIds.flatMap(id => !hiddenActions.has(id) && ACTION_CARDS[id] ? [ACTION_CARDS[id]] : []) ?? [];
   const symptoms = record?.symptoms.filter(symptom => symptom.present) ?? [];
-  const radiationSols = [radlabEventSol(mission)];
   const warnings = assessment && !assessment.findings.some(finding => finding.kind === 'data_quality')
     ? assessment.dataQualityWarnings
     : [];
 
-  const { tasks, syncWithAssessment, setTasks } = useFollowUpStore();
-
-  useEffect(() => {
-    if (record && assessment) {
-      syncWithAssessment(record, assessment);
-    }
-  }, [record, assessment, syncWithAssessment]);
+  const { tasks: allTasks, setTasks } = useFollowUpStore();
+  const tasks = tasksForScenario(allTasks, scenarioId);
+  const groundReviewRequested = record && tasks.some(task => task.sol === record.sol
+    && task.astronautId === record.astronautId && task.assignedRole === 'crew_medical_officer' && task.status === 'escalated');
+  const reviewTier = groundReviewRequested ? 'ground_flight_surgeon' : assessment?.recommendedTier;
+  const needsVigilance = assessment?.findings.some(({ ruleId }) => ruleId === 'combined-sleep-mood')
+    || symptoms.some(({ id }) => id === 'fatigue');
+  const vigilanceResults = record ? sessionsForSol(vigilance, record.sol) : [];
 
   return (
     <>
@@ -266,41 +240,15 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
         </div>
       </header>
 
-      {assessment && (
-        <section className="panel plain-summary" aria-labelledby="plain-summary-title">
-          <h2 id="plain-summary-title">{PLAIN_NEXT_STEP[assessment.recommendedTier].title}</h2>
-          <p className="plain-summary-action">{PLAIN_NEXT_STEP[assessment.recommendedTier].action}</p>
-          {assessment.findings.length > 0 ? (
-            <ul className="plain-summary-list">
-              {assessment.findings.map((finding, index) => (
-                <li key={`${finding.ruleId}-${index}`}>{plainFinding(finding)}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="plain-summary-action">All the readings that could be compared look like your usual.</p>
-          )}
-          <p className="plain-summary-note">This is a helper, not a diagnosis. If you feel unwell, tell your crew medical officer whatever this page says.</p>
-        </section>
-      )}
-
-      {record && (
-        <GroundCommunication
-          key={record.id}
-          record={record}
-          mission={mission}
-          onReview={() => findingsHeading.current?.focus()}
-        />
-      )}
-
       {assessment ? (
         <>
-          <div className="assessment-layout">
           <section className="assessment-findings" aria-labelledby="findings-title">
             <h2 id="findings-title" ref={findingsHeading} tabIndex={-1}>Findings</h2>
+            {reviewTier && (
+              <p className="assessment-review-note">{PLAIN_NEXT_STEP[reviewTier].title}</p>
+            )}
             {symptoms.length > 0 && (
-              <p className="muted assessment-symptoms">
-                Reported symptoms · {symptoms.map(symptom => symptom.label).join(', ')}
-              </p>
+              <p className="muted assessment-symptoms">Reported symptoms · {symptoms.map(symptom => symptom.label).join(', ')}</p>
             )}
             {warnings.length > 0 && (
               <ul className="panel assessment-warnings">
@@ -308,60 +256,61 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
               </ul>
             )}
             {assessment.findings.map((finding, index) => (
-              <FindingCard
-                key={`${finding.ruleId}-${index}`}
-                finding={finding}
-                readings={readings}
-                assessment={assessment}
-                tasks={tasks}
-              />
+              <FindingCard key={`${finding.ruleId}-${index}`} finding={finding} readings={readings} />
             ))}
             {assessment.findings.length === 0 && (
               <p className="panel assessment-empty">No change detected in the readings that could be compared.</p>
             )}
           </section>
 
-          <section className="assessment-actions" aria-labelledby="assessment-actions-title">
-            <h2 id="assessment-actions-title">Next steps</h2>
-            <div className="panel assessment-action">
-              <h3>Suggested route: {tierLabels[assessment.recommendedTier]}</h3>
-              <ol className="assessment-ladder" role="list" aria-label="Escalation ladder">
-                {escalationSteps.map(({ tier, text }) => (
-                  <li key={tier} aria-current={tier === assessment.recommendedTier ? 'step' : undefined}>
-                    <strong>{tierLabels[tier]}</strong>
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ol>
+          {record && (needsVigilance || vigilanceResults.length > 0) && (
+            <div className="assessment-vigilance">
+              {vigilanceResults.length > 0 && <VigilanceReadings sol={record.sol} history={vigilance} />}
+              {needsVigilance && vigilanceResults.length === 0 && (
+                <div className="panel cognitive-arena-card">
+                  <h2>Vigilance check recommended</h2>
+                  <p className="muted">Check reaction time and attention in Cognitive Lab.</p>
+                  <Link to="/cognitive" className="text-link">Open Cognitive Lab</Link>
+                </div>
+              )}
+              <Link to="/hazards/isolation" className="text-link">Open Hazard 2 and plan follow-up</Link>
             </div>
-            {record && <MedicalHandoffSection record={record} assessment={assessment} />}
-            {record && <WhatIfSimulator currentRecord={record} records={records} />}
-            {cards.map(card => (
-              <article className="panel assessment-action" key={card.id}>
-                <h3>{card.title}</h3>
-                <span className="badge action-card-status">{reviewLabels[card.reviewStatus]}</span>
-                <ol>
-                  {card.steps.map(step => <li key={step}>{step}</li>)}
-                </ol>
-                {card.kitItemIds && record && (
-                  <KitItemsList ids={card.kitItemIds} currentSol={record.sol} radiationSols={radiationSols} />
-                )}
-                <details className="assessment-why">
-                  <summary>Action sources</summary>
-                  <EvidenceSources ids={card.sourceRefs} />
-                </details>
-              </article>
-            ))}
-            <p className="muted assessment-version">Rules engine {assessment.engineVersion}</p>
-          </section>
-        </div>
+          )}
+
+          {cards.length > 0 && (
+            <details className="panel assessment-support">
+              <summary>Suggested actions</summary>
+              <div className="assessment-actions">
+                {cards.map(card => (
+                  <article className="assessment-action" key={card.id}>
+                    <h3>{card.title}</h3>
+                    <span className="badge action-card-status">{reviewLabels[card.reviewStatus]}</span>
+                    <ol>{card.steps.map(step => <li key={step}>{step}</li>)}</ol>
+                    {card.kitItemIds && record && (
+                      <KitItemsList ids={card.kitItemIds} currentSol={record.sol} />
+                    )}
+                    <details className="assessment-why">
+                      <summary>Action sources</summary>
+                      <EvidenceSources ids={card.sourceRefs} />
+                    </details>
+                  </article>
+                ))}
+              </div>
+            </details>
+          )}
 
           {record && (
-            <FollowUpCenter
-              tasks={tasks}
-              onTasksChange={setTasks}
-              currentUserRole="astronaut"
-            />
+            <details ref={followUp} className="panel assessment-support">
+              <summary className="assessment-handoff-toggle">Follow-up tasks and ground handoff</summary>
+              <div className="assessment-actions">
+                <FollowUpCenter tasks={tasks} onTasksChange={(next) => setTasks(next, scenarioId)} currentUserRole="astronaut" />
+                <GroundCommunication key={record.id} record={record} mission={mission} vigilance={vigilanceResults}
+                  onReview={() => findingsHeading.current?.focus()} />
+                <MedicalHandoffSection record={record}
+                  assessment={groundReviewRequested ? { ...assessment, recommendedTier: 'ground_flight_surgeon' } : assessment}
+                  mission={mission} vigilance={vigilance} />
+              </div>
+            </details>
           )}
         </>
       ) : (

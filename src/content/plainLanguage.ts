@@ -107,7 +107,7 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
     case 'entry-quality':
       return 'One number you entered looks unusual. Please measure again and check it.';
     case 'archive-replay-context':
-      return 'A solar storm hit Mars on nearby days (real NASA Curiosity rover data). It may or may not be related; the timing alone does not prove a cause.';
+      return finding.summary;
     case 'data-unavailable':
       return 'Some readings were not taken, so they could not be checked.';
     case 'orthostatic-check':
@@ -117,7 +117,7 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
     case 'countermeasure-adherence':
       return 'You exercised less than the target on most of the last 5 days. Regular exercise is what protects your muscles and bones in low gravity.';
     case 'motion-sickness-pattern':
-      return 'Your symptoms look like space motion sickness (dizziness, nausea or balance problems). It usually eases as your body adapts; tell your crew medical officer if you are vomiting.';
+      return 'You reported two or more symptoms related to motion or balance. Record any changes and tell the Crew Medical Officer if you are vomiting.';
     case 'sans-screen':
       return 'You reported a vision change or a puffy, full-feeling head. Fluid shift can affect the eyes, so ask your crew medical officer for an eye check.';
     case 'co2-headache-context':
@@ -131,11 +131,11 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
     case 'body-mass-loss':
       return 'Your weight has dropped below your usual. This often means you are eating less than your body needs.';
     case 'kidney-stone-screen':
-      return 'Pain in your side or back, or blood in your urine, can mean a kidney stone. Tell your crew medical officer today.';
+      return finding.summary;
     case 'behavioral-crisis':
       return 'You said you feel hopeless or unable to cope. Please talk to your crew medical officer or a crewmate now. You do not have to wait for Earth.';
     case 'bone-kidney-compound':
-      return 'Less exercise together with too little food or water raises bone-loss and kidney-stone risk more than any one alone.';
+      return finding.summary;
     default:
       return finding.summary;
   }
@@ -144,16 +144,16 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
 /** What to do next, by recommended route. */
 export const PLAIN_NEXT_STEP: Record<EscalationTier, { title: string; action: string }> = {
   self_care: {
-    title: 'You can look after this yourself',
-    action: 'Keep doing your daily check-in. Nothing needs a doctor right now.',
+    title: 'Self-care and continued monitoring',
+    action: 'Keep recording your readings and report concerns to the Crew Medical Officer.',
   },
   crew_medical_officer: {
     title: 'Talk to your crew medical officer today',
     action: 'Show them this page. They are the crew member trained to help with health questions.',
   },
   ground_flight_surgeon: {
-    title: 'Ask your medical officer to contact Earth',
-    action: 'They can send a summary to the doctors on Earth. A reply takes at least 40 minutes.',
+    title: 'Ground Flight Surgeon review requested',
+    action: 'Prepare a local summary of the recorded check-in.',
   },
 };
 
@@ -184,6 +184,6 @@ export const GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'Menu fatigue', meaning: 'Getting tired of the same space food for months, so you eat less without noticing.' },
   { term: 'Body mass', meaning: 'Your weight. In weightlessness it is measured with a special device, not a normal scale.' },
   { term: 'Kidney stone', meaning: 'A small hard lump that forms in the kidney. Bone calcium lost in low gravity and too little water make stones more likely.' },
-  { term: 'Medical kit', meaning: 'The medicines and supplies on board. There is no resupply from Earth, so Sol Check shows what is left and what has expired.' },
+  { term: 'Supplies on board', meaning: 'Food bars, drink pouches and health-check equipment. There is no resupply from Earth, so Sol Check shows what is left and what has expired. It does not list or recommend medicines.' },
   { term: 'Countermeasure', meaning: 'Something you do to protect your body in space, such as daily exercise against muscle and bone loss.' },
 ];

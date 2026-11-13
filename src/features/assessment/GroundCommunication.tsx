@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Radio } from 'lucide-react';
 import type { DailyCheckin, MissionContext } from '../../contracts';
+import { useMissionStore } from '../../app/store';
 import { EvidenceSources } from './EvidenceSources';
 import { formatGroundSummary } from './groundSummary';
+import type { VigilanceSession } from '../cognitive/vigilance';
 
 const communicationSources = ['nasa-delay', 'nasa-eimo'];
 const minuteFormatter = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
@@ -12,11 +14,12 @@ function delayClock(seconds: number) {
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-function GroundSummary({ record, mission, startedAt, onReview }: {
+function GroundSummary({ record, mission, startedAt, onReview, vigilance }: {
   record: DailyCheckin;
   mission: MissionContext;
   startedAt: number;
   onReview: () => void;
+  vigilance: readonly VigilanceSession[];
 }) {
   const roundTrip = mission.oneWayDelayMinutes * 2;
   const earliestReplyAt = startedAt + roundTrip * 60_000;
@@ -24,7 +27,7 @@ function GroundSummary({ record, mission, startedAt, onReview }: {
   const [includeNote, setIncludeNote] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
   const draftField = useRef<HTMLTextAreaElement>(null);
-  const draft = formatGroundSummary(record, includeNote);
+  const draft = formatGroundSummary(record, includeNote, vigilance);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -93,12 +96,29 @@ function GroundSummary({ record, mission, startedAt, onReview }: {
   );
 }
 
-export function GroundCommunication({ record, mission, onReview }: {
+export function GroundCommunication({ record, mission, onReview, vigilance }: {
   record: DailyCheckin;
   mission: MissionContext;
   onReview: () => void;
+  vigilance: readonly VigilanceSession[];
 }) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [auditError, setAuditError] = useState(false);
+  const recordGroundDraft = useMissionStore(state => state.recordGroundDraft);
+
+  function toggleDraft() {
+    if (startedAt !== null) {
+      setStartedAt(null);
+      return;
+    }
+    try {
+      recordGroundDraft(record.id);
+      setAuditError(false);
+    } catch {
+      setAuditError(true);
+    }
+    setStartedAt(Date.now());
+  }
 
   return (
     <section className="panel ground-communication" aria-labelledby="ground-communication-title">
@@ -112,11 +132,12 @@ export function GroundCommunication({ record, mission, onReview }: {
         </div>
         <button className="button button-primary" type="button" aria-expanded={startedAt !== null}
           aria-controls={startedAt !== null ? 'ground-summary' : undefined}
-          onClick={() => setStartedAt(startedAt === null ? Date.now() : null)}>
+          onClick={toggleDraft}>
           {startedAt === null ? 'Prepare summary for ground' : 'Close summary'}
         </button>
       </div>
-      {startedAt !== null && <GroundSummary record={record} mission={mission} startedAt={startedAt} onReview={onReview} />}
+      {startedAt !== null && auditError && <p role="status">This draft is available. Its audit entry could not be saved on this device.</p>}
+      {startedAt !== null && <GroundSummary record={record} mission={mission} startedAt={startedAt} onReview={onReview} vigilance={vigilance} />}
     </section>
   );
 }

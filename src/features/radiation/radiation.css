@@ -1,0 +1,558 @@
+.radiation-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.radiation-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+}
+
+/* Vehicle Status Banner */
+.radiation-status-banner {
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: grid;
+  gap: 0.85rem;
+  transition: all 0.25s ease;
+}
+
+.radiation-status-banner.status-green {
+  border-color: color-mix(in srgb, var(--status-steady) 50%, transparent);
+  background: color-mix(in srgb, var(--status-steady) 8%, var(--bg-surface));
+}
+
+.radiation-status-banner.status-yellow {
+  border-color: color-mix(in srgb, var(--status-change) 50%, transparent);
+  background: color-mix(in srgb, var(--status-change) 10%, var(--bg-surface));
+}
+
+.radiation-status-banner.status-orange {
+  border-color: color-mix(in srgb, var(--status-trend) 60%, transparent);
+  background: color-mix(in srgb, var(--status-trend) 12%, var(--bg-surface));
+}
+
+.radiation-status-banner.status-red {
+  border-color: color-mix(in srgb, var(--nasa-red) 70%, transparent);
+  background: color-mix(in srgb, var(--nasa-red) 14%, var(--bg-surface));
+  animation: banner-pulse 3s infinite ease-in-out;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 77, 0); }
+  50% { box-shadow: 0 0 24px -4px rgba(255, 105, 77, 0.4); }
+}
+
+.banner-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.banner-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.banner-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font: 700 0.85rem var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-green .banner-status-badge {
+  background: color-mix(in srgb, var(--status-steady) 20%, transparent);
+  color: var(--status-steady);
+  border: 1px solid var(--status-steady);
+}
+
+.status-yellow .banner-status-badge {
+  background: color-mix(in srgb, var(--status-change) 20%, transparent);
+  color: var(--status-change);
+  border: 1px solid var(--status-change);
+}
+
+.status-orange .banner-status-badge {
+  background: color-mix(in srgb, var(--status-trend) 20%, transparent);
+  color: var(--status-trend);
+  border: 1px solid var(--status-trend);
+}
+
+.status-red .banner-status-badge {
+  background: color-mix(in srgb, var(--nasa-red) 25%, transparent);
+  color: var(--nasa-red);
+  border: 1px solid var(--nasa-red);
+}
+
+.banner-message {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.banner-condition {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Simulation Preset Control Bar */
+.radiation-sim-bar {
+  padding: 1rem 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sim-bar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.sim-buttons-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sim-button {
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 550;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-control);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.sim-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.sim-button.is-active {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 650;
+}
+
+/* Spacecraft Map & Telemetry Grid */
+.radiation-schematic-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .radiation-schematic-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+.map-card {
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 1rem;
+}
+
+.map-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.radiation-station { display: grid; min-width: 0; gap: 0.65rem; }
+.radiation-station-stage {
+  height: clamp(300px, 34vw, 405px);
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 6px);
+}
+.radiation-station-caption { margin: 0; font-size: 0.82rem; }
+
+.radiation-station-overlay,
+.radiation-station-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.radiation-station-leaders {
+  fill: #101b24;
+  stroke: #a1d7f5;
+  stroke-width: 1.3px;
+}
+.radiation-station-leaders .is-selected { stroke: var(--accent); stroke-width: 2px; }
+
+.radiation-station-marker {
+  position: absolute;
+  width: min(27%, 134px);
+  display: grid;
+  gap: 3px;
+  padding: 5px 7px;
+  transform: translateY(-50%);
+  border: 1px solid #7aa7bf;
+  border-radius: 7px;
+  color: var(--text-primary);
+  background: rgb(13 21 29 / 0.93);
+  text-align: left;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  pointer-events: auto;
+}
+.radiation-station-marker[data-side='left'] { left: 2%; }
+.radiation-station-marker[data-side='right'] { right: 2%; }
+.radiation-station-marker:hover { background: #1c2c3a; }
+.radiation-station-marker[aria-pressed='true'] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+.radiation-station-shielding {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  color: #cfdae3;
+  font: 550 0.66rem var(--mono);
+}
+.radiation-station-shielding svg { display: block; }
+.radiation-room-rate { font: 650 0.75rem var(--mono); color: var(--status-steady); }
+.radiation-room-rate[data-level='elevated'] { color: var(--status-change); }
+.radiation-room-rate[data-level='acute'] { color: var(--nasa-red); }
+
+/* Directional Localization HUD */
+.directional-hud-panel {
+  padding: 1rem 1.2rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 6px);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.hud-vector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hud-vector-heading {
+  font: 600 0.95rem var(--mono);
+  color: var(--accent);
+}
+
+.hud-attenuation {
+  font: 600 0.85rem var(--mono);
+  color: var(--status-steady);
+}
+
+/* Personalized Room Access Matrix Table */
+.radiation-matrix-card {
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 1rem;
+}
+
+.matrix-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 8px);
+}
+
+.radiation-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+.radiation-matrix-table th {
+  padding: 0.75rem 0.9rem;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.radiation-matrix-table td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 40%, transparent);
+  vertical-align: middle;
+}
+
+.radiation-matrix-table tr:last-child td {
+  border-bottom: none;
+}
+
+.matrix-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font: 650 0.78rem var(--mono);
+}
+
+.matrix-status-cell.allowed {
+  background: color-mix(in srgb, var(--status-steady) 14%, var(--bg-raised));
+  color: var(--status-steady);
+  border: 1px solid color-mix(in srgb, var(--status-steady) 40%, transparent);
+}
+
+.matrix-status-cell.restricted {
+  background: color-mix(in srgb, var(--nasa-red) 16%, var(--bg-raised));
+  color: var(--nasa-red);
+  border: 1px solid color-mix(in srgb, var(--nasa-red) 50%, transparent);
+  animation: badge-pulse 2s infinite ease;
+}
+
+.matrix-status-cell.evac {
+  background: color-mix(in srgb, var(--status-trend) 16%, var(--bg-raised));
+  color: var(--status-trend);
+  border: 1px solid color-mix(in srgb, var(--status-trend) 50%, transparent);
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+
+.threat-warning-pill {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--nasa-red);
+  margin-top: 0.25rem;
+  max-width: 320px;
+}
+
+.beacon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-chip);
+  background: var(--tint-accent);
+  color: var(--accent);
+  font: 600 0.75rem var(--mono);
+  margin-left: 0.4rem;
+}
+
+/* Cumulative Career & 30-Day Budget Gauges */
+.radiation-gauges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 1.25rem;
+}
+
+.gauge-card {
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.gauge-kpi-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.gauge-kpi-num {
+  font: 700 1.6rem var(--mono);
+  color: var(--text-primary);
+}
+
+.gauge-kpi-sub {
+  font: 600 0.88rem var(--mono);
+  color: var(--text-secondary);
+}
+
+.gauge-track {
+  height: 12px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-subtle);
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+.gauge-milestones-row {
+  display: flex;
+  justify-content: space-between;
+  font: 550 0.72rem var(--mono);
+  color: var(--text-muted);
+}
+
+/* Evacuation Route Box */
+.evac-route-box {
+  padding: 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 1rem;
+}
+
+.evac-steps-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evac-step-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 8px);
+}
+
+.evac-step-item.is-hotzone {
+  border-color: var(--nasa-red);
+  background: color-mix(in srgb, var(--nasa-red) 8%, var(--bg-raised));
+}
+
+.step-num-badge {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 0.75rem var(--mono);
+}
+
+.step-instruction {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.step-rate-badge {
+  font: 600 0.8rem var(--mono);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-chip);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Post-Event Recovery Box */
+.recovery-box {
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--status-check) 8%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--status-check) 40%, transparent);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 1rem;
+}
+
+.hysteresis-progress-wrap {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.hysteresis-bar {
+  height: 10px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.hysteresis-fill {
+  height: 100%;
+  background: var(--status-check);
+  transition: width 0.3s ease;
+}
+
+.assay-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 0.85rem;
+}
+
+.assay-card {
+  padding: 0.85rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius) - 6px);
+  display: grid;
+  gap: 0.4rem;
+}
+
+/* CARN Timeline SVG Chart */
+.carn-chart-wrap {
+  padding: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 200px;
+  overflow: visible;
+}
