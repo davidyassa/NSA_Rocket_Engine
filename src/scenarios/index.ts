@@ -40,6 +40,9 @@ export const HERO_PREFILL: Record<MetricId, number> = {
   fluid_intake: 2.3,
   // Exercise is still short after the shelter days.
   exercise_minutes: 45,
+  // Camera breathing rate is normal; HRV is down after the short-sleep shelter sols.
+  respiratory_rate: 16,
+  hrv_rmssd: 32,
 };
 
 /** Shelter protocol (sols 41–42) and the sol before: exercise was cut short. */
@@ -51,6 +54,9 @@ const shelterCo2BySol: Partial<Record<number, { co2Mmhg: number; cabinTempC: num
   43: { co2Mmhg: 2.6, cabinTempC: 22.8 },
 };
 const shelterHeadacheSols = new Set([41, 42]);
+
+/** HRV dipped during the crowded, short-sleep shelter sols (synthetic). */
+const shelterHrvBySol: Partial<Record<number, number>> = { 41: 37, 42: 34 };
 
 const lowerSleepBySol: Partial<Record<number, number>> = { 39: 5.1, 40: 4.8, 42: 4.6 };
 
@@ -69,6 +75,8 @@ function historicalValues(sol: number, includesTrend: boolean): Record<MetricId,
     bp_diastolic_standing: 74 + (sol % 3) - 1 + 2,
     fluid_intake: Number((2.3 + (sol % 3) / 10).toFixed(1)),
     exercise_minutes: (includesTrend ? shortExerciseBySol[sol] : undefined) ?? 110 + (sol % 3) * 5,
+    respiratory_rate: 14 + (sol % 3),
+    hrv_rmssd: (includesTrend ? shelterHrvBySol[sol] : undefined) ?? 48 + (sol % 5) - 2,
   };
 }
 

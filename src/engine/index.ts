@@ -19,6 +19,8 @@ import {
   CORE_METRIC_IDS,
   EXERCISE_TARGET_MIN,
   FLUID_TARGET_L,
+  BREATHING_RANGE,
+  HRV_DROP_FRACTION,
   MOTION_SICKNESS_SYMPTOMS,
   ORTHOSTATIC,
   DEMO_DELTAS,
@@ -360,6 +362,26 @@ function assessCo2(recent: readonly ReviewedCheckin[], context?: AssessmentConte
   return finding('co2-headache-context', 'contextual_association', `Headaches were reported when habitat CO2 was at or above ${CO2_LIMIT_MMHG} mmHg: ${detail}. Timing alone cannot establish a cause.`);
 }
 
+function assessBreathing(current: ReviewedCheckin): Finding | null {
+  const today = current.measurements.get('respiratory_rate');
+  if (!today) return null;
+  if (today.value < BREATHING_RANGE.low) {
+    return finding('breathing-rate-range', 'observation', `Breathing rate ${today.value} breaths/min is below the usual resting range (${BREATHING_RANGE.low}–${BREATHING_RANGE.high}).`, [today.id]);
+  }
+  if (today.value > BREATHING_RANGE.high) {
+    return finding('breathing-rate-range', 'observation', `Breathing rate ${today.value} breaths/min is above the usual resting range (${BREATHING_RANGE.low}–${BREATHING_RANGE.high}).`, [today.id]);
+  }
+  return null;
+}
+
+function assessHrv(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]): Finding | null {
+  const today = current.measurements.get('hrv_rmssd');
+  if (!today) return null;
+  const baseline = buildBaseline('hrv_rmssd', prior);
+  if (!baseline || today.value >= baseline.median * HRV_DROP_FRACTION) return null;
+  return finding('hrv-below-usual', 'observation', `HRV (RMSSD) ${today.value} ms is below ${Math.round(HRV_DROP_FRACTION * 100)}% of the personal usual of ${Math.round(baseline.median)} ms.`, [today.id], [baseline]);
+}
+
 export function evaluateCheckin(
   checkin: DailyCheckin,
   history: readonly DailyCheckin[],
@@ -442,6 +464,10 @@ export function evaluateCheckin(
   if (sans) findings.push(sans);
   const co2 = assessCo2(recent, context);
   if (co2) findings.push(co2);
+  const breathing = assessBreathing(current);
+  if (breathing) findings.push(breathing);
+  const hrv = assessHrv(current, prior);
+  if (hrv) findings.push(hrv);
   const needsMedicalOfficer = urgentSymptoms.length > 0 || Boolean(sleep && mood) || Boolean(orthostatic)
     || present(checkin, 'vision_changes') || present(checkin, 'vomiting');
 
@@ -468,7 +494,7 @@ export function evaluateCheckin(
     dataQualityWarnings,
     recommendedTier: needsMedicalOfficer ? 'crew_medical_officer' : 'self_care',
     actionCardIds: actionCardIds.length > 0 ? actionCardIds : ['record-and-monitor'],
-    engineVersion: '1.4.0',
+    engineVersion: '1.5.0',
     overallState,
   };
 }

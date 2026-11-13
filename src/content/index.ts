@@ -32,6 +32,24 @@ export const SOURCES: Record<string, SourceRecord> = {
     supports: 'Headaches linked to cabin CO2 around 2.8–4.5 mmHg; NASA-STD-3001 limits the 1-hour average to 3 mmHg; a 7-day average under 2.5 mmHg keeps headache risk below 1%.',
     doesNotSupport: 'That a particular headache was caused by CO2; fluid shifts can cause similar headaches.',
   },
+  'ppg-respiratory-fusion': {
+    id: 'ppg-respiratory-fusion',
+    title: 'Multiparameter respiratory rate estimation from the photoplethysmogram (Karlen et al., IEEE TBME 2013)',
+    publisher: 'IEEE Transactions on Biomedical Engineering',
+    url: 'https://doi.org/10.1109/TBME.2013.2246160',
+    retrievedOn: '2026-11-13',
+    supports: 'Breathing changes the pulse wave in three ways (baseline, amplitude, beat timing). Fusing all three and discarding estimates that disagree gave about 3 breaths/min error, better than any single method.',
+    doesNotSupport: 'That a webcam pulse wave is as accurate as a fingertip pulse oximeter; the study used contact sensors.',
+  },
+  'hrv-norms': {
+    id: 'hrv-norms',
+    title: 'An overview of heart rate variability metrics and norms (Shaffer & Ginsberg, 2017)',
+    publisher: 'Frontiers in Public Health',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/29034226/',
+    retrievedOn: '2026-11-13',
+    supports: 'RMSSD is a short-term time-domain HRV measure; baseline values depend on age, sex and recording length, so norms are not interchangeable and personal comparison matters.',
+    doesNotSupport: 'A diagnosis from a single camera HRV reading.',
+  },
   'sans-review': {
     id: 'sans-review',
     title: 'Spaceflight-associated neuro-ocular syndrome (systematic review)',
@@ -275,6 +293,31 @@ MEASUREMENT_GUIDES.exercise_minutes = {
   sourceId: 'nasa-exercise',
 };
 
+MEASUREMENT_GUIDES.respiratory_rate = {
+  text: 'Measured by the camera from tiny changes in your pulse as you breathe. Or count breaths for 60 seconds.',
+  steps: [
+    'Tap "Measure breathing & HRV" and keep your face in the oval for about 45 seconds.',
+    'Breathe normally through your nose. Do not slow down or speed up on purpose.',
+    'No camera? Ask a crewmate to count how many times your chest rises in 60 seconds.',
+  ],
+  whyInSpace: 'A fast breathing rate at rest is an early sign of illness, high cabin CO2, anxiety or a lung problem. Fluid shifts in low gravity also change how you breathe.',
+  typicalRange: 'Adults at rest usually breathe 12–20 times a minute.',
+  watchFor: 'Breathing faster than usual at rest, feeling short of breath, or breathing faster on days the habitat CO2 is high.',
+  sourceId: 'ppg-respiratory-fusion',
+};
+MEASUREMENT_GUIDES.hrv_rmssd = {
+  text: 'Heart rate variability: how much the gap between heartbeats changes. Measured by the camera together with breathing rate.',
+  steps: [
+    'Use the same camera check as breathing rate (about 45 seconds, sitting still).',
+    'Measure at the same time each day, before exercise or coffee, so readings compare fairly.',
+    'Sol Check compares HRV only with your own usual, never with other people.',
+  ],
+  whyInSpace: 'HRV often drops with poor sleep, stress, illness or overtraining, sometimes before you feel it. It helps spot a tough few days early.',
+  typicalRange: 'Very personal (often 20–100 ms in healthy adults). A drop of 30% or more below your own usual is what Sol Check watches for.',
+  watchFor: 'Several low readings in a row, especially together with poor sleep or low mood.',
+  sourceId: 'hrv-norms',
+};
+
 export const ACTION_CARDS: Record<string, ActionCard> = {
   'record-and-monitor': {
     id: 'record-and-monitor',
@@ -364,6 +407,30 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['sans-review'],
     reviewStatus: 'needs_clinical_review',
+  },
+  'breathing-recheck': {
+    id: 'breathing-recheck',
+    title: 'Rest and measure your breathing again',
+    tier: 'self_care',
+    steps: [
+      'Sit quietly for 5 minutes, then repeat the camera check or count breaths for 60 seconds.',
+      'If it is still outside 12–20 a minute, or you feel short of breath, tell your crew medical officer.',
+      'If several crew breathe faster at once, ask life support to check cabin CO2.',
+    ],
+    sourceRefs: ['ppg-respiratory-fusion'],
+    reviewStatus: 'demo_heuristic',
+  },
+  'recovery-day': {
+    id: 'recovery-day',
+    title: 'Plan an easier, well-rested day',
+    tier: 'self_care',
+    steps: [
+      'Protect your next sleep period and keep a regular bedtime.',
+      'Keep exercise light today if you feel run-down, and drink regularly.',
+      'Measure HRV again tomorrow at the same time; tell your crew medical officer if it stays low for 3 days.',
+    ],
+    sourceRefs: ['hrv-norms'],
+    reviewStatus: 'demo_heuristic',
   },
   'co2-check': {
     id: 'co2-check',

@@ -19,6 +19,8 @@ export const DEMO_DELTAS: Readonly<Record<MetricId, number>> = {
   bp_diastolic_standing: 8,
   fluid_intake: 0.5,
   exercise_minutes: 30,
+  respiratory_rate: 4,
+  hrv_rmssd: 10,
 };
 
 /** The seven daily readings that use the generic baseline / trend rules. Optional readings have dedicated rules. */
@@ -32,6 +34,10 @@ export const FLUID_TARGET_L = 2;
 export const EXERCISE_TARGET_MIN = 90;
 /** NASA-STD-3001 habitat CO2 limit (1-hour average), mmHg. */
 export const CO2_LIMIT_MMHG = 3;
+/** Usual adult resting breathing rate, breaths per minute. */
+export const BREATHING_RANGE = { low: 12, high: 20 } as const;
+/** HRV is very personal: flag only a drop below this fraction of the person's own 14-sol median. */
+export const HRV_DROP_FRACTION = 0.7;
 export const MOTION_SICKNESS_SYMPTOMS = ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] as const;
 
 const baselineCondition = `Use the median of at least ${MIN_BASELINE_READINGS} distinct measured sols in the prior ${BASELINE_LOOKBACK_SOLS} sols.`;
@@ -256,6 +262,32 @@ const ruleDefinitions = {
     reviewStatus: 'sourced',
     actionCardIds: ['co2-check'],
     testCases: ['A headache on a 3.4 mmHg sol adds a context finding.', 'A headache on a 2.2 mmHg sol does not.'],
+  },
+  'breathing-rate-range': {
+    ruleId: 'breathing-rate-range',
+    version: '1.0.0',
+    metricIds: ['respiratory_rate'],
+    conditions: [`Flag a resting breathing rate below ${BREATHING_RANGE.low} or above ${BREATHING_RANGE.high} breaths/min on the current check-in.`],
+    contextRequirements: ['A breathing-rate entry on the current check-in (camera estimate or counted).'],
+    priority: 55,
+    reason: 'A resting breathing rate outside the usual adult range can be an early sign of illness, anxiety or high cabin CO2. Camera estimates are re-measured before acting.',
+    sourceRefs: ['ppg-respiratory-fusion'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['breathing-recheck'],
+    testCases: ['24 breaths/min is flagged as higher; 16 is not.', '9 breaths/min is flagged as lower.'],
+  },
+  'hrv-below-usual': {
+    ruleId: 'hrv-below-usual',
+    version: '1.0.0',
+    metricIds: ['hrv_rmssd'],
+    conditions: [`Flag RMSSD below ${Math.round(HRV_DROP_FRACTION * 100)}% of the personal median of at least ${MIN_BASELINE_READINGS} prior sols in the last ${BASELINE_LOOKBACK_SOLS}.`],
+    contextRequirements: [`An HRV entry today and at least ${MIN_BASELINE_READINGS} prior HRV readings.`],
+    priority: 50,
+    reason: 'HRV norms differ widely between people, so only a clear drop against the person’s own usual is surfaced. It is a recovery cue, not a diagnosis.',
+    sourceRefs: ['hrv-norms'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['recovery-day'],
+    testCases: ['30 ms against a 50 ms usual is flagged; 45 ms is not.', 'No finding without 5 prior readings.'],
   },
 } satisfies Record<string, RuleDefinition>;
 

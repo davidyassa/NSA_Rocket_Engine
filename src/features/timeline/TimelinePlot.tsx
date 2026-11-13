@@ -13,11 +13,15 @@ type PlotLine = {
 const plotWidth = 1000;
 const plotHeight = 100;
 
-export function TimelinePlot({ start, end, selectedSol, lines, leftTicks, rightTicks }: {
+/** A horizontal reference line, such as a safety limit. */
+type PlotLimit = { id: string; value: number; domain: readonly [number, number]; color: string; label: string };
+
+export function TimelinePlot({ start, end, selectedSol, lines, leftTicks, rightTicks, limits = [] }: {
   start: number;
   end: number;
   selectedSol: number;
   lines: readonly PlotLine[];
+  limits?: readonly PlotLimit[];
   leftTicks: ReactNode;
   rightTicks?: ReactNode;
 }) {
@@ -49,6 +53,19 @@ export function TimelinePlot({ start, end, selectedSol, lines, leftTicks, rightT
             />
           ))}
           <line x1="0" x2={plotWidth} y1={plotHeight / 2} y2={plotHeight / 2} className="timeline-grid-line" />
+          {limits.map(({ id, value, domain, color }) => (
+            <line
+              key={id}
+              x1="0"
+              x2={plotWidth}
+              y1={height(value, domain) * plotHeight}
+              y2={height(value, domain) * plotHeight}
+              stroke={color}
+              strokeWidth={1.5}
+              strokeDasharray="2 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
           {lines.map(({ id, points, domain, color, dashed }) => {
             let penDown = false;
             const segments = points.flatMap(({ sol, value }) => {
@@ -89,6 +106,9 @@ export function TimelinePlot({ start, end, selectedSol, lines, leftTicks, rightT
             />
           ),
         ) ?? [])}
+        {limits.map(({ id, value, domain, color, label }) => (
+          <span key={id} className="timeline-limit-label" style={{ top: `${height(value, domain) * 100}%`, color }}>{label}</span>
+        ))}
       </div>
       <div className="timeline-ticks timeline-ticks-right">{rightTicks}</div>
     </div>

@@ -44,8 +44,15 @@ declare module 'vitalcamera-sdk' {
     timestamp: number;
   }
 
+  export interface BvpData { value: number; timestamp: number; time?: number }
+  export interface BeatData { ibi: number; timestamp: number }
+  export interface HrvData { rmssd: number | null; sdnn: number | null; meanRR: number | null; n: number; reject: string | null; timestamp: number }
+
   export class VitalCamera {
     on(event: 'heartrate', callback: (data: HeartRateData) => void): void;
+    on(event: 'bvp', callback: (data: BvpData) => void): void;
+    on(event: 'beat', callback: (data: BeatData) => void): void;
+    on(event: 'hrv', callback: (data: HrvData) => void): void;
     on(event: 'face', callback: (data: FaceData | null) => void): void;
     on(event: 'error', callback: (data: { source: string; message: string }) => void): void;
     off(event: string, callback?: (...args: unknown[]) => void): void;
@@ -58,6 +65,7 @@ declare module 'vitalcamera-sdk' {
     constructor(config: BrowserAdapterConfig);
     init(): Promise<void>;
     start(): void;
+    processVideoFrame(source: HTMLVideoElement | HTMLCanvasElement, timestamp?: number): void;
     stop(): void;
     destroy(): Promise<void>;
     vitalcamera: VitalCamera;

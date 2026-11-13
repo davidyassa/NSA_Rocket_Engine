@@ -40,6 +40,8 @@ export const FIELD_HINTS: Record<MetricId, string> = {
   bp_diastolic_standing: 'Bottom number after 3 minutes standing.',
   fluid_intake: 'Water and drinks since your last check-in, in litres.',
   exercise_minutes: 'Minutes of actual exercise today (not set-up time).',
+  respiratory_rate: 'Breaths per minute at rest. The camera can measure this.',
+  hrv_rmssd: 'Heart rate variability in milliseconds. The camera can measure this.',
 };
 
 /** Field labels in everyday words (the technical name stays in brackets). */
@@ -52,6 +54,8 @@ export const PLAIN_FIELD_LABEL: Partial<Record<MetricId, string>> = {
   bp_diastolic_standing: 'Standing bottom number (diastolic)',
   fluid_intake: 'Water and drinks',
   exercise_minutes: 'Exercise today',
+  respiratory_rate: 'Breathing rate',
+  hrv_rmssd: 'Heart rate variability (HRV)',
 };
 
 const METRIC_WORDS: Record<MetricId, string> = {
@@ -67,6 +71,8 @@ const METRIC_WORDS: Record<MetricId, string> = {
   bp_diastolic_standing: 'standing blood pressure (bottom number)',
   fluid_intake: 'fluid intake',
   exercise_minutes: 'exercise',
+  respiratory_rate: 'breathing rate',
+  hrv_rmssd: 'heart rate variability',
 };
 
 function direction(summary: string): 'lower' | 'higher' | null {
@@ -110,6 +116,10 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
       return 'You reported a vision change or a puffy, full-feeling head. Fluid shift can affect the eyes, so ask your crew medical officer for an eye check.';
     case 'co2-headache-context':
       return 'Your headaches came on days when the habitat air had more carbon dioxide than NASA’s limit. Report it to the life-support crew. CO2 may be part of the cause, but the timing alone does not prove it.';
+    case 'breathing-rate-range':
+      return `You are breathing ${dir === 'lower' ? 'more slowly' : 'faster'} than the usual 12–20 breaths a minute at rest. Rest for 5 minutes and measure again.`;
+    case 'hrv-below-usual':
+      return 'Your heart rate variability is well below your usual. This often happens with poor sleep, stress or getting ill. Take it easier today and measure again tomorrow.';
     default:
       return finding.summary;
   }
@@ -153,5 +163,7 @@ export const GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'SANS', meaning: 'Spaceflight-associated neuro-ocular syndrome: eye and vision changes linked to fluids shifting toward the head. Needs eye imaging to assess.' },
   { term: 'Space motion sickness', meaning: 'Dizziness, nausea and balance problems while the inner ear adapts to a new gravity level.' },
   { term: 'CO2 (mmHg)', meaning: 'Carbon dioxide in the habitat air. NASA keeps the 1-hour average at or below 3 mmHg because higher levels cause headaches and tiredness.' },
+  { term: 'Breathing rate', meaning: 'How many breaths you take in one minute. Adults at rest usually take 12–20.' },
+  { term: 'HRV (heart rate variability)', meaning: 'How much the time between heartbeats changes from beat to beat. Higher is usually a sign of being well rested. It is very personal, so Sol Check compares it only with your own usual.' },
   { term: 'Countermeasure', meaning: 'Something you do to protect your body in space, such as daily exercise against muscle and bone loss.' },
 ];

@@ -1,4 +1,4 @@
-import { Activity, ChevronDown, ChevronLeft, ChevronRight, Flag, Pause, Play, RadioTower, RotateCcw } from 'lucide-react';
+import { Activity, ChevronDown, Wind, ChevronLeft, ChevronRight, Flag, Pause, Play, RadioTower, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { DailyCheckin, DemoScenario, HealthMeasurement, MissionEvent, Provenance } from '../../contracts';
@@ -6,6 +6,7 @@ import {
   RADLAB_CSV_URL, RADLAB_EVENT_SOURCE, RADLAB_HOURLY, RADLAB_MANIFEST, RADLAB_SOURCE, RADLAB_UNIT,
 } from '../../data/nasa';
 import { usableMeasurement } from '../../engine';
+import { CO2_LIMIT_MMHG } from '../../engine/rules';
 import { radlabEventSol, replaySolAt } from '../../sim';
 import { ORIGIN_META, TOKENS } from '../../ui/tokens';
 import { TimelinePlot } from './TimelinePlot';
@@ -14,6 +15,11 @@ import './timeline.css';
 const sleepColor = TOKENS.accent;
 const moodColor = TOKENS.textSecondary;
 const archiveColor = TOKENS.nasaArchive;
+const co2Color = TOKENS.accent;
+const cabinColor = TOKENS.textSecondary;
+const limitColor = TOKENS.statusTrend;
+const CO2_MAX = 4;
+const CABIN_RANGE = [18, 28] as const;
 const numberFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 const archiveDate = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
@@ -156,6 +162,13 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
   const moodPoints = crewSeries.map(({ sol, mood }) => ({
     sol: sol + 0.5, value: mood?.value ?? null, hollow: mood?.provenance === 'user_entered',
   }));
+
+  const habitatBySol = new Map((scenario.environment ?? []).map((sample) => [sample.sol, sample]));
+  const habitatSeries = sols.map((sol) => ({ sol, sample: habitatBySol.get(sol) }));
+  const co2Points = habitatSeries.map(({ sol, sample }) => ({ sol: sol + 0.5, value: sample ? Math.min(CO2_MAX, sample.co2Mmhg) : null }));
+  const cabinPoints = habitatSeries.map(({ sol, sample }) => ({ sol: sol + 0.5, value: sample?.cabinTempC ?? null }));
+  const selectedHabitat = habitatBySol.get(selectedSol);
+  const habitatOrigins = [...new Set((scenario.environment ?? []).map((sample) => sample.provenance))];
 
   const archivePoints = RADLAB_HOURLY.map((hour) => ({
     sol: replaySolAt(hour.hourStartUtc, missionContext),
@@ -340,6 +353,44 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
             )) : <span className="muted">No mission event recorded.</span>}
           </div>
         </section>
+
+        {habitatSeries.some(({ sample }) => sample) && (
+          <section className="timeline-lane" aria-labelledby="timeline-habitat-heading">
+            <div className="timeline-lane-heading">
+              <div className="timeline-lane-title">
+                <span className="timeline-lane-icon"><Wind size={17} aria-hidden="true" /></span>
+                <div>
+                  <h2 id="timeline-habitat-heading">Habitat air</h2>
+                  <p className="timeline-trace-legend"><span>CO2 · mmHg</span><span>Cabin · °C</span></p>
+                </div>
+              </div>
+              <ProvenanceDetails label="Habitat air provenance" origins={habitatOrigins.length ? habitatOrigins : ['synthetic_demo']}>
+                <p>Daily mean cabin CO2 and temperature. In this demo they are simulated life-support (ECLSS) readings, not live sensors.</p>
+                <p>The dotted line marks NASA’s {CO2_LIMIT_MMHG} mmHg limit for the 1-hour average CO2 (NASA-STD-3001). Values above {CO2_MAX} mmHg are drawn at the top edge.</p>
+              </ProvenanceDetails>
+            </div>
+            <TimelinePlot
+              start={start} end={end} selectedSol={selectedSol}
+              leftTicks={<><span>{CO2_MAX}</span><span>{CO2_MAX / 2}</span><span>0</span></>}
+              rightTicks={<><span>{CABIN_RANGE[1]}°</span><span>{(CABIN_RANGE[0] + CABIN_RANGE[1]) / 2}°</span><span>{CABIN_RANGE[0]}°</span></>}
+              limits={[{ id: 'co2-limit', value: CO2_LIMIT_MMHG, domain: [0, CO2_MAX], color: limitColor, label: `Limit ${CO2_LIMIT_MMHG} mmHg` }]}
+              lines={[
+                { id: 'co2', points: co2Points, domain: [0, CO2_MAX], color: co2Color, markers: co2Points },
+                { id: 'cabin', points: cabinPoints, domain: CABIN_RANGE, color: cabinColor, dashed: true },
+              ]}
+            />
+            <div className="timeline-selected-values">
+              <span className="timeline-selected-sol">Sol {selectedSol}</span>
+              {selectedHabitat ? (
+                <>
+                  <span>CO2 <strong>{numberFormat.format(selectedHabitat.co2Mmhg)} mmHg</strong>
+                    {selectedHabitat.co2Mmhg >= CO2_LIMIT_MMHG ? ' · above limit' : selectedHabitat.co2Mmhg >= 2.5 ? ' · elevated' : ' · within limit'}</span>
+                  <span>Cabin <strong>{numberFormat.format(selectedHabitat.cabinTempC)} °C</strong></span>
+                </>
+              ) : <span className="muted">No habitat reading for this sol.</span>}
+            </div>
+          </section>
+        )}
 
         <section className="timeline-lane" aria-labelledby="timeline-archive-heading">
           <div className="timeline-lane-heading">

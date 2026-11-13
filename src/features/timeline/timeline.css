@@ -534,3 +534,13 @@
     margin-left: 0;
   }
 }
+
+.timeline-limit-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-115%);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}

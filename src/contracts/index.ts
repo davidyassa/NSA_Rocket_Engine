@@ -6,6 +6,7 @@ export const METRIC_IDS = [
   // Optional readings added from the crew-health gap review:
   'heart_rate_standing', 'bp_systolic_standing', 'bp_diastolic_standing', // stand-up (orthostatic) test
   'fluid_intake', 'exercise_minutes', // hydration and the muscle/bone countermeasure
+  'respiratory_rate', 'hrv_rmssd', // camera-derived from the same face pulse signal (no extra hardware)
 ] as const;
 export const HEALTH_DOMAINS = [
   'cardiovascular', 'metabolic', 'temperature', 'sleep', 'behavioral', 'symptoms',
@@ -13,7 +14,7 @@ export const HEALTH_DOMAINS = [
 
 const metricIdSchema = z.enum(METRIC_IDS);
 const healthDomainSchema = z.enum(HEALTH_DOMAINS);
-const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min']);
+const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min', 'breaths_min', 'ms']);
 const provenanceSchema = z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']);
 const findingKindSchema = z.enum(['observation', 'trend', 'contextual_association', 'data_quality', 'data_unavailable']);
 const domainStatusSchema = z.enum([
@@ -60,6 +61,8 @@ export const METRICS: Record<MetricId, MetricInfo> = {
   bp_diastolic_standing: { label: 'Standing diastolic pressure', unit: 'mmHg', unitLabel: 'mmHg', domain: 'cardiovascular', optional: true },
   fluid_intake: { label: 'Fluid intake', unit: 'L', unitLabel: 'L', domain: 'metabolic', optional: true, countermeasure: true },
   exercise_minutes: { label: 'Exercise', unit: 'min', unitLabel: 'min', domain: 'metabolic', optional: true, countermeasure: true },
+  respiratory_rate: { label: 'Breathing rate', unit: 'breaths_min', unitLabel: 'breaths/min', domain: 'cardiovascular', optional: true },
+  hrv_rmssd: { label: 'Heart rate variability (RMSSD)', unit: 'ms', unitLabel: 'ms', domain: 'cardiovascular', optional: true },
 };
 
 export const SYMPTOM_OPTIONS = [
@@ -102,6 +105,14 @@ export function measurementValueError(metric: MetricId, value: number): string |
   }
   if (metric === 'exercise_minutes') {
     if (!Number.isInteger(value) || value < 0 || value > 600) return 'Enter whole minutes from 0 to 600.';
+    return;
+  }
+  if (metric === 'respiratory_rate') {
+    if (value < 4 || value > 60) return 'Enter breaths per minute from 4 to 60.';
+    return;
+  }
+  if (metric === 'hrv_rmssd') {
+    if (value < 5 || value > 250) return 'Enter milliseconds from 5 to 250.';
     return;
   }
   if (value <= 0) return 'Enter a value greater than zero.';

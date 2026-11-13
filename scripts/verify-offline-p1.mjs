@@ -539,7 +539,12 @@ async function main() {
     await sleep(600);
 
     const sol41Anchor = await cdp.eval(`document.querySelector('.timeline-selected-values .timeline-original-anchor')?.innerText`);
-    const sol41Radiation = await cdp.eval(`document.querySelectorAll('.timeline-selected-values')[2]?.innerText`);
+    const sol41Radiation = await cdp.eval(`document.querySelector('[aria-labelledby="timeline-archive-heading"] .timeline-selected-values')?.innerText`);
+    const sol41Habitat = await cdp.eval(`document.querySelector('[aria-labelledby="timeline-habitat-heading"] .timeline-selected-values')?.innerText ?? ''`);
+    console.log(`   ✓ Sol 41 habitat lane: "${sol41Habitat.split('\n').join(' · ')}"`);
+    if (!sol41Habitat.includes('3.4 mmHg') || !sol41Habitat.includes('above limit')) {
+      throw new Error(`Habitat lane missing the Sol 41 CO2 reading: "${sol41Habitat}"`);
+    }
     console.log(`   ✓ Sol 41 archive anchor: "${sol41Anchor}"`);
     console.log(`   ✓ Sol 41 radiation values: "${sol41Radiation.split('\n').join(' · ')}"`);
 
@@ -551,7 +556,7 @@ async function main() {
     }
 
     // Provenance details
-    await cdp.eval(`document.querySelectorAll('.timeline-provenance summary')[2]?.click()`);
+    await cdp.eval(`document.querySelector('[aria-labelledby="timeline-archive-heading"] .timeline-provenance summary')?.click()`);
     await sleep(300);
     const provText = await cdp.eval(`document.querySelector('.timeline-provenance dl')?.innerText`);
     console.log(`   ✓ RadLab provenance instrument: "${provText.split('\n')[1]}"`);

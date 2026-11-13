@@ -5,6 +5,12 @@ export interface PulseCheckCallbacks {
   onFaceDetected: (detected: boolean) => void;
   /** Face centre and width as fractions of the camera frame (raw, not mirrored); null when no face. */
   onFaceBox?: (box: { cx: number; cy: number; size: number } | null) => void;
+  /** Raw camera pulse wave sample (blood-volume pulse), ms timestamp. Used for breathing rate. */
+  onBvp?: (sample: { t: number; v: number }) => void;
+  /** One detected heartbeat: inter-beat interval (ms) and peak time (ms). */
+  onBeat?: (beat: { t: number; ibi: number }) => void;
+  /** Heart-rate variability from the SDK; rmssd is null with a reason while not trustworthy. */
+  onHrv?: (hrv: { rmssd: number | null; sdnn: number | null; n: number; reject: string | null }) => void;
   onError: (error: Error) => void;
 }
 
@@ -78,7 +84,87 @@ export function clearVitalCameraInferenceState(): Promise<boolean> {
 type TrackCapabilitiesLike = { whiteBalanceMode?: string[]; exposureMode?: string[] };
 type TrackSettingsLike = { colorTemperature?: number; exposureTime?: number; frameRate?: number };
 
+type FrameMetadata = { captureTime?: number; mediaTime?: number };
+type FrameVideo = HTMLVideoElement & {
+  requestVideoFrameCallback?: (cb: (now: number, meta: FrameMetadata) => void) => number;
+  cancelVideoFrameCallback?: (handle: number) => void;
+};
+/** Private SDK fields used to give the model the real frame timing (see startFrameLoop). */
+type AdapterTiming = { _dval?: number; _virtualTime?: number };
+
+/** Frames closer together than this are skipped, so the model always sees about 30 fps. */
+const MIN_FRAME_GAP_MS = 25;
+/** Rolling window used to measure the camera's real frame interval. */
+const DT_WINDOW = 90;
+
 export class VitalCameraService {
+  private frameHandle: number | null = null;
+  /** SDK's smoothed frame time → real camera capture time, so pulse timing is exact. */
+  private realTimeOf = new Map<number, number>();
+  /** Measured camera frame rate (frames per second), null until known. */
+  measuredFps: number | null = null;
+
+  /**
+   * Feed the camera model one call per NEW camera frame, with its real capture
+   * time, instead of the SDK's 30 Hz animation loop. Why:
+   *  - A 15–24 fps laptop camera polled at 30 Hz gives the model repeated frames,
+   *    which blur the pulse and slow the reading down.
+   *  - The SDK assumes 1/30 s per frame and corrects that only very slowly
+   *    (0.3% per frame, ~11 s), so on a slower camera the heart rate is
+   *    mis-scaled for the first part of every scan. We set the frame interval
+   *    from the measured camera rate every frame instead.
+   * Falls back to the SDK loop on browsers without requestVideoFrameCallback.
+   */
+  private startFrameLoop(adapter: BrowserAdapter, video: FrameVideo): boolean {
+    if (typeof video.requestVideoFrameCallback !== 'function') return false;
+    const timing = adapter as unknown as AdapterTiming;
+    const dts: number[] = [];
+    let lastProcessed = 0;
+    // One clock for the whole scan: the camera's capture time when the browser gives it,
+    // else the frame's media time (shifted onto the page clock), else the callback time.
+    let clock: 'capture' | 'media' | 'now' | null = null;
+    let mediaOffset = 0;
+    const onFrame = (now: number, meta: FrameMetadata) => {
+      if (this.isDestroyed || this.adapter !== adapter) return;
+      this.frameHandle = video.requestVideoFrameCallback!(onFrame);
+      if (clock === null) {
+        clock = typeof meta?.captureTime === 'number' && meta.captureTime > 0 ? 'capture'
+          : typeof meta?.mediaTime === 'number' && meta.mediaTime > 0 ? 'media' : 'now';
+        mediaOffset = now - (meta?.mediaTime ?? 0) * 1000;
+      }
+      const captured = clock === 'capture' ? meta.captureTime ?? now
+        : clock === 'media' ? (meta.mediaTime ?? 0) * 1000 + mediaOffset : now;
+      if (lastProcessed > 0 && captured - lastProcessed < MIN_FRAME_GAP_MS) return;
+      if (lastProcessed > 0) {
+        const dt = captured - lastProcessed;
+        if (dt > 0 && dt < 1000) {
+          dts.push(dt);
+          if (dts.length > DT_WINDOW) dts.shift();
+        }
+        if (dts.length >= 5) {
+          const sorted = [...dts].sort((a, b) => a - b);
+          const frameSeconds = sorted[Math.floor(sorted.length / 2)] / 1000;
+          if (typeof timing._dval === 'number') timing._dval = frameSeconds;
+          this.measuredFps = Math.round(10 / frameSeconds) / 10;
+        }
+      }
+      lastProcessed = captured;
+      adapter.processVideoFrame(video, captured);
+      if (typeof timing._virtualTime === 'number') {
+        this.realTimeOf.set(timing._virtualTime, captured);
+        if (this.realTimeOf.size > 600) this.realTimeOf.delete(this.realTimeOf.keys().next().value as number);
+      }
+    };
+    adapter.vitalcamera.start();
+    this.frameHandle = video.requestVideoFrameCallback(onFrame);
+    return true;
+  }
+
+  /** Real capture time for an SDK timestamp (falls back to the SDK time). */
+  private realTime(sdkTime: number): number {
+    return this.realTimeOf.get(sdkTime) ?? sdkTime;
+  }
+
   /**
    * Auto-exposure and auto white balance keep nudging brightness and colour,
    * which drowns the tiny pulse signal. Once the camera has settled (about 2 s),
@@ -218,7 +304,7 @@ export class VitalCameraService {
           enableFaceLandmarker: false,
           enableEmotion: false,
           enableGaze: false,
-          enableHrv: false,
+          enableHrv: true,
           enableHeadPose: false,
           sqiThreshold: 0.38,
         },
@@ -278,6 +364,28 @@ export class VitalCameraService {
           }
         });
 
+        if (callbacks.onBvp) {
+          this.adapter.vitalcamera.on('bvp', (data: { value: number; timestamp: number }) => {
+            if (!this.isDestroyed && Number.isFinite(data?.value) && Number.isFinite(data?.timestamp)) {
+              callbacks.onBvp?.({ t: this.realTime(data.timestamp), v: data.value });
+            }
+          });
+        }
+        if (callbacks.onBeat) {
+          this.adapter.vitalcamera.on('beat', (data: { ibi: number; timestamp: number }) => {
+            if (!this.isDestroyed && Number.isFinite(data?.ibi) && Number.isFinite(data?.timestamp)) {
+              callbacks.onBeat?.({ t: this.realTime(data.timestamp), ibi: data.ibi });
+            }
+          });
+        }
+        if (callbacks.onHrv) {
+          this.adapter.vitalcamera.on('hrv', (data: { rmssd: number | null; sdnn: number | null; n: number; reject: string | null }) => {
+            if (!this.isDestroyed && data) {
+              callbacks.onHrv?.({ rmssd: data.rmssd, sdnn: data.sdnn, n: data.n ?? 0, reject: data.reject ?? null });
+            }
+          });
+        }
+
         this.adapter.vitalcamera.on('error', (err: { source: string; message: string }) => {
           if (!this.isDestroyed) {
             callbacks.onError(new Error(`[${err.source}] ${err.message}`));
@@ -285,7 +393,7 @@ export class VitalCameraService {
         });
       }
 
-      this.adapter.start();
+      if (!this.startFrameLoop(this.adapter, videoEl as FrameVideo)) this.adapter.start();
     } catch (err) {
       await this.stop();
       const error = err instanceof Error ? err : new Error('ADAPTER_INIT_FAILED');
@@ -313,6 +421,11 @@ export class VitalCameraService {
 
   async stop(): Promise<void> {
     this.isDestroyed = true;
+    if (this.frameHandle !== null && this.videoEl) {
+      (this.videoEl as FrameVideo).cancelVideoFrameCallback?.(this.frameHandle);
+    }
+    this.frameHandle = null;
+    this.realTimeOf.clear();
     this.releaseStream();
 
     if (this.adapter) {

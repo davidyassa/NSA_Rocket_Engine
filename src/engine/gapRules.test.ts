@@ -93,8 +93,30 @@ describe('Sol 43 hero scenario tells the after-the-storm story', () => {
     const history = scenario.history.map((h) => ({ ...h, astronautId: 'crew-1', measurements: h.measurements.map((m) => ({ ...m, astronautId: 'crew-1' })) }));
     const result = evaluateCheckin(today, history, { events: scenario.events, archiveEvent: { sol: 41, date: '2017-09-11' }, environment: scenario.environment });
     const rules = result.findings.map((f) => f.ruleId);
-    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context']));
+    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual']));
     expect(rules).not.toContain('orthostatic-check'); // the scripted stand test is normal
-    expect(result.engineVersion).toBe('1.4.0');
+    expect(result.engineVersion).toBe('1.5.0');
+  });
+});
+
+describe('camera breathing rate and HRV', () => {
+  it('flags breathing outside 12–20 per minute at rest, both directions', () => {
+    expect(ids(checkin(43, { respiratory_rate: 24 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/above/);
+    expect(ids(checkin(43, { respiratory_rate: 9 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/below/);
+    expect(ids(checkin(43, { respiratory_rate: 16 })).findings.some((f) => f.ruleId === 'breathing-rate-range')).toBe(false);
+  });
+
+  it('compares HRV only with the person’s own usual, and needs 5 prior readings', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { hrv_rmssd: 50 }));
+    const low = ids(checkin(43, { hrv_rmssd: 30 }), history).findings.find((f) => f.ruleId === 'hrv-below-usual');
+    expect(low?.summary).toMatch(/usual of 50 ms/);
+    expect(low?.baselineUsed[0]?.metric).toBe('hrv_rmssd');
+    expect(ids(checkin(43, { hrv_rmssd: 45 }), history).findings.some((f) => f.ruleId === 'hrv-below-usual')).toBe(false);
+    expect(ids(checkin(43, { hrv_rmssd: 20 }), history.slice(0, 4)).findings.some((f) => f.ruleId === 'hrv-below-usual')).toBe(false);
+  });
+
+  it('never sets a body-area status or a "not measured" finding when skipped', () => {
+    const skipped = ids(checkin(43, seated));
+    expect(skipped.findings.some((f) => f.summary.toLowerCase().includes('breathing') || f.summary.includes('HRV'))).toBe(false);
   });
 });

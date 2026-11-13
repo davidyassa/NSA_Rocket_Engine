@@ -11,7 +11,7 @@ import {
   type MetricId,
 } from '../../contracts';
 import { MEASUREMENT_GUIDES, SOURCES } from '../../content';
-import { CameraPulseCheck } from './CameraPulseCheck';
+import { CameraPulseCheck, type CameraVitalsEstimate } from './CameraPulseCheck';
 import type { CameraPulseEstimate } from './pulseQuality';
 import { FIELD_HINTS, PLAIN_FIELD_LABEL } from '../../content/plainLanguage';
 import './checkin.css';
@@ -27,6 +27,7 @@ interface CheckinProps {
 /** One short page per measurement, then symptoms, then a review. */
 const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: string }[] = [
   { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Type your resting pulse, or let the camera measure it for you.' },
+  { id: 'breath', title: 'Breathing & HRV', metrics: ['respiratory_rate', 'hrv_rmssd'], intro: 'Optional, about 45 seconds. The camera reads your breathing rate and heart rate variability from the same face scan. No camera? Count your breaths for 60 seconds.' },
   { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic'], intro: 'Use the arm cuff, then type both numbers from the screen.' },
   { id: 'stand', title: 'Stand-up test', metrics: ['bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Optional, about 3 minutes. Stand up and measure again to check how your body copes with gravity. Skip it if you feel unwell.' },
   { id: 'temperature', title: 'Body temperature', metrics: ['body_temp'], intro: 'Use the thermometer and type the reading in °C.' },
@@ -175,6 +176,35 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     });
     // Reading accepted: move on to the next page automatically.
     window.setTimeout(() => goTo(1), 700);
+  }
+
+  function acceptCameraVitals(estimate: CameraVitalsEstimate) {
+    const readings: [MetricId, number | null, number | null][] = [
+      ['respiratory_rate', estimate.brpm, estimate.breathingQuality],
+      ['hrv_rmssd', estimate.rmssd, null],
+    ];
+    const accepted = readings.filter((entry): entry is [MetricId, number, number | null] => entry[1] !== null);
+    setDraft(previous => ({ ...previous, ...Object.fromEntries(accepted.map(([metric, value]) => [metric, String(value)])) }));
+    setPrefilled(previous => previous.filter(id => !accepted.some(([metric]) => metric === id)));
+    setCapture(previous => ({
+      ...previous,
+      ...Object.fromEntries(accepted.map(([metric, , quality]) => [metric, {
+        capturedAtUtc: estimate.capturedAtUtc,
+        source: 'camera_estimate',
+        status: 'accepted',
+        signalQuality: quality,
+        algorithm: estimate.algorithm,
+        device: 'browser webcam · on-device WebAssembly',
+        synthetic: false,
+      } satisfies MeasurementCapture])),
+    }));
+    setErrors(previous => {
+      const next = { ...previous };
+      for (const [metric] of accepted) delete next[metric];
+      return next;
+    });
+    const breathStep = STEPS.findIndex(page => page.id === 'breath');
+    window.setTimeout(() => goTo(breathStep + 1), 700);
   }
 
   /** Parse and check every reading; returns values plus any problems. */
@@ -396,6 +426,14 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
                 {/* The camera only runs while the heart-rate page is open. */}
                 {item.id === 'heart' && index === step && (
                   <CameraPulseCheck onAcceptEstimate={acceptCameraEstimate} />
+                )}
+                {item.id === 'breath' && index === step && (
+                  <CameraPulseCheck mode="breathing" onAcceptVitals={acceptCameraVitals} />
+                )}
+                {item.id === 'breath' && (capture.respiratory_rate?.source === 'camera_estimate' || capture.hrv_rmssd?.source === 'camera_estimate') && (
+                  <p className="checkin-capture-note">
+                    These values came from the camera. Typing a new number replaces it with your own entry.
+                  </p>
                 )}
                 {item.id === 'heart' && capture.heart_rate?.source === 'camera_estimate' && (
                   <p className="checkin-capture-note">
