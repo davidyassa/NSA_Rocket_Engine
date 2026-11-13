@@ -16,6 +16,9 @@
   background-position: center, center, center 55%;
   background-size: cover;
 }
+#mission-heading {
+  margin-bottom: 10px;
+}
 .mission-hero-content { padding: clamp(24px, 4vw, 60px); }
 .mission-habitat {
   display: flex;

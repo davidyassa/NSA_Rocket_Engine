@@ -79,13 +79,12 @@ export function Dashboard({ scenario, records, latest, assessment }: {
       <section className="mission-hero" aria-labelledby="mission-heading">
         <div className="mission-hero-content">
           <h1 id="mission-heading">Dashboard<span aria-hidden="true">.</span></h1>
-          <p className="mission-scenario">{scenario.title}</p>
           <Link to={logged ? '/assessment' : '/check-in'} className="button button-primary">
             {logged ? 'View today’s assessment' : 'Start check-in'} <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
       </section>
-      
+
       {pendingTasks.length > 0 && (
         <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
           <div>
