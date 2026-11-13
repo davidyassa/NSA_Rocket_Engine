@@ -1,8 +1,7 @@
 import {
-  ArrowRight, ArrowUpRight, Brain, CalendarClock, CircleAlert, Flame, HeartPulse, MapPin, Moon,
+  ArrowRight, ArrowUpRight, Brain, CalendarClock, CircleAlert, HeartPulse, Moon,
   Radio, ShieldAlert, Smile, Stethoscope, Thermometer, TrendingDown, Waves,
 } from 'lucide-react';
-import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { HEALTH_DOMAINS, METRICS } from '../../contracts';
 import type { DailyCheckin, DemoScenario, HealthDomain, MetricId, RiskAssessment } from '../../contracts';
@@ -11,7 +10,6 @@ import { RecentReadings } from './RecentReadings';
 import { CrewBodyFigure, DOMAIN_TARGETS } from './CrewBodyFigure';
 import { RoutineChecklist } from './RoutineChecklist';
 import { HabitatAir } from './HabitatAir';
-import { calculateCheckinStreak } from './streak';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
 import { PLAIN_DOMAIN, PLAIN_STATUS, plainFinding } from '../../content/plainLanguage';
 import './dashboard.css';
@@ -73,7 +71,6 @@ export function Dashboard({ scenario, records, latest, assessment }: {
   const hasEntered = readings.some((reading) => reading.provenance === 'user_entered');
 
   const activeRecords = records ?? (latest ? [latest] : scenario.history);
-  const streak = useMemo(() => calculateCheckinStreak(activeRecords), [activeRecords]);
   const { tasks } = useFollowUpStore();
   const pendingTasks = tasks.filter(t => t.status !== 'resolved');
 
@@ -214,7 +211,6 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             <Link className="button button-secondary" to="/demo?view=media">Browse mission imagery <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
         </div>
-        <p className="mission-photo-credit">Lunar outpost concept</p>
       </section>
     </div>
   );

@@ -9,7 +9,7 @@ import { Assessment } from '../features/assessment/Assessment';
 import { Checkin } from '../features/checkin/Checkin';
 import { CognitiveLab } from '../features/cognitive/CognitiveLab';
 import { Dashboard } from '../features/dashboard/Dashboard';
-// import { NasaHazards } from '../features/hazards/NasaHazards';
+import { NasaHazards } from '../features/hazards/NasaHazards';
 import { Timeline } from '../features/timeline/Timeline';
 // import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
@@ -151,6 +151,7 @@ export function App() {
             } />
             <Route path="/cognitive" element={<CognitiveLab currentSol={startSol} />} />
             <Route path="/assessment" element={<Assessment key={`${mission.scenarioId}:${revision}`} assessment={assessment} records={records} mission={scenario.missionContext} />} />
+            <Route path="/hazards" element={<NasaHazards />} />
             <Route path="/trends" element={
               <RouteErrorBoundary name="Trends">
                 <Suspense fallback={<p role="status">Loading trends…</p>}>
