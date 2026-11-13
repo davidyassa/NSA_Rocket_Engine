@@ -7,6 +7,7 @@ export const METRIC_IDS = [
   'heart_rate_standing', 'bp_systolic_standing', 'bp_diastolic_standing', // stand-up (orthostatic) test
   'fluid_intake', 'exercise_minutes', // hydration and the muscle/bone countermeasure
   'respiratory_rate', 'hrv_rmssd', // camera-derived from the same face pulse signal (no extra hardware)
+  'calorie_intake', 'body_mass', // food system: menu fatigue and weight loss far from resupply
 ] as const;
 export const HEALTH_DOMAINS = [
   'cardiovascular', 'metabolic', 'temperature', 'sleep', 'behavioral', 'symptoms',
@@ -14,7 +15,7 @@ export const HEALTH_DOMAINS = [
 
 const metricIdSchema = z.enum(METRIC_IDS);
 const healthDomainSchema = z.enum(HEALTH_DOMAINS);
-const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min', 'breaths_min', 'ms']);
+const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min', 'breaths_min', 'ms', 'kcal', 'kg']);
 const provenanceSchema = z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']);
 const findingKindSchema = z.enum(['observation', 'trend', 'contextual_association', 'data_quality', 'data_unavailable']);
 const domainStatusSchema = z.enum([
@@ -63,6 +64,8 @@ export const METRICS: Record<MetricId, MetricInfo> = {
   exercise_minutes: { label: 'Exercise', unit: 'min', unitLabel: 'min', domain: 'metabolic', optional: true, countermeasure: true },
   respiratory_rate: { label: 'Breathing rate', unit: 'breaths_min', unitLabel: 'breaths/min', domain: 'cardiovascular', optional: true },
   hrv_rmssd: { label: 'Heart rate variability (RMSSD)', unit: 'ms', unitLabel: 'ms', domain: 'cardiovascular', optional: true },
+  calorie_intake: { label: 'Food energy', unit: 'kcal', unitLabel: 'kcal', domain: 'metabolic', optional: true, countermeasure: true },
+  body_mass: { label: 'Body mass', unit: 'kg', unitLabel: 'kg', domain: 'metabolic', optional: true },
 };
 
 export const SYMPTOM_OPTIONS = [
@@ -81,6 +84,10 @@ export const SYMPTOM_OPTIONS = [
   // SANS (fluid shift and eye) screening
   { id: 'vision_changes', label: 'Blurred or changed vision' },
   { id: 'head_fullness', label: 'Puffy face or head fullness' },
+  // Food system, kidneys and behavioral health far from Earth
+  { id: 'poor_appetite', label: 'Poor appetite or food tastes bland' },
+  { id: 'flank_pain', label: 'Pain in your side or lower back, or blood in urine' },
+  { id: 'feeling_hopeless', label: 'Feeling hopeless or unable to cope' },
 ] as const;
 
 export const SOL_LENGTH_SECONDS = 88_775;
@@ -109,6 +116,14 @@ export function measurementValueError(metric: MetricId, value: number): string |
   }
   if (metric === 'respiratory_rate') {
     if (value < 4 || value > 60) return 'Enter breaths per minute from 4 to 60.';
+    return;
+  }
+  if (metric === 'calorie_intake') {
+    if (!Number.isInteger(value) || value < 0 || value > 8000) return 'Enter whole kilocalories from 0 to 8000.';
+    return;
+  }
+  if (metric === 'body_mass') {
+    if (value < 30 || value > 200) return 'Enter kilograms from 30 to 200.';
     return;
   }
   if (metric === 'hrv_rmssd') {
@@ -236,6 +251,8 @@ export const actionCardSchema = z.object({
   tier: escalationTierSchema,
   sourceRefs: z.array(z.string()),
   reviewStatus: reviewStatusSchema,
+  /** Medical-kit items this card relies on; their stock and expiry are shown with the card. */
+  kitItemIds: z.array(z.string()).optional(),
 });
 /** Synthetic habitat environment reading for one sol (Environmental Control and Life Support). */
 export const habitatSampleSchema = z.object({

@@ -50,6 +50,42 @@ export const SOURCES: Record<string, SourceRecord> = {
     supports: 'RMSSD is a short-term time-domain HRV measure; baseline values depend on age, sex and recording length, so norms are not interchangeable and personal comparison matters.',
     doesNotSupport: 'A diagnosis from a single camera HRV reading.',
   },
+  'iss-body-mass': {
+    id: 'iss-body-mass',
+    title: 'Body mass changes during long-duration spaceflight (Zwart et al., 2014)',
+    publisher: 'Aviation, Space, and Environmental Medicine',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/25197887/',
+    retrievedOn: '2026-11-13',
+    supports: 'Crew members have often eaten less than they need in flight and lost body mass; regular body-mass monitoring is important for crew health. NASA reports losses of about 2–5% in the first month.',
+    doesNotSupport: 'A clinical cut-off: the 3% and 5% thresholds in Sol Check are demo values.',
+  },
+  'renal-stones-astronauts': {
+    id: 'renal-stones-astronauts',
+    title: 'Renal stone formation among astronauts (Pietrzyk et al., 2007)',
+    publisher: 'Aviation, Space, and Environmental Medicine',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/17511294/',
+    retrievedOn: '2026-11-13',
+    supports: 'Spaceflight raises the urine saturation of stone-forming salts; more fluid, diet changes or medicine (such as potassium citrate) are used to lower the risk.',
+    doesNotSupport: 'Diagnosing a kidney stone from symptoms alone; that needs urine tests and imaging.',
+  },
+  'pharma-stability-space': {
+    id: 'pharma-stability-space',
+    title: 'Evaluation of physical and chemical changes in pharmaceuticals flown on space missions (Du et al., 2011)',
+    publisher: 'The AAPS Journal',
+    url: 'https://doi.org/10.1208/s12248-011-9270-0',
+    retrievedOn: '2026-11-13',
+    supports: 'Several medicines stored on the ISS lost active ingredient faster than ground copies; chronic radiation and repackaging are possible causes.',
+    doesNotSupport: 'That a particular tablet in the kit has lost potency; that needs laboratory testing.',
+  },
+  'nasa-bmed-risk': {
+    id: 'nasa-bmed-risk',
+    title: 'Risk of adverse cognitive or behavioral conditions and psychiatric disorders',
+    publisher: 'NASA Human Health and Performance',
+    url: 'https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders',
+    retrievedOn: '2026-11-13',
+    supports: 'Behavioral-health risk grows with mission length and isolation; validated countermeasures for exploration missions are not yet available, so the crew must handle problems onboard.',
+    doesNotSupport: 'A psychiatric diagnosis from a self-report checkbox.',
+  },
   'sans-review': {
     id: 'sans-review',
     title: 'Spaceflight-associated neuro-ocular syndrome (systematic review)',
@@ -318,6 +354,31 @@ MEASUREMENT_GUIDES.hrv_rmssd = {
   sourceId: 'hrv-norms',
 };
 
+MEASUREMENT_GUIDES.calorie_intake = {
+  text: 'Add up the food energy you ate today. Every space-food package lists its calories (kcal).',
+  steps: [
+    'Look at the label of each food pouch, bar or drink you finished today.',
+    'Add up the kcal numbers. Count only what you actually ate, not what you opened.',
+    'Type the total. A rough number is fine; consistency matters more than precision.',
+  ],
+  whyInSpace: 'Months of the same menu (menu fatigue) and low appetite make crew eat less. Too few calories speeds up muscle and bone loss and weakens immunity, and there is no resupply.',
+  typicalRange: 'Sol Check uses 2,000 kcal a day as a demo minimum. Your real target comes from your medical team (it depends on your size and exercise).',
+  watchFor: 'Skipping meals, food tasting bland, losing weight, or feeling weak.',
+  sourceId: 'iss-body-mass',
+};
+MEASUREMENT_GUIDES.body_mass = {
+  text: 'Weigh yourself with the habitat body-mass device, at the same time each day.',
+  steps: [
+    'Measure before breakfast, after using the toilet, in the same clothing each time.',
+    'In low gravity use the body-mass measuring device (a normal scale does not work in weightlessness).',
+    'Type the reading in kilograms. Sol Check compares it with your own usual.',
+  ],
+  whyInSpace: 'Crew often lose 2–5% of body mass early in a mission because they eat less than they need. Losing weight without trying is an early sign that nutrition is falling behind.',
+  typicalRange: 'Sol Check flags 3% below your usual, and 5% below it for the crew medical officer. These are demo values.',
+  watchFor: 'Weight dropping several sols in a row, especially with poor appetite or low exercise.',
+  sourceId: 'iss-body-mass',
+};
+
 export const ACTION_CARDS: Record<string, ActionCard> = {
   'record-and-monitor': {
     id: 'record-and-monitor',
@@ -363,6 +424,7 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['orthostatic-consensus', 'shuttle-fluid-loading'],
     reviewStatus: 'needs_clinical_review',
+    kitItemIds: ['ors'],
   },
   'hydrate': {
     id: 'hydrate',
@@ -374,6 +436,7 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['demo-method'],
     reviewStatus: 'demo_heuristic',
+    kitItemIds: ['ors'],
   },
   'exercise-plan': {
     id: 'exercise-plan',
@@ -396,6 +459,7 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['nasa-monitoring'],
     reviewStatus: 'needs_clinical_review',
+    kitItemIds: ['meclizine', 'ors'],
   },
   'eye-check': {
     id: 'eye-check',
@@ -407,6 +471,7 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['sans-review'],
     reviewStatus: 'needs_clinical_review',
+    kitItemIds: ['eye_chart'],
   },
   'breathing-recheck': {
     id: 'breathing-recheck',
@@ -431,6 +496,58 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
     ],
     sourceRefs: ['hrv-norms'],
     reviewStatus: 'demo_heuristic',
+    kitItemIds: ['melatonin'],
+  },
+  'nutrition-plan': {
+    id: 'nutrition-plan',
+    title: 'Eat enough, even when food feels boring',
+    tier: 'self_care',
+    steps: [
+      'Add a snack between meals; high-energy bars are in the medical kit.',
+      'Swap pouches with crewmates or add sauces and spices to fight menu fatigue.',
+      'Log food energy and body mass daily for a week so the trend is clear.',
+    ],
+    sourceRefs: ['iss-body-mass'],
+    reviewStatus: 'demo_heuristic',
+    kitItemIds: ['energy_bars', 'vitamin_d'],
+  },
+  'kidney-stone-care': {
+    id: 'kidney-stone-care',
+    title: 'Check for a kidney stone today',
+    tier: 'crew_medical_officer',
+    steps: [
+      'Tell your crew medical officer now. Side or back pain with blood in the urine can be a kidney stone.',
+      'Drink water steadily unless your medical officer says otherwise.',
+      'Your medical officer can test your urine with a strip and decide on treatment with the flight surgeon.',
+    ],
+    sourceRefs: ['renal-stones-astronauts'],
+    reviewStatus: 'demo_heuristic',
+    kitItemIds: ['urine_strips', 'potassium_citrate', 'paracetamol'],
+  },
+  'behavioral-support': {
+    id: 'behavioral-support',
+    title: 'Talk to someone now',
+    tier: 'crew_medical_officer',
+    steps: [
+      'Tell your crew medical officer or a crewmate you trust right now. You do not have to wait for Earth.',
+      'Stay with a crewmate and take a break from critical tasks until you feel steadier.',
+      'Your medical officer can set up a private call with the ground psychologist (replies take at least 40 minutes).',
+    ],
+    sourceRefs: ['nasa-bmed-risk'],
+    reviewStatus: 'demo_heuristic',
+  },
+  'protect-bones-kidneys': {
+    id: 'protect-bones-kidneys',
+    title: 'Protect your bones and kidneys together',
+    tier: 'self_care',
+    steps: [
+      'Get back to your full exercise plan; loading your bones is the main protection.',
+      'Drink at least the daily minimum and eat enough calories; both lower kidney-stone and bone risk.',
+      'Ask your crew medical officer whether a supplement from the kit is right for you.',
+    ],
+    sourceRefs: ['nasa-exercise', 'renal-stones-astronauts', 'iss-body-mass'],
+    reviewStatus: 'demo_heuristic',
+    kitItemIds: ['vitamin_d', 'potassium_citrate'],
   },
   'co2-check': {
     id: 'co2-check',

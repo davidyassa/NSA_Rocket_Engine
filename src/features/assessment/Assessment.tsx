@@ -24,6 +24,8 @@ import { FollowUpCenter } from '../followups/FollowUpCenter';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
 import type { FollowUpTask } from '../followups/followUpEngine';
 import { EvidencePassport } from './EvidencePassport';
+import { KitItemsList } from './KitItems';
+import { radlabEventSol } from '../../sim';
 import { PLAIN_NEXT_STEP, plainFinding } from '../../content/plainLanguage';
 import './assessment.css';
 
@@ -238,6 +240,7 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
   }
   const cards = assessment?.actionCardIds.flatMap(id => ACTION_CARDS[id] ? [ACTION_CARDS[id]] : []) ?? [];
   const symptoms = record?.symptoms.filter(symptom => symptom.present) ?? [];
+  const radiationSols = [radlabEventSol(mission)];
   const warnings = assessment && !assessment.findings.some(finding => finding.kind === 'data_quality')
     ? assessment.dataQualityWarnings
     : [];
@@ -340,6 +343,9 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
                 <ol>
                   {card.steps.map(step => <li key={step}>{step}</li>)}
                 </ol>
+                {card.kitItemIds && record && (
+                  <KitItemsList ids={card.kitItemIds} currentSol={record.sol} radiationSols={radiationSols} />
+                )}
                 <details className="assessment-why">
                   <summary>Action sources</summary>
                   <EvidenceSources ids={card.sourceRefs} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, CheckCircle2, CircleCheck, Database, Download, FileJson, FlaskConical, WifiOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { MissionMedia } from '../features/media/MissionGallery';
 import type { DailyCheckin, DemoScenario } from '../contracts';
 import { RADLAB_CSV_URL, RADLAB_MANIFEST, RADLAB_SOURCE } from '../data/nasa';
 import { DEMO_OPTIONS, SCENARIO_IDS, type ScenarioId } from '../scenarios';
@@ -70,12 +71,24 @@ export function DemoData({
   scenario?: DemoScenario;
   records?: readonly DailyCheckin[];
 }) {
+  const [searchParams] = useSearchParams();
+  const mediaRequested = searchParams.get('view') === 'media';
   const [error, setError] = useState('');
   const [exportMessage, setExportMessage] = useState('');
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const activeScenario = scenario ?? DEMO_OPTIONS[scenarioId].scenario;
   const activeRecords = records ?? activeScenario.history;
+
+  useEffect(() => {
+    if (!mediaRequested) return;
+    const frame = window.requestAnimationFrame(() => {
+      const gallery = document.getElementById('mission-media');
+      gallery?.focus({ preventScroll: true });
+      gallery?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mediaRequested]);
 
   function load(id: ScenarioId) {
     try {
@@ -138,6 +151,7 @@ export function DemoData({
       <header className="page-intro">
         <h1>Demo and data</h1>
         <p>Switch between synthetic crew histories, export local records, and inspect the Mars radiation archive.</p>
+        <Link to="/demo?view=media" className="text-link">Browse mission imagery <ArrowRight size={16} aria-hidden="true" /></Link>
       </header>
 
       <section aria-labelledby="scenarios-heading">
@@ -253,6 +267,7 @@ export function DemoData({
         </section>
         <OfflineStatus />
       </div>
+      <MissionMedia />
     </div>
   );
 }

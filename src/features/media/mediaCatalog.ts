@@ -1,0 +1,98 @@
+const mediaUrls = import.meta.glob<string>('../../ui/assets/nasa/*.webp', {
+  eager: true,
+  import: 'default',
+  query: '?url&no-inline',
+});
+
+export const mediaCategories = {
+  crew: 'Crew & health',
+  exploration: 'Exploration',
+  science: 'Earth & astronomy',
+  team: 'Team artwork',
+  challenge: 'Logos & challenge icons',
+} as const;
+
+export type MediaCategory = keyof typeof mediaCategories;
+
+const catalog = [
+  ['lunar-base', 'exploration', 'A lunar surface base', 'Concept illustration of astronauts, cargo rovers and a habitat on the Moon.'],
+  ['crew-artemis', 'crew', 'Artemis II crew', 'Four astronauts pose in orange flight suits.'],
+  ['crew-checkin', 'crew', 'Ultrasound in orbit', 'An astronaut in the station laboratory holds an ultrasound probe.'],
+  ['lunar-habitat', 'exploration', 'Lunar habitat concept', 'Artist’s view of a habitat and vehicles on the sunlit lunar surface.'],
+  ['spaceflight-infographic', 'crew', 'How space affects the human body', 'Illustrated guide to the effects of spaceflight on the brain, vision, bones, muscles and other body systems.'],
+  ['crew-lab', 'crew', 'Biology in orbit', 'An astronaut works at a rack of biology experiments aboard the space station.'],
+  ['crew-orbit', 'exploration', 'Moon over the limb of Earth', 'A crescent Moon floats above the blue edge of Earth’s atmosphere.'],
+  ['rocket-engine', 'team', 'Rocket Engine emblem', 'Rocket Engine team insignia showing a rocket and a plume against a star field.'],
+  ['crew-exercise', 'crew', 'Exercise in a spacecraft', 'An astronaut exercises alongside a round spacecraft window.'],
+  ['crew-flight', 'crew', 'Crew in flight suits', 'Four crew members stand beneath a U.S. flag.'],
+  ['hazards-radiation', 'exploration', 'Aurora from orbit', 'A green aurora glows over Earth’s night side.'],
+  ['hazards-isolation', 'crew', 'Life in close quarters', 'Two astronauts work inside a space station module surrounded by equipment.'],
+  ['hazards-distance', 'exploration', 'Earth at a distance', 'A small bright view of Earth set against the darkness of space.'],
+  ['hazards-gravity', 'crew', 'Working in microgravity', 'An astronaut floats inside a space station module with hair rising above their head.'],
+  ['hazards-environment', 'crew', 'Inside a station module', 'A round hatch frames an astronaut wearing blue inside the space station.'],
+  ['station-workstation', 'crew', 'Space station workstation', 'An astronaut sits amid cables, computers and other station equipment.'],
+  ['crew-downlink', 'crew', 'Crew downlink', 'An astronaut floats near a window and workstation.'],
+  ['crew-briefing', 'crew', 'Crew in training suits', 'Two people in white suits talk inside a training facility.'],
+  ['station-strength', 'crew', 'Strength in orbit', 'An astronaut flexes both arms in a station module.'],
+  ['station-gym', 'crew', 'Space station gym', 'An astronaut uses exercise equipment inside the station.'],
+  ['spaceflight-health', 'crew', 'The body in space', 'An astronaut uses a station exercise device.'],
+  ['orbital-research', 'crew', 'Space station research', 'An astronaut works beside the station’s laboratory equipment.'],
+  ['station-crew', 'crew', 'Astronaut at work', 'An astronaut in a green shirt works with equipment aboard the station.'],
+  ['station-plants', 'crew', 'Growing plants in orbit', 'Astronauts work beside trays of growing plants.'],
+  ['crew-suit-patches', 'crew', 'Spaceflight suit patches', 'Close-up of mission patches on orange flight suits.'],
+  ['launch-complex', 'exploration', 'Coastal launch complex', 'A launch tower stands beside a coastal waterway.'],
+  ['flight-formation', 'exploration', 'Flight formation', 'Aircraft trails streak past the sun over a dark foreground.'],
+  ['research-aircraft', 'exploration', 'Research aircraft', 'An experimental multirotor aircraft hovers above a dry landscape.'],
+  ['escapade-transfer', 'exploration', 'ESCAPADE transfer', 'Orbital trajectories curve around a planet in a mission illustration.'],
+  ['lunar-flyby', 'exploration', 'Lunar flyby', 'A cratered Moon fills the frame with a distant crescent beyond its horizon.'],
+  ['lunar-lidar-concept', 'exploration', 'Lunar lidar concept', 'A green lidar scan overlays a concept scene on the lunar surface.'],
+  ['engine-test', 'exploration', 'Engine test hardware', 'A circular opening in test hardware glows blue.'],
+  ['in-space-servicing', 'exploration', 'In-space servicing', 'Cover artwork for an in-space servicing, assembly and manufacturing publication.'],
+  ['lunar-rover-concept', 'exploration', 'Lunar rover concept', 'A rover with illuminated equipment sits on the lunar surface.'],
+  ['space-station-orbit', 'exploration', 'Spacecraft above Earth', 'A spacecraft passes above Earth’s blue horizon.'],
+  ['hubble-m30', 'science', 'Hubble view of Messier 30', 'Dense stars shine in a globular cluster.'],
+  ['gravitational-lenses', 'science', 'Gravitational lensing', 'A grid of telescope images shows light distorted around galaxies.'],
+  ['lisa-concept', 'science', 'LISA mission concept', 'Concept artwork of three spacecraft connected by laser paths.'],
+  ['roman-concept', 'science', 'Roman Space Telescope concept', 'A space telescope is shown against a purple star field.'],
+  ['blue-supernova', 'science', 'A stellar explosion', 'A bright pink source shines in a blue spiral galaxy.'],
+  ['research-instrument', 'science', 'Research instrument', 'Researchers gather around an instrument with transparent panels.'],
+  ['myanmar-mangroves', 'science', 'Myanmar mangroves', 'Satellite imagery shows water channels and vegetation along the coast.'],
+  ['vasquez-moonrise', 'science', 'Moonrise at Vasquez Rocks', 'A bright Moon rises above a rocky landscape.'],
+  ['scotland-peatlands', 'science', 'Scotland’s Flow Country', 'A satellite image shows the patterned landscape of Scotland’s peatlands.'],
+  ['earth-from-space', 'science', 'Earth from space', 'A sunlit portion of Earth shows blue oceans and swirling clouds.'],
+  ['team-console', 'team', 'Rocket Engine mission console', 'Team concept artwork of a spacecraft control room bearing the Rocket Engine patch.'],
+  ['team-patch', 'team', 'Rocket Engine mission patch', 'A circular team patch with an illustrated rocket on a dark blue background.'],
+  ['team-patch-detail', 'team', 'Rocket Engine patch detail', 'A close-up of a team patch surrounded by a blurred blue border.'],
+  ['rocket-engine-blue', 'team', 'Rocket Engine blue emblem', 'A Rocket Engine team insignia with a blue rocket exhaust trail.'],
+  ['rocket-engine-glow', 'team', 'Rocket Engine illuminated emblem', 'A circular team insignia with a bright blue and orange rocket plume.'],
+  ['rocket-engine-diagram', 'team', 'Rocket engine concept diagram', 'Team artwork showing a glowing engine beside technical diagrams.'],
+  ['nasa-insignia', 'challenge', 'NASA insignia', 'The round blue NASA insignia with white lettering and a red vector.'],
+  ['space-apps-logo', 'challenge', 'NASA Space Apps Challenge logo', 'The NASA Space Apps Challenge wordmark with a white orbital symbol.'],
+  ['award-art-technology', 'challenge', 'Art and Technology category icon', 'A yellow artist’s palette.'],
+  ['award-mission-concept', 'challenge', 'Best Mission Concept category icon', 'A yellow and blue rocket.'],
+  ['award-data', 'challenge', 'Best Use of Data category icon', 'A yellow stack of database disks with a magnifier.'],
+  ['award-science', 'challenge', 'Best Use of Science category icon', 'A spacecraft with blue solar panels.'],
+  ['award-storytelling', 'challenge', 'Best Use of Storytelling category icon', 'An open book with small stars around it.'],
+  ['award-technology', 'challenge', 'Best Use of Technology category icon', 'A yellow microchip with a blue center.'],
+  ['award-galactic-impact', 'challenge', 'Galactic Impact category icon', 'A galaxy of yellow, blue and white stars.'],
+  ['award-global-connection', 'challenge', 'Global Connection category icon', 'Figures join hands around a globe.'],
+  ['award-local-impact', 'challenge', 'Local Impact category icon', 'A folded map with a location marker.'],
+  ['award-inspiration', 'challenge', 'Most Inspirational category icon', 'A yellow flag with a blue mark.'],
+  ['award-laurels', 'challenge', 'Space Apps laurels', 'Yellow laurels encircle a stylized spacecraft.'],
+  ['award-earth', 'challenge', 'Space Apps globe emblem', 'Silver laurels encircle a blue and yellow globe.'],
+] as const satisfies ReadonlyArray<readonly [string, MediaCategory, string, string]>;
+
+type MediaId = (typeof catalog)[number][0];
+
+export const missionMedia = Object.fromEntries(
+  catalog.map(([id]) => [id, mediaUrls[`../../ui/assets/nasa/${id}.webp`]]),
+) as Record<MediaId, string>;
+
+export const mediaCatalog = catalog.map(([id, category, title, description]) => ({
+  id,
+  category,
+  title,
+  description,
+  src: missionMedia[id],
+  credit: id === 'vasquez-moonrise' ? 'NASA / Preston Dyches · CC BY-NC 2.0' : undefined,
+}));

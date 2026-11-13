@@ -87,13 +87,15 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: 'Circadian Disruption, Sleep Restriction & Sensory Monotony',
     spaceflightMechanism:
       'Living in a small, closed habitat with a 6-person crew for 900+ sols causes circadian drift (Mars sol = 24h 39m), sensory monotony, and cumulative sleep debt.',
-    solCheckMetrics: ['sleep_duration', 'mood', 'pvt_reaction_time', 'lapses_count'],
+    solCheckMetrics: ['sleep_duration', 'mood', 'pvt_reaction_time', 'lapses_count', 'hrv_rmssd', 'behavioral_crisis'],
     measuredBy: [
       'Sleep hours and mood compared with your own 14-sol baseline, with a combined sleep-and-mood trend rule',
       'PVT-B reaction-time test for alertness and lapses',
       'Fatigue reported in the daily check-in',
+      'Camera heart rate variability (HRV) compared with your own usual, as a recovery and stress cue',
+      '“Feeling hopeless or unable to cope” goes straight to the Crew Medical Officer: with a 40-minute round trip, a crisis is handled onboard',
     ],
-    needsHardware: ['Wearable sleep tracker (actigraphy) and heart-rate variability (HRV)', 'Camera-based drowsiness and eye-closure monitoring'],
+    needsHardware: ['Wearable sleep tracker (actigraphy) and ECG chest strap for clinical-grade HRV', 'Camera-based drowsiness and eye-closure monitoring'],
     sol43Status: {
       state: 'elevated',
       summary:
@@ -128,12 +130,14 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: '20-Minute Light-Speed Delay & Autonomous Medical Care',
     spaceflightMechanism:
       'Mars orbital distance creates a one-way communication latency of 4 to 22 minutes (Sol 43 simulation: 20 min one-way, 40 min round-trip). Immediate telemedicine is physically impossible.',
-    solCheckMetrics: ['simulated_delay_sec', 'autonomous_assessment_tier', 'handoff_package'],
+    solCheckMetrics: ['simulated_delay_sec', 'autonomous_assessment_tier', 'handoff_package', 'medical_kit', 'calorie_intake', 'body_mass'],
     measuredBy: [
       'Fully offline assessment on the device, routed to self-care, the Crew Medical Officer or Earth',
       'Ground summary and handoff package prepared for the 20-minute one-way delay',
+      'Medical-kit inventory (no resupply): stock, expiry and a potency check after a solar storm, shown next to each suggestion',
+      'Food energy and body mass for menu fatigue and weight loss, with a bone + kidney risk-multiplier rule',
     ],
-    needsHardware: ['Mission telemedicine link and store-and-forward data relay'],
+    needsHardware: ['Mission telemedicine link and store-and-forward data relay', 'Live medical-kit inventory (barcode or RFID) and laboratory potency testing'],
     sol43Status: {
       state: 'active_monitoring',
       summary:
@@ -143,16 +147,28 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
       'Total crew reliance on onboard medical expertise and clinical software during emergencies',
       'Zero real-time tele-robotic surgical support from terrestrial specialists',
       'Critical need for explainable, deterministic diagnostic logic with full audit trails',
+      'No resupply or evacuation: medicines run out or lose strength faster (radiation), and menu fatigue leads to eating too little',
     ],
     operationalCountermeasures: [
       'Sol Check 100% offline-first client architecture with zero remote CDN dependencies',
       'Evidence-grounded deterministic rule engine with tiered triage recommendations',
       'Automated Clinical Evidence Passport and Flight Surgeon Handoff Package generation',
+      'Inventory-aware action cards: each suggestion lists the kit items it needs and flags expired, low or radiation-exposed stock (no dosing advice)',
     ],
     officialReferences: [
       {
         title: 'Evidence Report: Risk of Unacceptable Health and Mission Outcomes Due to Limitations of In-flight Medical Capabilities',
         publisher: 'NASA Exploration Medical Capability (ExMC)',
+      },
+      {
+        title: 'Evaluation of Physical and Chemical Changes in Pharmaceuticals Flown on Space Missions (Du et al., 2011)',
+        publisher: 'The AAPS Journal',
+        link: 'https://doi.org/10.1208/s12248-011-9270-0',
+      },
+      {
+        title: 'Body mass changes during long-duration spaceflight (Zwart et al., 2014)',
+        publisher: 'Aviation, Space, and Environmental Medicine',
+        link: 'https://pubmed.ncbi.nlm.nih.gov/25197887/',
       },
     ],
   },
@@ -164,15 +180,17 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: 'Microgravity Transit (0g) & Martian Surface Gravity (0.38g)',
     spaceflightMechanism:
       'Transition between 0g (transit), 0.38g (Mars), and 1g (Earth) alters hydrostatic pressure gradients, vestibular perception, and mechanical bone/muscle loading.',
-    solCheckMetrics: ['bp_systolic', 'bp_diastolic', 'stand_test', 'exercise_minutes', 'fluid_intake', 'motion_sickness_symptoms', 'vision_changes', 'muscle_symptoms'],
+    solCheckMetrics: ['bp_systolic', 'bp_diastolic', 'stand_test', 'exercise_minutes', 'fluid_intake', 'motion_sickness_symptoms', 'vision_changes', 'muscle_symptoms', 'kidney_symptoms'],
     measuredBy: [
       'Stand-up test: blood pressure and pulse sitting, then after 3 minutes standing (orthostatic intolerance)',
       'Daily exercise minutes against a target (the countermeasure for muscle and bone loss)',
       'Fluid intake (hydration before gravity changes)',
       'Dizziness, vertigo, nausea, vomiting and balance problems (space motion sickness)',
       'Vision changes and puffy face or head fullness (SANS screening, prompts an eye check)',
+      'Kidney-stone warning signs (side or back pain, blood in urine) sent to the Crew Medical Officer, with recent low fluid named',
     ],
     needsHardware: [
+      'Urine and blood chemistry (calcium, electrolytes) and ultrasound for kidney-stone risk',
       'OCT, fundus imaging or eye ultrasound for SANS',
       'DXA scan and blood/urine biomarkers for bone density',
       'Ultrasound, EMG and force sensors for muscle mass and strength',
@@ -187,6 +205,7 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
       'Headward fluid shift causing facial swelling and eye/vision changes (SANS, spaceflight-associated neuro-ocular syndrome); the role of intracranial pressure is not established and the mechanism is still being researched',
       'Orthostatic intolerance upon gravitational transition (impaired baroreflex regulation)',
       'Bone mineral density loss (1–1.5% monthly in weight-bearing bones) and muscle fiber atrophy',
+      'Kidney stones: calcium released from bone plus low fluid intake raises urine saturation of stone-forming salts',
     ],
     operationalCountermeasures: [
       'Daily exercise block of about 2.5 hours on the ISS schedule, including equipment setup and cleanup (roughly 2 hours of actual resistive, treadmill and cycle exercise)',

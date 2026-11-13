@@ -35,6 +35,7 @@ const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: s
   { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'How many hours did you actually sleep last night?' },
   { id: 'mood', title: 'Mood', metrics: ['mood'], intro: 'Pick the number closest to how you feel right now.' },
   { id: 'water', title: 'Water & exercise', metrics: ['fluid_intake', 'exercise_minutes'], intro: 'Your daily countermeasures: what you drank and how long you exercised.' },
+  { id: 'food', title: 'Food & weight', metrics: ['calorie_intake', 'body_mass'], intro: 'Optional. Far from Earth there is no resupply, so eating enough matters. Add up today’s food labels and weigh yourself.' },
   { id: 'feel', title: 'How you feel', metrics: [], intro: 'Tick anything you noticed today. Leave it empty if you feel fine.' },
   { id: 'review', title: 'Review & save', metrics: [], intro: 'Check your answers. Tap Edit to change anything.' },
 ];
@@ -44,9 +45,11 @@ const MEASUREMENT_STEPS = STEPS.filter(step => step.metrics.length > 0);
 
 /** Symptom checkboxes grouped so related ones sit together. */
 const SYMPTOM_GROUPS: { title: string; ids: string[] }[] = [
-  { title: 'General', ids: ['headache', 'fatigue', 'muscle_ache', 'chest_discomfort', 'shortness_of_breath', 'digestive_discomfort'] },
+  { title: 'General', ids: ['headache', 'fatigue', 'muscle_ache', 'chest_discomfort', 'shortness_of_breath', 'digestive_discomfort', 'poor_appetite'] },
   { title: 'Dizziness and balance (motion sickness)', ids: ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] },
   { title: 'Eyes and head (fluid shift)', ids: ['vision_changes', 'head_fullness'] },
+  { title: 'Kidneys', ids: ['flank_pain'] },
+  { title: 'Mind', ids: ['feeling_hopeless'] },
 ];
 
 function stepForMetric(metric: MetricId): number {

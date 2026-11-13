@@ -1,5 +1,5 @@
 import {
-  ArrowRight, Brain, CalendarClock, CircleAlert, Flame, HeartPulse, Moon,
+  ArrowRight, ArrowUpRight, Brain, CalendarClock, CircleAlert, Flame, HeartPulse, MapPin, Moon,
   Radio, ShieldAlert, Smile, Stethoscope, Thermometer, TrendingDown, Waves,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -7,13 +7,13 @@ import { Link } from 'react-router-dom';
 import { HEALTH_DOMAINS, METRICS } from '../../contracts';
 import type { DailyCheckin, DemoScenario, HealthDomain, MetricId, RiskAssessment } from '../../contracts';
 import { ORIGIN_META, STATUS_META } from '../../ui/tokens';
-import craterPhoto from '../../ui/assets/gale-crater.webp';
+import { RecentReadings } from './RecentReadings';
 import { CrewBodyFigure, DOMAIN_TARGETS } from './CrewBodyFigure';
 import { RoutineChecklist } from './RoutineChecklist';
 import { HabitatAir } from './HabitatAir';
 import { calculateCheckinStreak } from './streak';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
-import { PLAIN_DOMAIN, PLAIN_STATUS } from '../../content/plainLanguage';
+import { PLAIN_DOMAIN, PLAIN_STATUS, plainFinding } from '../../content/plainLanguage';
 import './dashboard.css';
 
 const domainInfo = {
@@ -79,24 +79,16 @@ export function Dashboard({ scenario, records, latest, assessment }: {
 
   return (
     <div className="dashboard">
-      <div className="page-intro dashboard-intro">
-        <h1>Mission dashboard</h1>
-        <p>{scenario.title} · Daily crew health check-in</p>
-      </div>
-
-      <section className="mission-hero" aria-labelledby="mission-sol">
-        <div className="mission-photo" style={{ backgroundImage: `url(${craterPhoto})` }} aria-hidden="true" />
+      <section className="mission-hero" aria-labelledby="mission-heading">
         <div className="mission-hero-content">
-          <h2 id="mission-sol">Sol {startSol}</h2>
-          <p className="mission-habitat">{missionContext.habitat}</p>
-          <p>{logged ? 'Today’s check-in is recorded.' : 'Your daily check-in is ready.'}</p>
+          <p className="mission-habitat"><MapPin size={15} aria-hidden="true" /> {missionContext.habitat}</p>
+          <h1 id="mission-heading">Mission<br />dashboard<span aria-hidden="true">.</span></h1>
+          <p className="mission-scenario">{scenario.title}</p>
           <Link to={logged ? '/assessment' : '/check-in'} className="button button-primary">
-            {logged ? 'View today’s assessment' : 'Start check-in'} <ArrowRight size={17} aria-hidden="true" />
+            {logged ? 'View today’s assessment' : 'Start check-in'} <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
-        <a className="mission-photo-credit" href="https://science.nasa.gov/photojournal/curiosity-looks-downslope-from-the-sulfate-unit/" target="_blank" rel="noreferrer">
-          NASA/JPL-Caltech/MSSS
-        </a>
+        <p className="mission-photo-credit">Lunar habitat concept</p>
       </section>
 
       <div className="mission-stats panel">
@@ -108,7 +100,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             <span>Check-in streak</span>
             <span className="streak-origin">
               {streak.syntheticCount > 0 && streak.userEnteredCount > 0
-                ? `${streak.syntheticCount} syn · ${streak.userEnteredCount} entered`
+                ? `${streak.syntheticCount} synthetic · ${streak.userEnteredCount} entered`
                 : streak.syntheticCount > 0
                   ? 'Seeded synthetic'
                   : streak.userEnteredCount > 0
@@ -120,8 +112,6 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         </div>
         <div><Radio size={19} aria-hidden="true" /><span>Simulated one-way delay</span><strong>{missionContext.oneWayDelayMinutes} min</strong></div>
       </div>
-
-      <RoutineChecklist scenario={scenario} latest={latest} />
 
       {pendingTasks.length > 0 && (
         <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
@@ -138,6 +128,24 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         </aside>
       )}
 
+      <div className="dashboard-overview">
+        <RecentReadings records={activeRecords} />
+        <section className="panel dashboard-flags" aria-labelledby="open-flags-heading">
+          <div className="flags-title">
+            <span className="domain-icon"><TrendingDown size={18} aria-hidden="true" /></span>
+            <h2 id="open-flags-heading">Open flags</h2>
+            <Link to="/assessment" className="round-link" aria-label="Review open flags"><ArrowUpRight size={18} aria-hidden="true" /></Link>
+          </div>
+          <p className="flag-total"><strong>{flags.length}</strong><span>{latest ? `From Sol ${latest.sol}` : 'No check-in yet'}</span></p>
+          {flags.length === 0
+            ? <p className="flag-summary muted">No open flags for the latest check-in.</p>
+            : <p className="flag-summary">{plainFinding(flags[0])}</p>}
+          <Link to="/assessment" className="text-link">View assessment <ArrowRight size={16} aria-hidden="true" /></Link>
+        </section>
+      </div>
+
+      <RoutineChecklist scenario={scenario} latest={latest} />
+
       <section aria-labelledby="health-domains-heading" className="dashboard-health">
         <div className="section-title">
           <div>
@@ -149,12 +157,6 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             {hasEntered && <span className={ORIGIN_META.user_entered.className}>{ORIGIN_META.user_entered.label}</span>}
           </div>
         </div>
-
-        <CrewBodyFigure
-          latest={latest}
-          assessment={assessment}
-          domainReading={domainReading}
-        />
 
         <div className="domain-grid">
           {HEALTH_DOMAINS.map((domain) => {
@@ -168,6 +170,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
                 to={target.path}
                 className="panel domain-card domain-card-interactive"
                 key={domain}
+                data-tone={status.tone}
                 aria-label={`View ${label} details: ${domainReading(domain, latest)}. Status: ${status.label}`}
               >
                 <div className="domain-title">
@@ -192,54 +195,45 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             );
           })}
         </div>
+
+        <CrewBodyFigure
+          latest={latest}
+          assessment={assessment}
+          domainReading={domainReading}
+        />
       </section>
 
       <section className="dashboard-quick-intel-grid" aria-label="Operational Health Intelligence">
         <HabitatAir environment={scenario.environment} sol={startSol} />
-        <article className="panel dashboard-intel-card">
-          <div className="section-title">
-            <div className="flags-title">
-              <span className="domain-icon"><Brain size={18} aria-hidden="true" /></span>
-              <h2>Cognitive lab (PVT-B)</h2>
-            </div>
-            <Link to="/cognitive" className="text-link">Open lab <ArrowRight size={14} aria-hidden="true" /></Link>
+        <article className="panel dashboard-intel-card dashboard-intel-image cognitive-feature">
+          <div className="flags-title">
+            <span className="domain-icon"><Brain size={18} aria-hidden="true" /></span>
+            <h2>Cognitive lab</h2>
           </div>
-          <p className="muted" style={{ fontSize: '0.85rem', margin: '0.2rem 0 0.8rem', lineHeight: 1.4 }}>
-            NASA Brief Psychomotor Vigilance Task tracks astronaut readiness, reaction times, and lapses (&gt;500ms).
-          </p>
-          <Link to="/cognitive" className="button button-secondary" style={{ width: 'fit-content' }}>
-            Run vigilance test <ArrowRight size={16} aria-hidden="true" />
-          </Link>
+          <p>Check reaction time and lapses with the brief vigilance test.</p>
+          <Link to="/cognitive" className="button button-secondary">Open lab <ArrowUpRight size={16} aria-hidden="true" /></Link>
         </article>
 
-        <article className="panel dashboard-intel-card">
-          <div className="section-title">
-            <div className="flags-title">
-              <span className="domain-icon"><ShieldAlert size={18} aria-hidden="true" /></span>
-              <h2>NASA 5 hazards context</h2>
-            </div>
-            <Link to="/hazards" className="text-link">View matrix <ArrowRight size={14} aria-hidden="true" /></Link>
+        <article className="panel dashboard-intel-card dashboard-intel-image hazards-feature">
+          <div className="flags-title">
+            <span className="domain-icon"><ShieldAlert size={18} aria-hidden="true" /></span>
+            <h2>NASA’s five hazards</h2>
           </div>
-          <p className="muted" style={{ fontSize: '0.85rem', margin: '0.2rem 0 0.8rem', lineHeight: 1.4 }}>
-            Grounded in NASA HRP risk books: Radiation (Curiosity MSL-RAD), Behavioral Isolation, and Distance latency.
-          </p>
-          <Link to="/hazards" className="button button-secondary" style={{ width: 'fit-content' }}>
-            Explore NASA HRP evidence <ArrowRight size={16} aria-hidden="true" />
-          </Link>
+          <p>See how radiation, isolation, distance, gravity and habitat conditions connect to crew readings.</p>
+          <Link to="/hazards" className="button button-secondary">Explore the hazards <ArrowUpRight size={16} aria-hidden="true" /></Link>
         </article>
       </section>
 
-      <section className="panel dashboard-flags" aria-labelledby="open-flags-heading">
-        <div className="section-title">
-          <div className="flags-title">
-            <span className="domain-icon"><TrendingDown size={18} aria-hidden="true" /></span>
-            <h2 id="open-flags-heading">Open flags</h2>
-            <span className="badge">{flags.length}</span>
+      <section className="mission-explore" aria-labelledby="mission-explore-title">
+        <div className="mission-explore-content">
+          <h2 id="mission-explore-title">Explore human<br />spaceflight.</h2>
+          <p>See what shapes crew health beyond Earth, from cabin conditions to deep-space radiation.</p>
+          <div className="mission-explore-actions">
+            <Link className="button button-primary" to="/hazards">Explore NASA’s five hazards <ArrowUpRight size={16} aria-hidden="true" /></Link>
+            <Link className="button button-secondary" to="/demo?view=media">Browse mission imagery <ArrowUpRight size={16} aria-hidden="true" /></Link>
           </div>
-          <Link to="/assessment" className="text-link">View assessment <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
-        {flags.length === 0 ? <p className="muted">No open flags for the latest check-in.</p> :
-          <ul>{flags.slice(0, 3).map((flag, index) => <li key={`${flag.ruleId}-${index}`}>{flag.summary}</li>)}</ul>}
+        <p className="mission-photo-credit">Lunar outpost concept</p>
       </section>
     </div>
   );

@@ -42,6 +42,8 @@ export const FIELD_HINTS: Record<MetricId, string> = {
   exercise_minutes: 'Minutes of actual exercise today (not set-up time).',
   respiratory_rate: 'Breaths per minute at rest. The camera can measure this.',
   hrv_rmssd: 'Heart rate variability in milliseconds. The camera can measure this.',
+  calorie_intake: 'Food energy you ate today, in kcal (add up the labels).',
+  body_mass: 'Your weight from the body-mass device, in kg.',
 };
 
 /** Field labels in everyday words (the technical name stays in brackets). */
@@ -56,6 +58,8 @@ export const PLAIN_FIELD_LABEL: Partial<Record<MetricId, string>> = {
   exercise_minutes: 'Exercise today',
   respiratory_rate: 'Breathing rate',
   hrv_rmssd: 'Heart rate variability (HRV)',
+  calorie_intake: 'Food eaten today',
+  body_mass: 'Body weight (mass)',
 };
 
 const METRIC_WORDS: Record<MetricId, string> = {
@@ -73,6 +77,8 @@ const METRIC_WORDS: Record<MetricId, string> = {
   exercise_minutes: 'exercise',
   respiratory_rate: 'breathing rate',
   hrv_rmssd: 'heart rate variability',
+  calorie_intake: 'food energy',
+  body_mass: 'body weight',
 };
 
 function direction(summary: string): 'lower' | 'higher' | null {
@@ -120,6 +126,16 @@ export function plainFinding(finding: Pick<Finding, 'ruleId' | 'summary' | 'base
       return `You are breathing ${dir === 'lower' ? 'more slowly' : 'faster'} than the usual 12–20 breaths a minute at rest. Rest for 5 minutes and measure again.`;
     case 'hrv-below-usual':
       return 'Your heart rate variability is well below your usual. This often happens with poor sleep, stress or getting ill. Take it easier today and measure again tomorrow.';
+    case 'energy-intake-low':
+      return 'You have eaten less than 2,000 kcal on most of the last 5 days. Eating too little speeds up muscle and bone loss, and there is no resupply.';
+    case 'body-mass-loss':
+      return 'Your weight has dropped below your usual. This often means you are eating less than your body needs.';
+    case 'kidney-stone-screen':
+      return 'Pain in your side or back, or blood in your urine, can mean a kidney stone. Tell your crew medical officer today.';
+    case 'behavioral-crisis':
+      return 'You said you feel hopeless or unable to cope. Please talk to your crew medical officer or a crewmate now. You do not have to wait for Earth.';
+    case 'bone-kidney-compound':
+      return 'Less exercise together with too little food or water raises bone-loss and kidney-stone risk more than any one alone.';
     default:
       return finding.summary;
   }
@@ -165,5 +181,9 @@ export const GLOSSARY: { term: string; meaning: string }[] = [
   { term: 'CO2 (mmHg)', meaning: 'Carbon dioxide in the habitat air. NASA keeps the 1-hour average at or below 3 mmHg because higher levels cause headaches and tiredness.' },
   { term: 'Breathing rate', meaning: 'How many breaths you take in one minute. Adults at rest usually take 12–20.' },
   { term: 'HRV (heart rate variability)', meaning: 'How much the time between heartbeats changes from beat to beat. Higher is usually a sign of being well rested. It is very personal, so Sol Check compares it only with your own usual.' },
+  { term: 'Menu fatigue', meaning: 'Getting tired of the same space food for months, so you eat less without noticing.' },
+  { term: 'Body mass', meaning: 'Your weight. In weightlessness it is measured with a special device, not a normal scale.' },
+  { term: 'Kidney stone', meaning: 'A small hard lump that forms in the kidney. Bone calcium lost in low gravity and too little water make stones more likely.' },
+  { term: 'Medical kit', meaning: 'The medicines and supplies on board. There is no resupply from Earth, so Sol Check shows what is left and what has expired.' },
   { term: 'Countermeasure', meaning: 'Something you do to protect your body in space, such as daily exercise against muscle and bone loss.' },
 ];

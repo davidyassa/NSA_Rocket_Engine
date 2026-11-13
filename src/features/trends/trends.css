@@ -93,3 +93,11 @@
   .trend-summary dt { font-size: 0.8rem; }
   .trend-table { font-size: 0.77rem; }
 }
+
+.trend-panel {
+  background: radial-gradient(ellipse at 90% 0%, #3b2b22 0%, var(--bg-surface) 64%);
+}
+.trend-chart {
+  border-radius: calc(var(--radius) - 5px);
+  background: linear-gradient(180deg, transparent 25%, #47302259);
+}

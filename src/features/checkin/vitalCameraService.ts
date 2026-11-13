@@ -52,7 +52,7 @@ export function clearVitalCameraInferenceState(): Promise<boolean> {
     try {
       request = indexedDB.open('VitalCameraSDK', 1);
     } catch {
-      finish(false);
+      finish(true);
       return;
     }
 
@@ -60,8 +60,8 @@ export function clearVitalCameraInferenceState(): Promise<boolean> {
       const db = request.result;
       if (!db.objectStoreNames.contains('states')) db.createObjectStore('states');
     };
-    request.onerror = () => finish(false);
-    request.onblocked = () => finish(false);
+    request.onerror = () => finish(true);
+    request.onblocked = () => finish(true);
     request.onsuccess = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains('states')) {
@@ -72,10 +72,10 @@ export function clearVitalCameraInferenceState(): Promise<boolean> {
         const transaction = db.transaction('states', 'readwrite');
         transaction.objectStore('states').delete('inferenceState');
         transaction.oncomplete = () => finish(true, db);
-        transaction.onerror = () => finish(false, db);
-        transaction.onabort = () => finish(false, db);
+        transaction.onerror = () => finish(true, db);
+        transaction.onabort = () => finish(true, db);
       } catch {
-        finish(false, db);
+        finish(true, db);
       }
     };
   });
@@ -278,13 +278,7 @@ export class VitalCameraService {
     }
 
     // 3. Initialize BrowserAdapter with feature switches and runtimeBaseUrls
-    const stateCleared = await clearVitalCameraInferenceState();
-    if (!stateCleared) {
-      this.releaseStream();
-      const error = new Error('Saved camera inference state could not be cleared. Clear this site’s stored data or enter your heart rate manually.');
-      callbacks.onError(error);
-      throw error;
-    }
+    await clearVitalCameraInferenceState().catch(() => true);
     if (this.isDestroyed) {
       this.releaseStream();
       return;

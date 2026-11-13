@@ -7,6 +7,8 @@ import { FollowUpCenter } from '../followups/FollowUpCenter';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
 import { HandoffSimulator } from '../assessment/HandoffSimulator';
 import { generateMedicalHandoffPackage } from '../assessment/medicalHandoff';
+import { MedicalKitTable } from '../assessment/KitItems';
+import { radlabEventSol } from '../../sim';
 
 interface CrewMedicalOfficerProps {
   scenario: DemoScenario;
@@ -16,7 +18,7 @@ interface CrewMedicalOfficerProps {
 }
 
 export function CrewMedicalOfficer({ scenario, latest, assessment, records }: CrewMedicalOfficerProps) {
-  const [activeTab, setActiveTab] = useState<'triage' | 'actions' | 'quality' | 'telemetry'>('triage');
+  const [activeTab, setActiveTab] = useState<'triage' | 'actions' | 'kit' | 'quality' | 'telemetry'>('triage');
   const [cmoSignOff, setCmoSignOff] = useState<{ signed: boolean; timestamp?: string; notes?: string }>({ signed: false });
   const [cmoNotes, setCmoNotes] = useState<string>('Reviewed Sol 43 sleep/mood delta following solar event. Prescribe oral hydration and rest duty cycle.');
 
@@ -98,7 +100,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--line)', paddingBottom: '6px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderBottom: '1px solid var(--line)', paddingBottom: '6px' }}>
         <button
           type="button"
           className={`button button-sm button-secondary tab-toggle${activeTab === 'triage' ? ' is-selected' : ''}`}
@@ -114,6 +116,14 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           onClick={() => setActiveTab('actions')}
         >
           Action Center Queue ({pendingTasksCount})
+        </button>
+        <button
+          type="button"
+          className={`button button-sm button-secondary tab-toggle${activeTab === 'kit' ? ' is-selected' : ''}`}
+            aria-pressed={activeTab === 'kit'}
+          onClick={() => setActiveTab('kit')}
+        >
+          Medical kit
         </button>
         <button
           type="button"
@@ -146,7 +156,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <div style={{ display: 'grid', gap: '8px' }}>
             {(assessment?.findings ?? []).map((finding, idx) => (
               <div key={idx} className="cmo-finding-row">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span className="badge" style={{ fontSize: '0.8rem' }}>{finding.kind.toUpperCase()}</span>
                   <code style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Rule: {finding.ruleId}</code>
                 </div>
@@ -206,6 +216,10 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
       )}
 
       {/* Tab 3: Sensor & Data Quality */}
+      {activeTab === 'kit' && (
+        <MedicalKitTable currentSol={latest?.sol ?? scenario.startSol} radiationSols={[radlabEventSol(scenario.missionContext)]} />
+      )}
+
       {activeTab === 'quality' && (
         <section className="panel panel-padded">
           <h2 style={{ fontSize: '1.16rem', margin: '0 0 4px' }}>Sensor Provenance & Signal Quality</h2>

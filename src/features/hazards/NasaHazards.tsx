@@ -4,7 +4,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { NASA_FIVE_HAZARDS, type NasaHazard } from './hazardsData';
+import { missionMedia } from '../media/mediaCatalog';
 import './hazards.css';
+
+const hazardImages: Record<string, string> = {
+  radiation: missionMedia['hazards-radiation'],
+  isolation: missionMedia['hazards-isolation'],
+  distance: missionMedia['hazards-distance'],
+  gravity: missionMedia['hazards-gravity'],
+  environment: missionMedia['hazards-environment'],
+};
 
 const HAZARD_ICONS: Record<string, LucideIcon> = {
   radiation: Radiation,
@@ -45,6 +54,12 @@ const INDICATOR_LABELS: Record<string, string> = {
   motion_sickness_symptoms: 'Motion sickness symptoms',
   vision_changes: 'Vision changes',
   habitat_co2: 'Habitat CO2',
+  hrv_rmssd: 'Heart rate variability (camera)',
+  behavioral_crisis: 'Behavioral crisis self-report',
+  medical_kit: 'Medical-kit inventory',
+  calorie_intake: 'Food energy',
+  body_mass: 'Body mass',
+  kidney_symptoms: 'Kidney-stone signs',
   cabin_temperature: 'Cabin temperature',
 };
 
@@ -101,6 +116,7 @@ export function NasaHazards() {
           const headingId = `hazard-${hazard.id}`;
           return (
             <article key={hazard.id} className={`hazard-card${isFocused ? ' is-focused' : ''}`} aria-labelledby={headingId}>
+              <img className="hazard-card-photo" src={hazardImages[hazard.id]} alt="" loading="lazy" />
               <div className="hazard-card-header">
                 <span className="hazard-icon" aria-hidden="true"><Icon size={22} strokeWidth={1.8} /></span>
                 <div className="hazard-title">

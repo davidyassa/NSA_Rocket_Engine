@@ -3,7 +3,7 @@ import { StyleSheet, SafeAreaView, StatusBar, View, Text, TouchableOpacity, Acti
 import { WebView } from 'react-native-webview';
 import { useCameraPermissions } from 'expo-camera';
 
-const HTTPS_URL = 'https://bbs-composition-interface-directive.trycloudflare.com/';
+const HTTPS_URL = 'https://assume-olympics-connector-cotton.trycloudflare.com/';
 const LOCAL_WIFI_URL = 'http://10.52.237.41:4173/';
 
 export default function App() {

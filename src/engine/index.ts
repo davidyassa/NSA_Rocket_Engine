@@ -21,6 +21,8 @@ import {
   FLUID_TARGET_L,
   BREATHING_RANGE,
   HRV_DROP_FRACTION,
+  ENERGY_MIN_KCAL,
+  BODY_MASS_DROP,
   MOTION_SICKNESS_SYMPTOMS,
   ORTHOSTATIC,
   DEMO_DELTAS,
@@ -382,6 +384,49 @@ function assessHrv(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]):
   return finding('hrv-below-usual', 'observation', `HRV (RMSSD) ${today.value} ms is below ${Math.round(HRV_DROP_FRACTION * 100)}% of the personal usual of ${Math.round(baseline.median)} ms.`, [today.id], [baseline]);
 }
 
+function assessEnergy(current: ReviewedCheckin, recent: readonly ReviewedCheckin[]): Finding | null {
+  if (!current.measurements.get('calorie_intake')) return null;
+  const { readings, count } = countRecent('calorie_intake', recent, (value) => value < ENERGY_MIN_KCAL);
+  if (count < MIN_TREND_READINGS) return null;
+  const appetite = present(current.checkin, 'poor_appetite') ? ' Poor appetite was also reported.' : '';
+  return finding('energy-intake-low', 'trend', `Food energy was below ${ENERGY_MIN_KCAL} kcal on ${count} of the last ${TREND_LOOKBACK_SOLS} sols.${appetite}`, readings.map(({ id }) => id));
+}
+
+function assessBodyMass(current: ReviewedCheckin, prior: readonly ReviewedCheckin[]): { finding: Finding; cmo: boolean } | null {
+  const today = current.measurements.get('body_mass');
+  if (!today) return null;
+  const baseline = buildBaseline('body_mass', prior);
+  if (!baseline) return null;
+  const drop = (baseline.median - today.value) / baseline.median;
+  if (drop < BODY_MASS_DROP.flag) return null;
+  const percent = (drop * 100).toFixed(1);
+  return {
+    finding: finding('body-mass-loss', 'observation', `Body mass ${today.value} kg is ${percent}% below the personal usual of ${Math.round(baseline.median * 10) / 10} kg.`, [today.id], [baseline]),
+    cmo: drop >= BODY_MASS_DROP.cmo,
+  };
+}
+
+function assessKidneyStone(current: ReviewedCheckin, recent: readonly ReviewedCheckin[]): Finding | null {
+  if (!present(current.checkin, 'flank_pain')) return null;
+  const { readings, count } = countRecent('fluid_intake', recent, (value) => value < FLUID_TARGET_L);
+  const context = count > 0 ? ` Fluid intake was below ${FLUID_TARGET_L} L on ${count} of the last ${TREND_LOOKBACK_SOLS} sols.` : '';
+  return finding('kidney-stone-screen', 'observation', `Side or lower-back pain, or blood in urine, reported: possible kidney stone. Crew Medical Officer check today.${context}`, readings.map(({ id }) => id));
+}
+
+function assessBoneKidneyCompound(recent: readonly ReviewedCheckin[]): Finding | null {
+  const exercise = countRecent('exercise_minutes', recent, (value) => value < EXERCISE_TARGET_MIN);
+  if (exercise.count < MIN_TREND_READINGS) return null;
+  const fluid = countRecent('fluid_intake', recent, (value) => value < FLUID_TARGET_L);
+  const food = countRecent('calorie_intake', recent, (value) => value < ENERGY_MIN_KCAL);
+  const partners = [
+    fluid.count >= 2 ? `low fluid on ${fluid.count} sols` : null,
+    food.count >= 2 ? `low food energy on ${food.count} sols` : null,
+  ].filter(Boolean);
+  if (!partners.length) return null;
+  const ids = [...exercise.readings, ...(fluid.count >= 2 ? fluid.readings : []), ...(food.count >= 2 ? food.readings : [])].map(({ id }) => id);
+  return finding('bone-kidney-compound', 'contextual_association', `Short exercise on ${exercise.count} of the last ${TREND_LOOKBACK_SOLS} sols together with ${partners.join(' and ')}: these multiply bone-loss and kidney-stone risk. This is a risk context, not a measurement of bone or kidneys.`, ids);
+}
+
 export function evaluateCheckin(
   checkin: DailyCheckin,
   history: readonly DailyCheckin[],
@@ -468,8 +513,21 @@ export function evaluateCheckin(
   if (breathing) findings.push(breathing);
   const hrv = assessHrv(current, prior);
   if (hrv) findings.push(hrv);
+  const energy = assessEnergy(current, recent);
+  if (energy) findings.push(energy);
+  const bodyMass = assessBodyMass(current, prior);
+  if (bodyMass) findings.push(bodyMass.finding);
+  const kidney = assessKidneyStone(current, recent);
+  if (kidney) findings.push(kidney);
+  const crisis = present(checkin, 'feeling_hopeless')
+    ? finding('behavioral-crisis', 'observation', 'Feeling hopeless or unable to cope reported. Crew Medical Officer support now; do not wait for Earth or for a trend.')
+    : null;
+  if (crisis) findings.push(crisis);
+  const compound = assessBoneKidneyCompound(recent);
+  if (compound) findings.push(compound);
   const needsMedicalOfficer = urgentSymptoms.length > 0 || Boolean(sleep && mood) || Boolean(orthostatic)
-    || present(checkin, 'vision_changes') || present(checkin, 'vomiting');
+    || present(checkin, 'vision_changes') || present(checkin, 'vomiting')
+    || Boolean(kidney) || Boolean(crisis) || Boolean(bodyMass?.cmo);
 
   findings.sort((left, right) => RULES[right.ruleId].priority - RULES[left.ruleId].priority);
   const actionCardIds = [...new Set(findings.flatMap(({ ruleId }) => RULES[ruleId].actionCardIds))];
@@ -494,7 +552,7 @@ export function evaluateCheckin(
     dataQualityWarnings,
     recommendedTier: needsMedicalOfficer ? 'crew_medical_officer' : 'self_care',
     actionCardIds: actionCardIds.length > 0 ? actionCardIds : ['record-and-monitor'],
-    engineVersion: '1.5.0',
+    engineVersion: '1.6.0',
     overallState,
   };
 }

@@ -1,0 +1,143 @@
+.mission-media {
+  margin-top: clamp(32px, 6vw, 68px);
+  scroll-margin-top: calc(var(--topbar-height) + var(--safe-top) + 18px);
+}
+
+.mission-media-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.mission-media-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 5px;
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  letter-spacing: -0.035em;
+}
+
+.mission-media-header h2 svg { color: var(--accent); flex: none; }
+.mission-media-header p { margin: 0; }
+.mission-media-filter { display: grid; gap: 5px; color: var(--muted); font-size: 0.8rem; }
+.mission-media-filter select { min-height: 44px; padding: 7px 9px; color: var(--ink); font-size: 0.9rem; }
+
+.mission-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.mission-media-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.mission-media-card:hover { background: var(--bg-hover); border-color: var(--border-control); }
+.mission-media-card:hover svg { color: var(--accent); }
+
+.mission-media-thumbnail {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.mission-media-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 200ms ease;
+}
+
+.mission-media-card:hover img { transform: scale(1.04); }
+
+.mission-media-card[data-category="challenge"] img {
+  object-fit: contain;
+  padding: 12px;
+}
+
+.mission-media-card-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+  padding: 10px 13px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.mission-media-card-label svg { flex: none; color: var(--muted); }
+
+.mission-media-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mission-media-pagination p { margin: 0; font-size: 0.85rem; }
+
+.mission-media-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(900px, calc(100% - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--ink);
+}
+
+.mission-media-dialog::backdrop { background: rgb(8 7 6 / 0.85); }
+
+.mission-media-dialog-header,
+.mission-media-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+}
+
+.mission-media-dialog-header h3 { margin: 0; font-size: 1.25rem; line-height: 1.2; }
+.mission-media-dialog-header p { margin: 4px 0 0; font-size: 0.82rem; }
+.mission-media-close { flex: none; min-width: 44px; padding: 8px; }
+.mission-media-view { display: grid; place-items: center; background: var(--bg-base); }
+.mission-media-view img { max-width: 100%; max-height: 68dvh; width: auto; height: auto; object-fit: contain; }
+.mission-media-dialog-actions .text-link { min-height: 44px; align-items: center; text-align: center; font-size: 0.9rem; }
+
+@media (max-width: 700px) {
+  .mission-media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 430px) {
+  .mission-media-grid { gap: 9px; }
+  .mission-media-card-label { padding: 8px; font-size: 0.85rem; }
+  .mission-media-card-label svg { width: 13px; height: 13px; }
+  .mission-media-dialog-header, .mission-media-dialog-actions { padding-inline: 10px; gap: 6px; }
+  .mission-media-dialog-actions .button { padding-inline: 7px; font-size: 0.85rem; gap: 4px; }
+}

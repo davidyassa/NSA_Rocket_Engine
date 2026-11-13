@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Orbit, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { CheckinEntry } from '../contracts';
+import rocketEngineMark from '../ui/assets/nasa/rocket-engine.webp';
 import { RADLAB_MANIFEST } from '../data/nasa';
 import { evaluateCheckin } from '../engine';
 import { Assessment } from '../features/assessment/Assessment';
@@ -112,9 +113,9 @@ export function App() {
     <div className="app-shell">
       <button className="skip-link" type="button" onClick={() => main.current?.focus()}>Skip to content</button>
       <aside className="sidebar">
-        <Link to="/" className="wordmark">
-          <span className="wordmark-icon"><Orbit size={22} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span>Sol Check</span>
+        <Link to="/" className="wordmark" aria-label="Sol Check dashboard">
+          <span className="wordmark-icon"><img src={rocketEngineMark} alt="" /></span>
+          <span className="wordmark-name">Sol Check<small>Rocket Engine</small></span>
         </Link>
 
         <div className="sidebar-body">
@@ -146,7 +147,8 @@ export function App() {
       <div className="work-area">
         <header className="topbar">
           <div className="breadcrumbs">
-            <span>Mission</span><ChevronRight size={13} aria-hidden="true" /><strong>{section}</strong>
+            <Link to="/" className="mobile-wordmark" aria-label="Sol Check dashboard"><img src={rocketEngineMark} alt="" /></Link>
+            <span className="breadcrumb-root">Mission</span><ChevronRight size={13} aria-hidden="true" /><strong>{section}</strong>
           </div>
           <div className="topbar-meta">
             <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
@@ -156,7 +158,7 @@ export function App() {
             <span className="badge badge-synthetic"><span className="badge-dot" /> Synthetic demo</span>
           </div>
         </header>
-        <main className="main-content" id="main-content" ref={main} tabIndex={-1}>
+        <main className="main-content" data-route={pathname} id="main-content" ref={main} tabIndex={-1}>
           {warning && <p className="storage-warning" role="alert">{warning}</p>}
           <Routes>
             <Route path="/" element={<Dashboard scenario={scenario} records={records} latest={latest} assessment={assessment} />} />

@@ -21,6 +21,8 @@ export const DEMO_DELTAS: Readonly<Record<MetricId, number>> = {
   exercise_minutes: 30,
   respiratory_rate: 4,
   hrv_rmssd: 10,
+  calorie_intake: 300,
+  body_mass: 1,
 };
 
 /** The seven daily readings that use the generic baseline / trend rules. Optional readings have dedicated rules. */
@@ -38,6 +40,10 @@ export const CO2_LIMIT_MMHG = 3;
 export const BREATHING_RANGE = { low: 12, high: 20 } as const;
 /** HRV is very personal: flag only a drop below this fraction of the person's own 14-sol median. */
 export const HRV_DROP_FRACTION = 0.7;
+/** Demo daily food-energy minimum, kcal (real targets are individual). */
+export const ENERGY_MIN_KCAL = 2000;
+/** Body mass below the personal usual: 3% is flagged, 5% goes to the Crew Medical Officer (demo values). */
+export const BODY_MASS_DROP = { flag: 0.03, cmo: 0.05 } as const;
 export const MOTION_SICKNESS_SYMPTOMS = ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] as const;
 
 const baselineCondition = `Use the median of at least ${MIN_BASELINE_READINGS} distinct measured sols in the prior ${BASELINE_LOOKBACK_SOLS} sols.`;
@@ -288,6 +294,77 @@ const ruleDefinitions = {
     reviewStatus: 'demo_heuristic',
     actionCardIds: ['recovery-day'],
     testCases: ['30 ms against a 50 ms usual is flagged; 45 ms is not.', 'No finding without 5 prior readings.'],
+  },
+  'energy-intake-low': {
+    ruleId: 'energy-intake-low',
+    version: '1.0.0',
+    metricIds: ['calorie_intake'],
+    conditions: [`Food energy below ${ENERGY_MIN_KCAL} kcal on at least ${MIN_TREND_READINGS} of the last ${TREND_LOOKBACK_SOLS} logged sols.`],
+    contextRequirements: ['A food-energy entry on the current check-in.'],
+    priority: 58,
+    reason: 'Menu fatigue and low appetite make crew under-eat; with no resupply this speeds muscle and bone loss. Logged intake is self-reported.',
+    sourceRefs: ['iss-body-mass'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['nutrition-plan'],
+    testCases: ['1,700 kcal on 3 of 5 sols is a trend; one low day is not.'],
+  },
+  'body-mass-loss': {
+    ruleId: 'body-mass-loss',
+    version: '1.0.0',
+    metricIds: ['body_mass'],
+    conditions: [
+      `Flag body mass ${BODY_MASS_DROP.flag * 100}% or more below the personal median of at least ${MIN_BASELINE_READINGS} prior sols.`,
+      `${BODY_MASS_DROP.cmo * 100}% or more below the usual routes to the Crew Medical Officer.`,
+    ],
+    contextRequirements: [`A body-mass entry today and at least ${MIN_BASELINE_READINGS} prior readings.`],
+    priority: 62,
+    reason: 'Unplanned weight loss is the clearest sign that nutrition is falling behind in flight.',
+    sourceRefs: ['iss-body-mass'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['nutrition-plan'],
+    testCases: ['58.0 kg against a 61.0 kg usual (−4.9%) is flagged; 60.0 kg is not.', '57.5 kg (−5.7%) routes to the CMO.'],
+  },
+  'kidney-stone-screen': {
+    ruleId: 'kidney-stone-screen',
+    version: '1.0.0',
+    metricIds: ['fluid_intake'],
+    conditions: ['Side or lower-back pain, or blood in urine, is reported.', `Recent fluid intake below the demo minimum is added as context.`],
+    contextRequirements: ['The symptom checkbox on the current check-in.'],
+    priority: 92,
+    reason: 'Bone calcium released in low gravity and low fluid intake raise kidney-stone risk; there is no evacuation, so it is checked onboard the same day.',
+    sourceRefs: ['renal-stones-astronauts'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['kidney-stone-care'],
+    testCases: ['Flank pain routes to the CMO.', 'Low fluid on recent sols is named in the summary.'],
+  },
+  'behavioral-crisis': {
+    ruleId: 'behavioral-crisis',
+    version: '1.0.0',
+    metricIds: [],
+    conditions: ['Feeling hopeless or unable to cope is reported.'],
+    contextRequirements: ['The symptom checkbox on the current check-in.'],
+    priority: 99,
+    reason: 'With a 40-minute round trip to Earth, a behavioral crisis must be handled by the crew; the report goes straight to the Crew Medical Officer without waiting for a trend.',
+    sourceRefs: ['nasa-bmed-risk'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['behavioral-support'],
+    testCases: ['The checkbox alone routes to the CMO.'],
+  },
+  'bone-kidney-compound': {
+    ruleId: 'bone-kidney-compound',
+    version: '1.0.0',
+    metricIds: ['exercise_minutes', 'fluid_intake', 'calorie_intake'],
+    conditions: [
+      `Exercise below ${EXERCISE_TARGET_MIN} min on at least ${MIN_TREND_READINGS} of the last ${TREND_LOOKBACK_SOLS} sols, AND`,
+      `fluid below ${FLUID_TARGET_L} L or food below ${ENERGY_MIN_KCAL} kcal on at least 2 of those sols.`,
+    ],
+    contextRequirements: ['Exercise plus fluid or food logs over the last 5 sols.'],
+    priority: 40,
+    reason: 'Low gravity pulls calcium from bone; too little loading, food and water together multiply bone-loss and kidney-stone risk (a cross-hazard “risk multiplier”).',
+    sourceRefs: ['nasa-exercise', 'renal-stones-astronauts', 'iss-body-mass'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['protect-bones-kidneys'],
+    testCases: ['Short exercise plus two low-food sols adds a context finding; short exercise alone does not.'],
   },
 } satisfies Record<string, RuleDefinition>;
 

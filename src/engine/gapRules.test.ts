@@ -12,7 +12,7 @@ function checkin(sol: number, values: Partial<Record<MetricId, number>>, symptom
       id: `${id}:${metric}`, astronautId: 'crew-1', metric, value: values[metric]!, unit: METRICS[metric].unit,
       observedAtUtc: submittedAtUtc, provenance: 'synthetic_demo' as const,
     }]),
-    symptoms: ['headache', 'dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems', 'vision_changes', 'head_fullness']
+    symptoms: ['headache', 'dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems', 'vision_changes', 'head_fullness', 'poor_appetite', 'flank_pain', 'feeling_hopeless']
       .map((s) => ({ id: s, label: s.replace('_', ' '), present: symptoms.includes(s) })),
   };
 }
@@ -93,9 +93,9 @@ describe('Sol 43 hero scenario tells the after-the-storm story', () => {
     const history = scenario.history.map((h) => ({ ...h, astronautId: 'crew-1', measurements: h.measurements.map((m) => ({ ...m, astronautId: 'crew-1' })) }));
     const result = evaluateCheckin(today, history, { events: scenario.events, archiveEvent: { sol: 41, date: '2017-09-11' }, environment: scenario.environment });
     const rules = result.findings.map((f) => f.ruleId);
-    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual']));
+    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual', 'energy-intake-low', 'bone-kidney-compound']));
     expect(rules).not.toContain('orthostatic-check'); // the scripted stand test is normal
-    expect(result.engineVersion).toBe('1.5.0');
+    expect(result.engineVersion).toBe('1.6.0');
   });
 });
 
@@ -118,5 +118,45 @@ describe('camera breathing rate and HRV', () => {
   it('never sets a body-area status or a "not measured" finding when skipped', () => {
     const skipped = ids(checkin(43, seated));
     expect(skipped.findings.some((f) => f.summary.toLowerCase().includes('breathing') || f.summary.includes('HRV'))).toBe(false);
+  });
+});
+
+describe('distance from Earth: food, kidneys, behavioral crisis', () => {
+  const rule = (result: ReturnType<typeof ids>, id: string) => result.findings.find((f) => f.ruleId === id);
+
+  it('trends low food energy on 3 of 5 sols, not one low day, and mentions poor appetite', () => {
+    const history = [checkin(41, { calorie_intake: 1600 }), checkin(42, { calorie_intake: 1800 })];
+    expect(rule(ids(checkin(43, { calorie_intake: 1900 }, ['poor_appetite']), history), 'energy-intake-low')?.summary).toMatch(/3 of the last 5.*Poor appetite/);
+    expect(rule(ids(checkin(43, { calorie_intake: 1900 })), 'energy-intake-low')).toBeUndefined();
+  });
+
+  it('flags weight 3% below the personal usual and routes 5% to the Crew Medical Officer', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { body_mass: 61 }));
+    expect(rule(ids(checkin(43, { body_mass: 60 }), history), 'body-mass-loss')).toBeUndefined();
+    const flagged = ids(checkin(43, { body_mass: 58.9 }), history);
+    expect(rule(flagged, 'body-mass-loss')?.summary).toMatch(/3\.4% below the personal usual of 61 kg/);
+    expect(flagged.recommendedTier).toBe('self_care');
+    expect(ids(checkin(43, { body_mass: 57.5 }), history).recommendedTier).toBe('crew_medical_officer');
+  });
+
+  it('sends side/back pain to the Crew Medical Officer and names recent low fluid', () => {
+    const result = ids(checkin(43, { fluid_intake: 1.4 }, ['flank_pain']));
+    expect(rule(result, 'kidney-stone-screen')?.summary).toMatch(/Fluid intake was below 2 L on 1/);
+    expect(result.recommendedTier).toBe('crew_medical_officer');
+    expect(result.actionCardIds).toContain('kidney-stone-care');
+  });
+
+  it('routes "hopeless or unable to cope" to the Crew Medical Officer immediately', () => {
+    const result = ids(checkin(43, {}, ['feeling_hopeless']));
+    expect(rule(result, 'behavioral-crisis')).toBeDefined();
+    expect(result.recommendedTier).toBe('crew_medical_officer');
+    expect(result.findings[0].ruleId).toBe('behavioral-crisis');
+  });
+
+  it('adds the bone + kidney risk multiplier only when short exercise meets low food or water', () => {
+    const shortExercise = [checkin(41, { exercise_minutes: 20, calorie_intake: 1700 }), checkin(42, { exercise_minutes: 30, calorie_intake: 1800 })];
+    expect(rule(ids(checkin(43, { exercise_minutes: 40, calorie_intake: 2500 }), shortExercise), 'bone-kidney-compound')?.kind).toBe('contextual_association');
+    const exerciseOnly = [checkin(41, { exercise_minutes: 20, calorie_intake: 2600 }), checkin(42, { exercise_minutes: 30, calorie_intake: 2600 })];
+    expect(rule(ids(checkin(43, { exercise_minutes: 40, calorie_intake: 2500 }), exerciseOnly), 'bone-kidney-compound')).toBeUndefined();
   });
 });

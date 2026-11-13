@@ -323,3 +323,28 @@
   .ground-summary-grid { grid-template-columns: 1fr; }
 }
 
+
+/* Medical kit (no resupply) */
+.kit-items { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.kit-items h4 { margin: 0 0 6px; font-size: 0.9rem; color: var(--text-secondary); }
+.kit-items ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.kit-items li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.kit-item-name { font-weight: 600; }
+.kit-item-meta { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.kit-note { margin: 8px 0 0; font-size: 0.875rem; color: var(--text-secondary); }
+.kit-status { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: 0.8125rem; white-space: nowrap; }
+.kit-expired { color: var(--status-trend); background: var(--tint-trend); }
+.kit-potency { color: var(--status-check); background: var(--tint-check); }
+.kit-low, .kit-soon { color: var(--status-change); background: var(--tint-change); }
+.kit-ok { color: var(--status-steady); background: var(--tint-steady); }
+.kit-panel h2 { margin: 0 0 4px; font-size: 1.16rem; }
+.tabular { font-variant-numeric: tabular-nums; }
+.kit-panel { min-width: 0; }
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.kit-card { display: grid; gap: 6px; padding: 12px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.kit-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.kit-card-use, .kit-card-why { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
+.kit-card-facts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; }
+.kit-card-facts div { display: grid; }
+.kit-card-facts dt { color: var(--text-muted); font-size: 0.8125rem; }
+.kit-card-facts dd { margin: 0; }
