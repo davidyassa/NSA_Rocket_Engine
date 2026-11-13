@@ -85,12 +85,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
           </Link>
         </div>
       </section>
-
-      <div className="mission-stats panel">
-        <div><CalendarClock size={19} aria-hidden="true" /><span>Last check-in</span><strong>{latest ? `Sol ${latest.sol}` : 'None recorded'}</strong></div>
-        <div><Radio size={19} aria-hidden="true" /><span>Simulated one-way delay</span><strong>{missionContext.oneWayDelayMinutes} min</strong></div>
-      </div>
-
+      
       {pendingTasks.length > 0 && (
         <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
           <div>
