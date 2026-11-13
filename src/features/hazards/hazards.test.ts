@@ -12,7 +12,8 @@ describe('NASA Human Research Program Five Hazards Matrix', () => {
     expect(ids).toContain('environment');
 
     for (const hazard of NASA_FIVE_HAZARDS) {
-      expect(hazard.hrpRiskId).toMatch(/^HRP-/);
+      expect(hazard.hrpRiskId).toMatch(/^SC-/);
+      expect(hazard.hrpElement.length).toBeGreaterThan(0);
       expect(hazard.solCheckMetrics.length).toBeGreaterThan(0);
       expect(hazard.clinicalImpacts.length).toBeGreaterThan(0);
       expect(hazard.operationalCountermeasures.length).toBeGreaterThan(0);

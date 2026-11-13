@@ -27,12 +27,13 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
    - **NASA HRP Clinical Categorization**: Categorizes performance (Optimal, Mild Slowing, Clinically Significant Psychomotor Fatigue, or Excessive False Starts) with direct reference to ISS flight thresholds and fatigue countermeasures (caffeine, sleep hygiene, duty rest scheduling).
 
 2. **NASA Five Hazards Matrix & Evidence Explorer (`#/hazards`)**:
+   - **Reference IDs**: `SC-…` codes are Sol Check's own internal references. NASA does not publish risk codes in that form, so each hazard also names the current NASA HRP research element (Space Radiation; Human Factors and Behavioral Performance; Exploration Medical Capability; Human Health Countermeasures).
    - **Deep-Space Hazard Taxonomy**: Directly correlates crew vitals and behavioral observations to NASA's official Five Hazards of Human Spaceflight:
-     1. **Space Radiation** (`HRP-RAD-01`): Correlated with Gale Crater MSL Curiosity RAD surface observations and solar particle events.
-     2. **Isolation & Confinement** (`HRP-BHP-01`): Tracks behavioral shifts, mood degradation, and psychomotor vigilance lapses.
-     3. **Distance from Earth** (`HRP-EXMC-01`): Manages autonomous medical care under 20-minute one-way communication latency.
-     4. **Altered Gravity Fields** (`HRP-HHC-01`): Monitors orthostatic blood pressure variations, cardiovascular deconditioning, and vestibular changes.
-     5. **Hostile Closed Environments** (`HRP-SHFH-01`): Tracks habitat environmental stressors, air quality, acoustic fatigue, and sleep disruptions.
+     1. **Space Radiation** (`SC-RAD-01`, HRP element: Space Radiation): Correlated with Gale Crater MSL Curiosity RAD surface observations and solar particle events.
+     2. **Isolation & Confinement** (`SC-BHP-01`, HRP element: HFBP): Tracks behavioral shifts, mood degradation, and psychomotor vigilance lapses.
+     3. **Distance from Earth** (`SC-EXMC-01`, HRP element: ExMC): Manages autonomous medical care under 20-minute one-way communication latency.
+     4. **Altered Gravity Fields** (`SC-HHC-01`, HRP element: HHC): Monitors orthostatic blood pressure variations, cardiovascular deconditioning, and vestibular changes.
+     5. **Hostile Closed Environments** (`SC-ENV-01`, HRP element: HFBP habitability): Tracks habitat environmental stressors, air quality, acoustic fatigue, and sleep disruptions.
    - **Interactive Evidence Explorer**: Detailed spaceflight pathology, operational countermeasures, and live links to official NASA HRP Evidence Books.
 
 3. **Medical Evidence Passport & Flight Surgeon Handoff Package (`#/assessment`)**:
@@ -40,20 +41,43 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
    - **Cryptographic Traceability**: Generates a deterministic SHA checksum verifying package integrity across interplanetary transmission.
    - **Evidence-to-Action Chain**: Provides full explainability: Observation → Signal Quality → Baseline Comparison → HRP Decision Rule → Clinical Recommendation → Flight Surgeon Burst Uplink.
 
-4. **Interactive 2D Body Figure (F14)**:
-   - An anatomical crew figure on the dashboard provides an alternative, keyboard-accessible navigation path to health domain details (Head → Mood, Visor → Sleep, Chest → Heart Rate, Torso → Temperature, Abdomen → Blood Glucose, Limbs → Systemic Symptoms). Controls feature visible focus, readable names, and text status labels that operate independently of color. All six domain cards remain fully interactive and usable on mobile.
+4. **3D Crew Digital Twin Host & 2D Body Map (F14)**:
+   - **Team Blender astronaut**: a lazily loaded, self-hosted three.js viewport (separate chunk, precached offline) renders `assets/astronaut/astronaut_sol_check.glb`, imported directly with no copies, manifest or placeholder. Export checklist: [docs/3d-model-integration.md](docs/3d-model-integration.md).
+   - **Orbit and framing**: mouse, touch and pen orbit with damping, pitch limits, no scroll hijacking, idle auto-rotation (off under reduced motion), double-click / **Reset view** easing, keyboard **Rotate left/right**, and camera framing computed from the model bounds.
+   - **Six projected hotspots**: Head → Mood, Visor → Sleep, Chest → Heart rate (pulses at the latest heart rate), Torso → Temperature, Abdomen → Blood glucose, Limbs → Symptoms. Anchors come from Blender empties named `hotspot_<domain>`, with bounding-box fallbacks. The markers are real focusable `.figure-region-target` buttons that show status by icon, colour and label. A HUD pill shows the reading. Suit parts tagged `solcheck_domain` highlight and are clickable.
+   - **Accessible fallbacks**: a `[ ✦ 3D model | ☷ 2D view ]` segmented toggle. The 2D SVG body map and the `.crew-figure-link` list provide the same six routes. The view switches to 2D automatically if WebGL is unavailable.
 
-5. **Timeline Replay (F20)**:
+5. **Closed-Loop Mission Health Action Center (`#/assessment` & `#/cmo`)**:
+   - An autonomous clinical task engine (`src/features/followups/followUpEngine.ts`) transforms findings and sensor warnings into structured, actionable crew follow-up tasks with state machine tracking (`open` → `acknowledged` → `in_progress` → `awaiting_measurement` → `awaiting_medical_review` → `resolved` / `escalated`) and a complete audit trail recording crew member actions, timestamps, and rationales.
+
+6. **Interactive 6-Layer Health Evidence Passport (`src/features/assessment/EvidencePassport.tsx`)**:
+   - For every autonomous finding, astronauts and flight surgeons can inspect 6 distinct traceable audit layers: (1) Raw Input Observations & Data Origins, (2) Signal Quality & Sensor Uncertainty Gates, (3) Rolling Median & MAD Spread, (4) Deterministic Decision Rule, (5) NASA HRP Five Hazards Evidence Book mapping, and (6) Closed-Loop Clinical Follow-Up Tasks.
+
+7. **Crew Medical Officer (CMO) Console (`#/cmo`)**:
+   - A dedicated clinical operational desk for the onboard medical officer with 4 specialized tabs: Clinical Triage & Digital Sign-off, Action Center Queue, Sensor & Data Quality, and Interplanetary Telemetry.
+
+8. **Timeline Replay (F20)**:
    - Replay controls (Play, Pause, Restart, Step) allow user-controlled playback across the three-lane timeline (Crew Vitals, Mission Events, Curiosity RAD Radiation), advancing smoothly across mission sols to highlight the September 11, 2017 solar particle event at Sol 41. Preserves original units, archive dates, provenance, and unmeasured gaps.
 
-6. **Measurement Reminders and Routine Checklist (F13)**:
+9. **Measurement Reminders and Routine Checklist (F13)**:
    - Descriptive in-app reminders indicate whether the current sol check-in is pending or recorded, using simulated Gale Crater habitat mission time. An interactive routine checklist guides daily vital sign collection; checklist progress is scoped to the active scenario and sol, persisting locally and clearing upon demo reset.
 
-7. **Local Record Export (F17)**:
+10. **Local Record Export (F17)**:
    - Available under **Demo and data**, this feature exports the active scenario's check-in history into a structured, validated JSON file (`schemaVersion: 1`). The interface details exact record counts, sol ranges, and explicitly notes the inclusion of crew notes and seeded synthetic records before download.
 
-8. **Check-in Streak (F15)**:
+11. **Check-in Streak (F15)**:
    - A consecutive-sol check-in counter is integrated into the dashboard mission metrics. The counter tallies each sol once, breaks sequence at any missing sol, maintains scenario isolation, and clearly identifies seeded synthetic history versus user-entered contributions.
+
+## Flight-console design system
+
+Dark NASA flight-console palette (tokens in `src/ui/theme.css`, hex mirrors in `src/ui/tokens.ts`). Space Grotesk headings, Inter body text (16 px base) and JetBrains Mono numerals are bundled locally.
+
+- **Contrast is computed, not assumed**: `src/ui/tokens.test.ts` checks every text and status token at ≥ 4.5:1 and control borders at ≥ 3:1 on all three surfaces. NASA Blue `#0B3D91` measures 1.7–2.0:1 on the dark surfaces, so it is used only as a fill behind light text (wordmark tile, top telemetry rule), never as text or a control boundary.
+- **Status in three channels**: `STATUS_META` gives every domain status an icon, a label and a colour: Equal / No change detected, Triangle / Change from baseline, TrendingUpDown / Sustained trend, CircleDashed / Baseline not established, PencilLine / Check entry, Minus / Not measured.
+- **Origin always visible**: `[Entered]`, `[Synthetic]`, `[NASA archive]` (pink `#FF7AD9`, reserved for Curiosity RAD) and `[Derived]` badges.
+- **One primary action per view**: tabs and filters use a selected-state style instead of filled primary buttons. The only deliberate exception is the camera consent card, a focused sub-flow inside check-in.
+- **Responsive shell**: labelled sidebar at 1024 px and wider, an icon-only 76 px rail from 768 to 1023 px, and a phone bottom bar (Dashboard, Assessment, centred Check-in, Timeline, More) below 768 px. Touch targets are at least 44 × 44 px, safe-area insets are honoured, and phone charts scroll sideways at a 480 px minimum width. Native iOS/Android plan: [docs/mobile-roadmap.md](docs/mobile-roadmap.md).
+- **No NASA insignia, logotype or mission patches** appear in the app. NASA identity is expressed through colour, typography, telemetry framing and cited HRP content only.
 
 ## Optional Offline Camera Pulse Check (Phase 2)
 
@@ -78,7 +102,7 @@ An optional on-device optical pulse estimation tool is integrated beside manual 
 ## Rehearse the Sol 43 demo
 
 1. Open **Dashboard → Start check-in**. Open the blood pressure measurement guide, select **Fill demo readings**, mark **Fatigue**, and select **Save and assess**.
-2. Open **Why this finding?** under the sleep finding. Inspect the five readings, personal baseline, rule and sources. The sleep and mood readings each meet the demo delta on four of the last five sols. The suggested route is Crew Medical Officer.
+2. Open **Why this finding?** under the sleep finding. Inspect the five readings, personal baseline, rule and sources. The sleep and mood readings each meet the demo delta on three of the last five sols. The suggested route is Crew Medical Officer.
 3. Select **Prepare summary for ground**. Inspect the local draft, the simulated 20-minute one-way delay and the 40-minute earliest possible reply. **Copy summary** copies the draft to the local clipboard. Notes are opt-in.
 4. In **Trends**, inspect the sleep baseline, then choose another indicator. In **Timeline**, select **Sol 41** and open **NASA archive provenance**. Confirm the original UTC date, instrument, units and coverage.
 5. Reload while offline and confirm the saved check-in is still available. **Reset demo** clears local check-ins across the three scenarios and restores the original Sol 43 scenario.
@@ -98,5 +122,10 @@ node scripts/nasa/import-radlab.mjs --verify
 The bundled RadLab archive contains 1,220 Curiosity RAD readings from 4–17 September 2017. The chart shows 330 UTC hourly medians and preserves six missing hours as gaps. The 11 September solar particle event is replayed on Sol 41. The measured unit is absorbed dose rate in µGy/hour. The single-point event reading at 08:01:51 UTC is 15.384445 µGy/hour, and the raw peak reading is 23.182808 µGy/hour at 15:23:41 UTC. Raw readings and hourly medians are kept clearly labeled throughout. Its alignment with the synthetic crew history provides timeline context, with no inference about crew exposure or health effects. The original CSV, exact API query, archive timestamps and retrieval date are available in **Timeline**. To refresh the fixture during development, run `node scripts/nasa/import-radlab.mjs` with network access. [NASA RadLab instrument](https://visualization.osdr.nasa.gov/radlab/gui/knowledgebase/MSL-RAD-Surface) · [NASA JPL event report](https://www.jpl.nasa.gov/news/large-solar-storm-sparks-global-aurora-and-doubles-radiation-levels-on-the-martian-surface/)
 
 Rule deltas, routing and synthetic scenarios are demo heuristics. The dashboard photo shows Gale Crater as seen by Curiosity. [Photo credit: NASA/JPL-Caltech/MSSS](https://science.nasa.gov/photojournal/curiosity-looks-downslope-from-the-sulfate-unit/)
+
+## Team
+
+NASA Space Apps Challenge 2026 · *Create Health Monitoring Software for Astronauts on Space Missions*.
+Team: Ahmed Shacker, Ahmed Sherif, Andrew Sameh, David Michael, Hassan Mohsen, Ziad AbdElhaleem. Coach: Mariam Mohamed. Local Lead: Dr. Moatasem Mahran.
 
 See the [build plan](docs/build-plan.md) and [source review](docs/source-review.md) for acceptance checks and evidence limits. OpenAI Codex assisted with initial P0 implementation; Google DeepMind Gemini / Antigravity designed and verified P1 features, offline WebAssembly camera integration, and automated CDP test suites.

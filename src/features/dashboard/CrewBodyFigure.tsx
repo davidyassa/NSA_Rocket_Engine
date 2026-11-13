@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  Activity, ArrowRight, CircleAlert, CircleCheck, HeartPulse, Moon,
-  Smile, Stethoscope, Thermometer, Waves,
+  ArrowRight, Box, HeartPulse, PersonStanding, Moon, Smile, Stethoscope, Thermometer, Waves,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { DailyCheckin, DomainStatus, HealthDomain, RiskAssessment } from '../../contracts';
+import { HEALTH_DOMAINS, type DailyCheckin, type HealthDomain, type RiskAssessment } from '../../contracts';
+import { STATUS_META } from '../../ui/tokens';
+import { CrewBody3D, type DomainSummary } from './CrewBody3D';
 
 export const DOMAIN_TARGETS: Record<HealthDomain, { path: string; label: string; region: string; shortcut: string }> = {
   behavioral: { path: '/trends?metric=mood', label: 'Behavioral health', region: 'Head (mind & mood)', shortcut: 'Head' },
@@ -24,14 +25,7 @@ const domainIcons = {
   symptoms: Stethoscope,
 };
 
-const statusLabels: Record<DomainStatus, { label: string; Icon: typeof CircleCheck; tone: string }> = {
-  no_change_detected: { label: 'No change detected', Icon: CircleCheck, tone: 'steady' },
-  change_from_baseline: { label: 'Change from baseline', Icon: CircleAlert, tone: 'watch' },
-  sustained_trend: { label: 'Sustained trend', Icon: Activity, tone: 'watch' },
-  baseline_not_established: { label: 'Baseline not established', Icon: CircleAlert, tone: 'muted' },
-  check_entry: { label: 'Check entry', Icon: CircleAlert, tone: 'watch' },
-  not_measured: { label: 'Not measured', Icon: CircleAlert, tone: 'muted' },
-};
+const statusLabels = STATUS_META;
 
 export function CrewBodyFigure({
   latest,
@@ -44,6 +38,15 @@ export function CrewBodyFigure({
 }) {
   const navigate = useNavigate();
   const [activeDomain, setActiveDomain] = useState<HealthDomain | null>(null);
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
+  const [fallbackReason, setFallbackReason] = useState('');
+
+  const summaries = useMemo(() => Object.fromEntries(HEALTH_DOMAINS.map((domain) => [domain, {
+    label: DOMAIN_TARGETS[domain].label,
+    value: domainReading(domain, latest),
+    status: assessment?.domainStatuses[domain] ?? 'not_measured',
+  }])) as Record<HealthDomain, DomainSummary>, [latest, assessment, domainReading]);
+  const heartRate = latest?.measurements.find((m) => m.metric === 'heart_rate')?.value ?? null;
 
   const domainOrder: HealthDomain[] = [
     'behavioral',
@@ -56,24 +59,54 @@ export function CrewBodyFigure({
 
   return (
     <section className="panel crew-figure-card" aria-labelledby="crew-figure-heading">
-      <div className="crew-figure-header">
+      <div className="crew-figure-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
         <div>
-          <h2 id="crew-figure-heading" className="crew-figure-title">Interactive 2D crew figure</h2>
+          <h2 id="crew-figure-heading" className="crew-figure-title">
+            {viewMode === '3d' ? 'Crew digital twin' : 'Crew body map'}
+          </h2>
           <p className="crew-figure-subtitle">
-            Navigate to health domain details by selecting anatomical regions or controls.
+            {viewMode === '3d'
+              ? 'Rotate the suit and select a region to open its readings. Marker colour, icon and label show status.'
+              : 'Select a body region or a row to open its readings.'}
           </p>
         </div>
+
+        <div className="segmented figure-mode-toggle" role="group" aria-label="Figure view">
+          <button type="button" onClick={() => setViewMode('3d')} aria-pressed={viewMode === '3d'} disabled={Boolean(fallbackReason)}>
+            <Box size={15} aria-hidden="true" /> 3D model
+          </button>
+          <button type="button" onClick={() => setViewMode('2d')} aria-pressed={viewMode === '2d'}>
+            <PersonStanding size={15} aria-hidden="true" /> 2D view
+          </button>
+        </div>
       </div>
+      {fallbackReason && (
+        <p className="crew-figure-fallback" role="status">3D view unavailable: {fallbackReason} Showing the 2D body map.</p>
+      )}
 
       <div className="crew-figure-layout">
-        <div className="crew-figure-visual-wrap" role="img" aria-label="Interactive 2D anatomical crew figure showing 6 health regions">
-          <svg
-            className="crew-figure-svg"
-            viewBox="0 0 200 320"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="false"
-          >
+        <div className={`crew-figure-visual-wrap is-${viewMode}`} role="group" aria-label="Crew figure with 6 selectable health regions">
+          {viewMode === '3d' ? (
+            <CrewBody3D
+              activeDomain={activeDomain}
+              summaries={summaries}
+              heartRate={heartRate}
+              onHoverDomain={setActiveDomain}
+              onSelectDomain={(domain) => navigate(DOMAIN_TARGETS[domain].path)}
+              onUnavailable={(reason) => {
+                setFallbackReason(reason);
+                setViewMode('2d');
+              }}
+            />
+          ) : (
+            <svg
+              className="crew-figure-svg"
+              viewBox="0 0 200 320"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="false"
+              role="presentation"
+            >
             {/* Background body silhouette */}
             <g className="crew-figure-silhouette">
               {/* Head / Helmet */}
@@ -210,7 +243,8 @@ export function CrewBodyFigure({
               <circle cx="162" cy="190" r="3" className="region-pin" />
             </g>
           </svg>
-        </div>
+        )}
+      </div>
 
         {/* Keyboard-accessible list of domain controls with visible focus and non-color status labels */}
         <div className="crew-figure-controls" role="navigation" aria-label="Health domains by body region">

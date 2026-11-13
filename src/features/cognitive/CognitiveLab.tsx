@@ -217,8 +217,8 @@ export function CognitiveLab({ currentSol = 43 }: { currentSol?: number }) {
                 <span className="pvt-instruction-hint">Test length:</span>
                 <button
                   type="button"
-                  className={`button ${trialsCount === 3 ? 'button-primary' : 'button-secondary'}`}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                  className={`button button-sm button-secondary tab-toggle${trialsCount === 3 ? ' is-selected' : ''}`}
+            aria-pressed={trialsCount === 3}
                   onClick={e => {
                     e.stopPropagation();
                     setTrialsCount(3);
@@ -228,8 +228,8 @@ export function CognitiveLab({ currentSol = 43 }: { currentSol?: number }) {
                 </button>
                 <button
                   type="button"
-                  className={`button ${trialsCount === 6 ? 'button-primary' : 'button-secondary'}`}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}
+                  className={`button button-sm button-secondary tab-toggle${trialsCount === 6 ? ' is-selected' : ''}`}
+            aria-pressed={trialsCount === 6}
                   onClick={e => {
                     e.stopPropagation();
                     setTrialsCount(6);
@@ -364,10 +364,10 @@ export function CognitiveLab({ currentSol = 43 }: { currentSol?: number }) {
             style={{
               borderColor:
                 summary.performanceTier === 'significant_fatigue'
-                  ? '#d90429'
+                  ? 'var(--nasa-red)'
                   : summary.performanceTier === 'mild_fatigue'
-                  ? '#d97706'
-                  : '#2d6a4f',
+                  ? 'var(--status-trend)'
+                  : 'var(--status-steady)',
             }}
           >
             <strong>Operational Assessment:</strong>

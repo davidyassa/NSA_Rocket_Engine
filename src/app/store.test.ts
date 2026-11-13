@@ -68,18 +68,32 @@ describe('check-in provenance round trip', () => {
     );
     const heartRate = checkin.measurements.find((reading) => reading.metric === 'heart_rate');
 
-    expect(heartRate?.provenance).toBe('synthetic_demo');
-    expect(heartRate?.source).toBeUndefined();
+    expect(heartRate).toMatchObject({
+      provenance: 'synthetic_demo',
+      source: 'synthetic',
+      status: 'accepted',
+      synthetic: true,
+    });
+    expect(heartRate?.capturedAtUtc).toBeUndefined();
+    expect(heartRate?.signalQuality).toBeUndefined();
+    expect(heartRate?.algorithm).toBeUndefined();
     expect(entryFromCheckin(checkin).capture.heart_rate).toBeUndefined();
   });
 
-  it('leaves manual readings free of capture metadata', () => {
+  it('records manual and self-report sources without inventing capture details', () => {
     const checkin = buildCheckin(entry(), HERO_SCENARIO);
     const heartRate = checkin.measurements.find((reading) => reading.metric === 'heart_rate');
+    const mood = checkin.measurements.find((reading) => reading.metric === 'mood');
 
-    expect(heartRate?.provenance).toBe('user_entered');
-    expect(heartRate?.source).toBeUndefined();
+    expect(heartRate).toMatchObject({
+      provenance: 'user_entered',
+      source: 'manual',
+      status: 'accepted',
+      synthetic: false,
+    });
     expect(heartRate?.signalQuality).toBeUndefined();
+    expect(heartRate?.capturedAtUtc).toBeUndefined();
+    expect(mood?.source).toBe('self_report');
     expect(entryFromCheckin(checkin).capture).toEqual({});
   });
 

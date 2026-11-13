@@ -1,6 +1,7 @@
 import { Bell, CheckCircle2, CircleAlert, ClipboardCheck, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { utcAtSol, type DailyCheckin, type DemoScenario } from '../../contracts';
+import { confirmTap } from '../../app/native';
 import { useMissionStore } from '../../app/store';
 
 export const ROUTINE_CHECKLIST_ITEMS = [
@@ -117,7 +118,7 @@ export function RoutineChecklist({
                     type="checkbox"
                     id={inputId}
                     checked={checked}
-                    onChange={() => toggleChecklistItem(item.id, startSol)}
+                    onChange={() => { toggleChecklistItem(item.id, startSol); void confirmTap(); }}
                     className="routine-checklist-checkbox"
                   />
                   <div>
@@ -132,7 +133,7 @@ export function RoutineChecklist({
       </div>
 
       <div className="routine-reminder-footer">
-        <Link to={isLogged ? '/assessment' : '/check-in'} className="button button-primary">
+        <Link to={isLogged ? '/assessment' : '/check-in'} className="button button-secondary">
           {isLogged ? 'Inspect assessment' : `Complete Sol ${startSol} check-in`}
         </Link>
       </div>

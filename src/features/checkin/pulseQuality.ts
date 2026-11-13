@@ -18,6 +18,9 @@ export const PULSE_SQI_DISPLAY_FLOOR = 0.38;
 export const PULSE_SQI_ACCEPT_FLOOR = 0.55;
 export const MIN_ACCEPT_SAMPLES = 5;
 export const PULSE_WINDOW_SIZE = 12;
+export const PULSE_MIN_SESSION_MS = 15_000;
+export const PULSE_MAX_SAMPLE_AGE_MS = 2_500;
+export const PULSE_MAX_SAMPLE_GAP_MS = 2_500;
 export const PHYSIOLOGIC_HR_MIN = 40;
 export const PHYSIOLOGIC_HR_MAX = 200;
 
@@ -30,7 +33,20 @@ export interface PulseSample {
   timestamp: number;
 }
 
-export type PulseGateReason = 'collecting' | 'weak_signal' | 'implausible' | 'ready';
+export type PulseGateReason =
+  | 'collecting'
+  | 'warming_up'
+  | 'face_lost'
+  | 'stale'
+  | 'weak_signal'
+  | 'implausible'
+  | 'ready';
+
+export interface PulseSessionContext {
+  sessionStartedAt: number;
+  facePresent: boolean;
+  now: number;
+}
 
 export interface PulseGateResult {
   ready: boolean;
@@ -74,7 +90,9 @@ function isUsable(sample: PulseSample): boolean {
     && Number.isFinite(sample.sqi)
     && sample.hr >= PHYSIOLOGIC_HR_MIN
     && sample.hr <= PHYSIOLOGIC_HR_MAX
-    && sample.sqi >= 0;
+    && sample.sqi >= 0
+    && sample.sqi <= 1
+    && Number.isFinite(sample.timestamp);
 }
 
 /**
@@ -114,6 +132,51 @@ export function assessPulseSamples(samples: readonly PulseSample[]): PulseGateRe
     windowSize: PULSE_WINDOW_SIZE,
     reason: 'ready',
   };
+}
+
+export function assessPulseSession(
+  samples: readonly PulseSample[],
+  context: PulseSessionContext,
+): PulseGateResult {
+  if (!context.facePresent) return { ...EMPTY_GATE, reason: 'face_lost' };
+
+  const window = samples.slice(-PULSE_WINDOW_SIZE);
+  if (window.length === 0) return EMPTY_GATE;
+
+  const gate = assessPulseSamples(window);
+  const notReady = (reason: PulseGateReason): PulseGateResult => ({
+    ...gate,
+    ready: false,
+    medianHr: null,
+    reason,
+  });
+
+  if (!Number.isFinite(context.now) || !Number.isFinite(context.sessionStartedAt)) {
+    return notReady('stale');
+  }
+  if (context.now - context.sessionStartedAt < PULSE_MIN_SESSION_MS) {
+    return notReady('warming_up');
+  }
+
+  const latest = window[window.length - 1];
+  if (window.some(sample =>
+    sample.timestamp < context.sessionStartedAt
+    || sample.timestamp > context.now
+    || !Number.isFinite(sample.timestamp))) {
+    return notReady('stale');
+  }
+  if (context.now - latest.timestamp > PULSE_MAX_SAMPLE_AGE_MS) {
+    return notReady('stale');
+  }
+  for (let index = 1; index < window.length; index += 1) {
+    const gap = window[index].timestamp - window[index - 1].timestamp;
+    if (gap < 0 || gap > PULSE_MAX_SAMPLE_GAP_MS) return notReady('stale');
+  }
+
+  const recent = window.slice(-MIN_ACCEPT_SAMPLES);
+  if (recent.length < MIN_ACCEPT_SAMPLES) return notReady('collecting');
+  if (recent.some(sample => !isUsable(sample))) return notReady('collecting');
+  return gate;
 }
 
 export function isPhysiologicHeartRate(hr: number): boolean {

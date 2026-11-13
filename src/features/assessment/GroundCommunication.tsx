@@ -110,7 +110,7 @@ export function GroundCommunication({ record, mission, onReview }: {
             <p className="muted">Prepare a local draft for the flight surgeon.</p>
           </div>
         </div>
-        <button className="button button-secondary" type="button" aria-expanded={startedAt !== null}
+        <button className="button button-primary" type="button" aria-expanded={startedAt !== null}
           aria-controls={startedAt !== null ? 'ground-summary' : undefined}
           onClick={() => setStartedAt(startedAt === null ? Date.now() : null)}>
           {startedAt === null ? 'Prepare summary for ground' : 'Close summary'}

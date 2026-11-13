@@ -44,7 +44,7 @@
 
 .checkin-demo-status {
   margin: 0.45rem 0 0;
-  color: #665447;
+  color: var(--status-trend);
   font-size: 0.83rem;
 }
 
@@ -102,7 +102,7 @@
   width: 100%;
   min-width: 0;
   min-height: 2.65rem;
-  border: 1px solid #c6bfb2;
+  border: 1px solid var(--border-subtle);
   border-radius: 0.4rem;
   padding: 0.48rem 0.55rem;
   background: var(--panel);
@@ -115,7 +115,7 @@
 }
 
 .reading-unit {
-  color: #625e56;
+  color: var(--text-secondary);
   white-space: nowrap;
   font-family: var(--mono);
   font-size: 0.72rem;
@@ -128,14 +128,14 @@
 }
 
 .reading-origin--camera {
-  color: #1f5c43;
-  border-color: #b7dfca;
-  background: #eef7f1;
+  color: var(--status-steady);
+  border-color: color-mix(in srgb, var(--status-steady) 40%, transparent);
+  background: var(--bg-raised);
 }
 
 .checkin-capture-note {
   margin: 0.35rem 0 0;
-  color: #4a6a58;
+  color: var(--status-steady);
   font-size: 0.74rem;
   line-height: 1.4;
 }
@@ -143,14 +143,14 @@
 .reading-error {
   display: block;
   margin-top: 0.35rem;
-  color: #963a2a;
+  color: var(--accent);
   font-size: 0.78rem;
   line-height: 1.35;
 }
 
 .measurement-guide {
   margin-top: 0.65rem;
-  color: #625e56;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -206,7 +206,7 @@
 }
 
 .checkin-note-label span {
-  color: #625e56;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   font-weight: 400;
 }
@@ -239,3 +239,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+.measurement-guide[open] {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.measurement-guide summary { color: var(--accent); font-weight: 600; font-size: 0.95rem; }
+.measurement-guide-steps { list-style: decimal; margin: 0.6rem 0 0.4rem; padding-left: 1.25rem; color: var(--text-primary); font-size: 0.95rem; }
+.measurement-guide-steps li + li { margin-top: 0.25rem; }
+.measurement-guide-facts { display: grid; gap: 0.45rem; margin: 0.6rem 0; }
+.measurement-guide-facts dt {
+  color: var(--text-muted);
+  font: 500 0.75rem/1.4 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.measurement-guide-facts dd { margin: 0.1rem 0 0; color: var(--text-secondary); font-size: 0.9rem; }
+.measurement-guide-note { color: var(--text-muted); font-size: 0.8rem; }

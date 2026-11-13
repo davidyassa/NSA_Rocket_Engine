@@ -8,7 +8,7 @@
 
 .cognitive-arena-card {
   padding: 1.5rem;
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   display: flex;
@@ -33,41 +33,41 @@
 }
 
 .pvt-target-box.idle {
-  background: #f7f5ef;
+  background: var(--bg-raised);
   border-color: var(--line);
   color: var(--ink);
 }
 
 .pvt-target-box.waiting {
-  background: #2a2220;
-  border-color: #6b3e34;
-  color: #eed5ce;
+  background: var(--bg-base);
+  border-color: var(--accent);
+  color: var(--accent);
   cursor: wait;
 }
 
 .pvt-target-box.active {
-  background: #111e16;
-  border-color: #2d6a4f;
-  color: #74c69d;
-  box-shadow: 0 0 20px rgba(45, 106, 79, 0.4);
+  background: var(--bg-base);
+  border-color: var(--status-steady);
+  color: var(--status-steady);
+  box-shadow: 0 0 20px rgb(0 0 0 / 0.6);
 }
 
 .pvt-target-box.feedback-good {
-  background: #eef7f2;
-  border-color: #2d6a4f;
-  color: #1b4332;
+  background: var(--bg-raised);
+  border-color: var(--status-steady);
+  color: var(--status-steady);
 }
 
 .pvt-target-box.feedback-lapse {
-  background: #fdf2f0;
-  border-color: #d90429;
-  color: #a80320;
+  background: var(--bg-raised);
+  border-color: var(--nasa-red);
+  color: var(--nasa-red);
 }
 
 .pvt-target-box.feedback-early {
-  background: #fff8eb;
-  border-color: #d97706;
-  color: #b45309;
+  background: var(--bg-raised);
+  border-color: var(--status-trend);
+  color: var(--status-trend);
 }
 
 .pvt-counter-display {
@@ -88,9 +88,9 @@
   padding: 0.2rem 0.5rem;
   font-family: var(--mono);
   font-size: 0.8rem;
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--bg-base) 8%, transparent);
   border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid color-mix(in srgb, var(--bg-base) 12%, transparent);
   margin: 0 0.2rem;
 }
 
@@ -127,7 +127,7 @@
 .pvt-stat-tile {
   padding: 1rem;
   border-radius: calc(var(--radius) - 3px);
-  background: #faf8f2;
+  background: var(--bg-raised);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -152,16 +152,16 @@
 }
 
 .pvt-stat-delta.good {
-  color: #2d6a4f;
+  color: var(--status-steady);
 }
 
 .pvt-stat-delta.bad {
-  color: #d90429;
+  color: var(--nasa-red);
 }
 
 .pvt-evidence-card {
   padding: 1.25rem;
-  background: #fbf9f5;
+  background: var(--bg-surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   font-size: 0.88rem;
@@ -184,21 +184,21 @@
   font-family: var(--mono);
   font-size: 0.78rem;
   font-weight: 600;
-  background: #ede8dc;
+  background: var(--bg-raised);
   color: var(--ink);
 }
 
 .pvt-trial-chip.lapse {
-  background: #fad2cf;
-  color: #900;
+  background: var(--tint-red);
+  color: var(--nasa-red);
 }
 
 .pvt-trial-chip.early {
-  background: #feebc8;
-  color: #b7791f;
+  background: var(--tint-change);
+  color: var(--status-trend);
 }
 
 .pvt-trial-chip.good {
-  background: #c6f6d5;
-  color: #22543d;
+  background: var(--tint-steady);
+  color: var(--status-steady);
 }

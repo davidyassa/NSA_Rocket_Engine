@@ -36,8 +36,9 @@ declare module 'vitalcamera-sdk' {
   }
 
   export interface FaceData {
-    box: { x: number; y: number; w: number; h: number };
-    keypoints?: Array<{ x: number; y: number }>;
+    detected: boolean;
+    box: { x: number; y: number; w: number; h: number } | null;
+    keypoints?: Array<{ x: number; y: number }> | null;
     videoWidth: number;
     videoHeight: number;
     timestamp: number;

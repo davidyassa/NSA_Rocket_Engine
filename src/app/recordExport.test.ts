@@ -13,7 +13,7 @@ describe('record export', () => {
     expect(exportData.syntheticCount).toBe(HERO_SCENARIO.history.length);
     expect(exportData.userEnteredCount).toBe(0);
     expect(exportData.includesSeededSynthetic).toBe(true);
-    expect(exportData.includesNotes).toBe(true);
+    expect(exportData.includesNotes).toBe(false);
     expect(exportData.solRange.startSol).toBe(1);
     expect(exportData.solRange.endSol).toBe(42);
   });
@@ -32,7 +32,14 @@ describe('record export', () => {
           value: 70,
           unit: 'bpm',
           observedAtUtc: '2039-07-14T08:00:00.000Z',
+          capturedAtUtc: '2039-07-14T08:04:11.000Z',
           provenance: 'user_entered',
+          source: 'camera_estimate',
+          status: 'accepted',
+          signalQuality: 0.812,
+          algorithm: 'vitalcamera-sdk · PSD + SQI TFLite models (local inference)',
+          device: 'browser webcam · on-device WebAssembly',
+          synthetic: false,
         },
       ],
       symptoms: [{ id: 'fatigue', label: 'Fatigue', present: true }],
@@ -54,5 +61,14 @@ describe('record export', () => {
     expect(parsed.records[42].note).toBe('Morning resting vitals verified');
     expect(parsed.records[42].measurements[0].provenance).toBe('user_entered');
     expect(parsed.records[42].measurements[0].unit).toBe('bpm');
+    expect(parsed.records[42].measurements[0]).toMatchObject({
+      capturedAtUtc: '2039-07-14T08:04:11.000Z',
+      source: 'camera_estimate',
+      status: 'accepted',
+      signalQuality: 0.812,
+      algorithm: 'vitalcamera-sdk · PSD + SQI TFLite models (local inference)',
+      device: 'browser webcam · on-device WebAssembly',
+      synthetic: false,
+    });
   });
 });

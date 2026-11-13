@@ -20,9 +20,9 @@
   font-size: 0.88rem;
   font-weight: 620;
 }
-.trend-metric:hover span { border-color: #c8ab9c; color: var(--ink); }
-.trend-metric input:checked + span { border-color: #d7a18f; background: var(--accent-soft); color: var(--accent-dark); }
-.trend-metric input:focus-visible + span { outline: 3px solid #bb6249; outline-offset: 3px; }
+.trend-metric:hover span { border-color: color-mix(in srgb, var(--status-trend) 40%, transparent); color: var(--ink); }
+.trend-metric input:checked + span { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--accent-soft); color: var(--accent-dark); }
+.trend-metric input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 3px; }
 
 .trend-panel { min-width: 0; padding: clamp(14px, 2.4vw, 26px); }
 .trend-panel-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 10px; }
@@ -30,7 +30,7 @@
 .trend-range { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; }
 .trend-range select {
   min-height: 42px;
-  border: 1px solid #d4c8b9;
+  border: 1px solid var(--border-subtle);
   border-radius: 7px;
   padding: 5px 8px;
   color: var(--ink);
@@ -43,7 +43,7 @@
   margin: 13px 0 16px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: #faf7ef;
+  background: var(--bg-raised);
 }
 .trend-summary div { min-width: 0; padding: 12px; }
 .trend-summary div + div { border-left: 1px solid var(--line); }
@@ -57,7 +57,7 @@
 .trend-key { flex: 0 0 auto; display: inline-block; }
 .trend-key-reading { width: 8px; height: 8px; border: 1.6px solid var(--accent); border-radius: 50%; }
 .trend-key-entered { width: 7px; height: 7px; transform: rotate(45deg); background: var(--accent); }
-.trend-key-baseline { width: 18px; height: 0; border-top: 2px dashed #4d6b5b; }
+.trend-key-baseline { width: 18px; height: 0; border-top: 2px dashed var(--border-control); }
 .trend-chart { width: 100%; height: clamp(220px, 37vw, 318px); min-width: 0; overflow: clip; }
 .trend-chart .recharts-cartesian-axis-tick-value { fill: var(--muted); font: 0.67rem var(--mono); }
 .trend-chart .recharts-wrapper:focus-visible { outline-offset: -3px; }
@@ -67,11 +67,11 @@
   gap: 3px;
   max-width: 200px;
   padding: 8px 10px;
-  border: 1px solid #d8c7b9;
+  border: 1px solid color-mix(in srgb, var(--status-trend) 40%, transparent);
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
-  box-shadow: 0 4px 12px #342a2214;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.13);
   font-size: 0.79rem;
   white-space: normal;
 }

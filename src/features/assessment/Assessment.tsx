@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { Check } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   METRICS,
@@ -16,8 +17,13 @@ import { RULES } from '../../engine';
 import { EvidenceSources } from './EvidenceSources';
 import { GroundCommunication } from './GroundCommunication';
 import { WhatIfSimulator } from './WhatIfSimulator';
-import { provenanceLabels } from './groundSummary';
+import { HandoffSimulator } from './HandoffSimulator';
+import { ORIGIN_META } from '../../ui/tokens';
 import { generateMedicalHandoffPackage, formatMedicalHandoffMarkdown } from './medicalHandoff';
+import { FollowUpCenter } from '../followups/FollowUpCenter';
+import { useFollowUpStore } from '../followups/useFollowUpStore';
+import type { FollowUpTask } from '../followups/followUpEngine';
+import { EvidencePassport } from './EvidencePassport';
 import './assessment.css';
 
 interface AssessmentProps {
@@ -42,7 +48,7 @@ function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; a
     a.download = `sol-check-flight-surgeon-handoff-sol-${record.sol}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setDownloadMsg(`Downloaded JSON package (Checksum: ${pkg.clinicalSignOff.checksum})`);
+    setDownloadMsg(`Downloaded JSON package (Checksum: ${pkg.localDraft.checksum})`);
   }
 
   function downloadMarkdown() {
@@ -61,12 +67,12 @@ function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; a
     <div className="panel assessment-action" style={{ borderTop: '3px solid var(--accent)' }}>
       <p className="eyebrow">Autonomous Medical Care</p>
       <h3>Evidence Passport & Flight Surgeon Handoff</h3>
-      <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: '#4a453e', margin: '0.3rem 0 0.6rem' }}>
+      <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem' }}>
         Traceable clinical evidence package prepared autonomously under a simulated 20-minute one-way
         communication delay.
       </p>
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0.5rem 0' }}>
-        <button type="button" className="button button-primary" onClick={downloadJson}>
+        <button type="button" className="button button-secondary" onClick={downloadJson}>
           Download handoff (JSON)
         </button>
         <button type="button" className="button button-secondary" onClick={downloadMarkdown}>
@@ -74,13 +80,15 @@ function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; a
         </button>
       </div>
       {downloadMsg && (
-        <p className="muted" style={{ fontSize: '0.75rem', color: '#2d6a4f', marginTop: '0.2rem' }}>
-          ✓ {downloadMsg}
+        <p className="muted" style={{ fontSize: '0.75rem', color: 'var(--status-steady)', marginTop: '0.2rem' }}>
+          <Check size={14} aria-hidden="true" className="inline-icon" /> {downloadMsg}
         </p>
       )}
       <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>
-        <strong>Integrity Checksum:</strong> <code>{pkg.clinicalSignOff.checksum}</code> · Triage: <strong>{pkg.triageTier.toUpperCase()}</strong>
+        <strong>Integrity Checksum:</strong> <code>{pkg.localDraft.checksum}</code> · Triage: <strong>{pkg.triageTier.toUpperCase()}</strong>
       </p>
+
+      <HandoffSimulator pkg={pkg} />
     </div>
   );
 }
@@ -125,7 +133,7 @@ function ReadingTable({ ids, readings }: {
   if (!inputs.length) return <p className="muted">Measurement inputs unavailable for this finding.</p>;
   return (
     <div className="assessment-table-wrap" tabIndex={0} role="region" aria-label="Recorded readings">
-      <table className="assessment-table">
+      <table className="assessment-table data-table">
         <thead>
           <tr><th scope="col">Sol</th><th scope="col">Indicator</th><th scope="col">Value</th><th scope="col">Origin</th></tr>
         </thead>
@@ -134,12 +142,12 @@ function ReadingTable({ ids, readings }: {
             const metric = METRICS[measurement.metric];
             return (
               <tr key={measurement.id}>
-                <td>{sol}</td>
+                <td className="num">{sol}</td>
                 <th scope="row">{metric.label}</th>
-                <td>{measurement.value} {metric.unitLabel}</td>
+                <td className="num">{measurement.value} {metric.unitLabel}</td>
                 <td>
-                  <span className={measurement.provenance === 'synthetic_demo' ? 'badge badge-synthetic' : 'badge'}>
-                    {provenanceLabels[measurement.provenance]}
+                  <span className={ORIGIN_META[measurement.provenance].className}>
+                    {ORIGIN_META[measurement.provenance].label}
                   </span>
                 </td>
               </tr>
@@ -151,9 +159,11 @@ function ReadingTable({ ids, readings }: {
   );
 }
 
-function FindingCard({ finding, readings }: {
+function FindingCard({ finding, readings, assessment, tasks }: {
   finding: Finding;
   readings: ReadonlyMap<string, IndexedReading>;
+  assessment: RiskAssessment;
+  tasks?: FollowUpTask[];
 }) {
   const rule = RULES[finding.ruleId];
   return (
@@ -203,6 +213,13 @@ function FindingCard({ finding, readings }: {
           <ReadingTable ids={finding.inputMeasurementIds} readings={readings} />
           <h4>Evidence sources</h4>
           <EvidenceSources ids={finding.sourceRefs} />
+
+          <EvidencePassport
+            finding={finding}
+            readings={readings}
+            assessment={assessment}
+            tasks={tasks}
+          />
         </div>
       </details>
     </article>
@@ -223,6 +240,14 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
   const warnings = assessment && !assessment.findings.some(finding => finding.kind === 'data_quality')
     ? assessment.dataQualityWarnings
     : [];
+
+  const { tasks, syncWithAssessment, setTasks } = useFollowUpStore();
+
+  useEffect(() => {
+    if (record && assessment) {
+      syncWithAssessment(record, assessment);
+    }
+  }, [record, assessment, syncWithAssessment]);
 
   return (
     <>
@@ -247,7 +272,8 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
       )}
 
       {assessment ? (
-        <div className="assessment-layout">
+        <>
+          <div className="assessment-layout">
           <section className="assessment-findings" aria-labelledby="findings-title">
             <h2 id="findings-title" ref={findingsHeading} tabIndex={-1}>Findings</h2>
             {symptoms.length > 0 && (
@@ -261,7 +287,13 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
               </ul>
             )}
             {assessment.findings.map((finding, index) => (
-              <FindingCard key={`${finding.ruleId}-${index}`} finding={finding} readings={readings} />
+              <FindingCard
+                key={`${finding.ruleId}-${index}`}
+                finding={finding}
+                readings={readings}
+                assessment={assessment}
+                tasks={tasks}
+              />
             ))}
             {assessment.findings.length === 0 && (
               <p className="panel assessment-empty">No change detected in the readings that could be compared.</p>
@@ -300,6 +332,15 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
             <p className="muted assessment-version">Rules engine {assessment.engineVersion}</p>
           </section>
         </div>
+
+          {record && (
+            <FollowUpCenter
+              tasks={tasks}
+              onTasksChange={setTasks}
+              currentUserRole="astronaut"
+            />
+          )}
+        </>
       ) : (
         <section className="panel assessment-empty">
           <h2>Check-in needed</h2>

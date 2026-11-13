@@ -1,3 +1,4 @@
+import { ExternalLink } from 'lucide-react';
 import { useRef, useState, type FormEvent } from 'react';
 import {
   METRIC_IDS,
@@ -55,9 +56,17 @@ function MeasurementGuide({ metric, label }: { metric: MetricId; label: string }
   return (
     <details className="measurement-guide">
       <summary aria-label={`How to measure ${label.toLowerCase()}`}>How to measure</summary>
-      <p>{guide.text}</p>
+      <ol className="measurement-guide-steps">
+        {guide.steps.map((step) => <li key={step}>{step}</li>)}
+      </ol>
+      <dl className="measurement-guide-facts">
+        <div><dt>Why it matters in space</dt><dd>{guide.whyInSpace}</dd></div>
+        <div><dt>Typical range</dt><dd>{guide.typicalRange}</dd></div>
+        <div><dt>Watch for</dt><dd>{guide.watchFor}</dd></div>
+      </dl>
+      <p className="measurement-guide-note">General reference only. Sol Check compares readings with your own baseline. Not a diagnosis.</p>
       {source && (source.url
-        ? <a href={source.url} target="_blank" rel="noreferrer">{source.publisher} reference ↗</a>
+        ? <a href={source.url} target="_blank" rel="noreferrer">{source.publisher} reference<ExternalLink size={13} aria-hidden="true" className="external-icon" /></a>
         : <small>{source.title}</small>)}
     </details>
   );

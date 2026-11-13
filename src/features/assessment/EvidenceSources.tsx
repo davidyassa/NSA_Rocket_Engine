@@ -1,3 +1,4 @@
+import { ExternalLink } from 'lucide-react';
 import { SOURCES } from '../../content';
 
 export function EvidenceSources({ ids }: { ids: readonly string[] }) {
@@ -9,7 +10,7 @@ export function EvidenceSources({ ids }: { ids: readonly string[] }) {
         return (
           <li key={id}>
             {source.url ? (
-              <a href={source.url} target="_blank" rel="noreferrer">{source.title} ↗</a>
+              <a href={source.url} target="_blank" rel="noreferrer">{source.title}<ExternalLink size={13} aria-hidden="true" className="external-icon" /></a>
             ) : (
               <strong>{source.title}</strong>
             )}

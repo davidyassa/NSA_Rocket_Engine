@@ -9,7 +9,14 @@ const exportMeasurementSchema = z.object({
   value: z.number(),
   unit: z.string(),
   observedAtUtc: z.string(),
-  provenance: z.enum(['user_entered', 'synthetic_demo']),
+  capturedAtUtc: z.string().optional(),
+  provenance: z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']),
+  source: z.enum(['manual', 'validated_hardware', 'camera_estimate', 'self_report', 'research_import', 'synthetic']).optional(),
+  status: z.enum(['accepted', 'rejected_low_quality', 'missing', 'corrected']).optional(),
+  signalQuality: z.number().min(0).max(1).nullable().optional(),
+  algorithm: z.string().optional(),
+  device: z.string().optional(),
+  synthetic: z.boolean().optional(),
 });
 
 const exportCheckinSchema = z.object({
@@ -82,7 +89,14 @@ export function buildRecordExport(
         value: m.value,
         unit: m.unit,
         observedAtUtc: m.observedAtUtc,
-        provenance: (m.provenance === 'user_entered' ? 'user_entered' : 'synthetic_demo') as 'user_entered' | 'synthetic_demo',
+        capturedAtUtc: m.capturedAtUtc,
+        provenance: m.provenance,
+        source: m.source,
+        status: m.status,
+        signalQuality: m.signalQuality,
+        algorithm: m.algorithm,
+        device: m.device,
+        synthetic: m.synthetic,
       })),
       symptoms: record.symptoms.map((s) => ({
         id: s.id,
@@ -105,7 +119,7 @@ export function buildRecordExport(
       role: scenario.profile.role,
       isSynthetic: scenario.profile.isSynthetic,
     },
-    includesNotes: hasNotes || true, // Explicitly documented that notes field is included in records
+    includesNotes: hasNotes,
     includesSeededSynthetic: syntheticCount > 0,
     recordCount: exportRecords.length,
     syntheticCount,

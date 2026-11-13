@@ -19,9 +19,14 @@ function loadMission(): { mission: StoredMission; warning: string | null } {
 }
 
 function captureOf(reading: HealthMeasurement): MeasurementCapture | null {
-  if (reading.source === undefined && reading.capturedAtUtc === undefined && reading.signalQuality == null) {
-    return null;
-  }
+  const defaultSource = reading.source === 'manual' || reading.source === 'self_report' || reading.source === 'synthetic';
+  const hasCaptureDetails = reading.capturedAtUtc !== undefined
+    || reading.signalQuality != null
+    || reading.algorithm !== undefined
+    || reading.device !== undefined
+    || (reading.source !== undefined && !defaultSource)
+    || (reading.status !== undefined && reading.status !== 'accepted');
+  if (!hasCaptureDetails) return null;
   return {
     capturedAtUtc: reading.capturedAtUtc,
     source: reading.source,
@@ -47,6 +52,11 @@ export function buildCheckin(entry: CheckinEntry, scenario: DemoScenario): Daily
       id: `${id}:${metric}`, astronautId: profile.id, metric, value, unit: METRICS[metric].unit,
       observedAtUtc, provenance,
       ...(capture ?? {}),
+      source: capture?.source ?? (provenance === 'synthetic_demo'
+        ? 'synthetic'
+        : metric === 'sleep_duration' || metric === 'mood' ? 'self_report' : 'manual'),
+      status: capture?.status ?? 'accepted',
+      synthetic: capture?.synthetic ?? (provenance === 'synthetic_demo'),
     }];
   });
 
@@ -155,6 +165,9 @@ export const useMissionStore = create<MissionStore>((set, get) => ({
   resetDemo() {
     try {
       storage().reset();
+      if (typeof window !== 'undefined') {
+        try { window.localStorage.removeItem('sol-check:follow-up-tasks'); } catch { /* non-fatal */ }
+      }
       set({ mission: emptyMission, warning: null });
     } catch {
       throw new Error('The demo could not be reset. Check your browser’s local storage settings.');

@@ -40,33 +40,49 @@
   5. `reported-symptoms`: Records current symptoms (e.g. Fatigue) and detects recurring symptoms across the lookback window.
   6. `archive-replay-context`: Contextual association linking lower sleep/mood during shelter protocol with the aligned Curiosity RAD radiation event.
   7. `data-unavailable`: Discloses unmeasured metrics or insufficient history (< 5 sols) preventing baseline calculation.
-* **Interactive 2D Crew Figure Destinations (`src/features/dashboard/CrewBodyFigure.tsx`):**
-  * **Head (shortcut `"Head"`):** Navigates to `#/trends?metric=mood` (Behavioral health).
-  * **Visor (shortcut `"Visor"`):** Navigates to `#/trends?metric=sleep_duration` (Sleep).
-  * **Chest (shortcut `"Chest"`):** Navigates to `#/trends?metric=heart_rate` (Cardiovascular).
-  * **Torso (shortcut `"Torso"`):** Navigates to `#/trends?metric=body_temp` (Temperature).
-  * **Abdomen (shortcut `"Abdomen"`):** Navigates to `#/trends?metric=blood_glucose` (Metabolic).
-  * **Limbs (shortcut `"Limbs"`):** Navigates to `#/assessment` (Reported systemic symptoms).
+* **3D Crew Digital Twin Host & 2D Crew Figure (`src/features/dashboard/CrewBody3D.tsx`, `twin/`, `CrewBodyFigure.tsx`):**
+  * **Team Blender astronaut:** lazily loaded, self-hosted three.js viewport (own chunk, precached offline) rendering `assets/astronaut/astronaut_sol_check.glb`, imported directly. Export checklist: `docs/3d-model-integration.md`.
+  * **Orbit, framing, hotspots:** damped orbit with pitch limits and no scroll hijacking, idle auto-rotation (off under reduced motion), double-click / Reset view, keyboard Rotate left/right, bounds-based camera framing, and six projected `.figure-region-target` buttons with icon + colour + label status. The chest marker pulses at the latest heart rate.
+  * **Toggleable View:** `[ ✦ 3D model ]` (default) and `[ ☷ 2D view ]` segmented toggle. The view falls back to 2D automatically without WebGL.
+  * **Anatomical Hotspots & Routing:**
+    * **Head (shortcut `"Head"`):** Navigates to `#/trends?metric=mood` (Behavioral health).
+    * **Visor (shortcut `"Visor"`):** Navigates to `#/trends?metric=sleep_duration` (Sleep).
+    * **Chest (shortcut `"Chest"`):** Navigates to `#/trends?metric=heart_rate` (Cardiovascular, pulsating node).
+    * **Torso (shortcut `"Torso"`):** Navigates to `#/trends?metric=body_temp` (Temperature).
+    * **Abdomen (shortcut `"Abdomen"`):** Navigates to `#/trends?metric=blood_glucose` (Metabolic).
+    * **Limbs (shortcut `"Limbs"`):** Navigates to `#/assessment` (Reported systemic symptoms).
+  * **Accessibility:** 6 invisible DOM target buttons ensure 100% screen reader accessibility and CDP automated test compliance.
 
 ---
 
 ## 3b. Advanced Clinical Intelligence & Mission Safety Features
+* **Closed-Loop Mission Health Action Center (`#/assessment` & `#/cmo`):**
+  * Autonomous task engine (`src/features/followups/followUpEngine.ts`) transforms findings and sensor warnings into actionable crew follow-up items with clinical state tracking (`open` → `acknowledged` → `in_progress` → `awaiting_measurement` → `awaiting_medical_review` → `resolved` / `escalated`).
+  * Features a full audit trail recording timestamps, responsible crew member, and clinical rationales.
+* **Interactive 6-Layer Health Evidence Passport (`src/features/assessment/EvidencePassport.tsx`):**
+  * For every autonomous finding, astronauts and flight surgeons can inspect 6 distinct traceable audit layers: (1) Raw Input Observations, (2) Signal Quality & Sensor Uncertainty Gates, (3) Rolling Median & MAD Spread, (4) Deterministic Decision Rule, (5) NASA HRP Five Hazards Evidence Book mapping, and (6) Closed-Loop Follow-Up Actions.
+* **Crew Medical Officer (CMO) Clinical Desk (`#/cmo`):**
+  * Dedicated high-level operational console for the onboard medical officer with 4 tabs: Clinical Triage & Digital Sign-off, Action Center Queue, Sensor & Data Quality, and Interplanetary Telemetry.
 * **Cognitive Performance Laboratory (`#/cognitive`):**
   * Implements the **Brief Psychomotor Vigilance Task (PVT-B)** deployed aboard the ISS by the NASA Human Research Program (HRP) Behavioral Health & Performance (BHP) element.
   * Measures sustained attention, reaction speed, vigilance lapses (>500 ms), and false starts (<100 ms).
   * Evaluates clinical psychomotor slowing against NASA fatigue thresholds and provides recommended countermeasures (sleep hygiene, rest duty cycle).
 * **NASA Five Hazards Matrix & Evidence Explorer (`#/hazards`):**
-  * Explicitly maps Sol Check metrics to the Five Hazards of Human Spaceflight: Space Radiation (`HRP-RAD-01`), Isolation & Confinement (`HRP-BHP-01`), Distance from Earth (`HRP-EXMC-01`), Altered Gravity (`HRP-HHC-01`), and Hostile Closed Environments (`HRP-SHFH-01`).
+  * Explicitly maps Sol Check metrics to the Five Hazards of Human Spaceflight: Space Radiation (`SC-RAD-01`, HRP element: Space Radiation), Isolation & Confinement (`SC-BHP-01`, HRP element: HFBP), Distance from Earth (`SC-EXMC-01`, HRP element: ExMC), Altered Gravity (`SC-HHC-01`, HRP element: HHC), and Hostile Closed Environments (`SC-ENV-01`, HRP element: HFBP habitability).
   * Links directly to NASA HRP Evidence Books and maps Sol 43 mission indicators to verified spaceflight countermeasures.
-* **Clinical Handoff Package & Medical Passport (`#/assessment`):**
-  * Creates a validated JSON (v1.0.0) medical handoff payload and clinical Markdown briefing package for the Flight Surgeon with deterministic SHA checksum verification for delay-tolerant interplanetary transmission.
+* **Exploration Medical Handoff Package & Change Detection (`#/assessment`):**
+  * Creates a validated JSON (v1.1.0) medical handoff payload and clinical Markdown briefing package for the Flight Surgeon with deterministic FNV-1a-32 change-detection verification for delay-tolerant interplanetary transmission.
+  * Interactive round-trip rehearsal simulator (`HandoffSimulator.tsx`) with two-sided file verification.
 
 ---
 
-## 4. AI-Use & Development Credits
+## 4. Team, AI-Use & Development Credits
+**Team:** Ahmed Shacker, Ahmed Sherif, Andrew Sameh, David Michael, Hassan Mohsen, Ziad AbdElhaleem. **Coach:** Mariam Mohamed. **Local Lead:** Dr. Moatasem Mahran. The 3D astronaut model is authored by the team in Blender.
+
 Sol Check was developed transparently using human-guided AI pair programming:
 * **OpenAI Codex:** Provided the initial project scaffolding, foundational P0 offline contracts, state stores, Vite PWA configuration, NASA RadLab fixture processing, baseline logic, and initial UI layouts.
 * **Google DeepMind Gemini / Antigravity:** Designed and implemented all P1 capabilities (F14 interactive 2D body figure, F20 timeline replay with Sol 41 archive event, F13 reminders & checklist, F17 local JSON export, F15 check-in streak), Phase 2 Vital Camera SDK integration with self-hosted LiteRT/MediaPipe WebAssembly runtimes, precache optimization, subpath URL resolution, and automated offline CDP verification testing.
+* **Anthropic Claude:** Flight-console design system and token migration with computed WCAG contrast tests, three-channel status and origin badges, responsive rail and bottom navigation, the three.js host for the team's 3D model (orbit, framing, projected hotspots, fallbacks), structured measurement guides, and relabelling hazard IDs as internal `SC-` references mapped to NASA HRP elements.
 * **Deterministic Medical Assessment:** All medical rules, baselines, and escalation tiers are deterministic, transparent TypeScript heuristics without ungrounded LLM inference.
 
 ---
@@ -76,8 +92,10 @@ All bundled runtime models and libraries in `public/vendor/` are self-hosted wit
 1. **VitalCamera SDK:** MIT License with Privacy Protection Addendum (Copyright 2025 Kegang Wang). Enforces strictly local on-device inference and prohibits external transmission of biometric feeds.
 2. **MediaPipe Tasks-Vision:** Apache 2.0 License (Google LLC). BlazeFace face detection.
 3. **LiteRT WebAssembly Runtime:** Apache 2.0 License (The TensorFlow Authors / Google). Local neural network WASM engine.
-4. **FacePhys Models:** MIT License with Privacy Addendum (`model.tflite`, `proj.tflite`, `sqi_model.tflite`, `psd_model.tflite`, `state.gz`, `blaze_face_short_range.tflite`).
-5. **Notice Files:** Maintained in [public/vendor/LICENSE](file:///Users/ahmedelazab/Desktop/Nasa%20Rocket%20Engine/public/vendor/LICENSE) and [public/vendor/NOTICE](file:///Users/ahmedelazab/Desktop/Nasa%20Rocket%20Engine/public/vendor/NOTICE).
+4. **three.js:** MIT License (three.js authors). Bundled locally for the 3D model host.
+5. **Fonts:** Inter, Space Grotesk and JetBrains Mono (SIL Open Font License 1.1), bundled via Fontsource.
+6. **FacePhys Models:** MIT License with Privacy Addendum (`model.tflite`, `proj.tflite`, `sqi_model.tflite`, `psd_model.tflite`, `state.gz`, `blaze_face_short_range.tflite`).
+7. **Notice Files:** Maintained in [public/vendor/LICENSE](file:///Users/ahmedelazab/Desktop/Nasa%20Rocket%20Engine/public/vendor/LICENSE) and [public/vendor/NOTICE](file:///Users/ahmedelazab/Desktop/Nasa%20Rocket%20Engine/public/vendor/NOTICE).
 
 ---
 

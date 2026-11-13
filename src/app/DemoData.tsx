@@ -5,9 +5,28 @@ import type { DailyCheckin, DemoScenario } from '../contracts';
 import { RADLAB_CSV_URL, RADLAB_MANIFEST, RADLAB_SOURCE } from '../data/nasa';
 import { DEMO_OPTIONS, SCENARIO_IDS, type ScenarioId } from '../scenarios';
 import { buildRecordExport, parseAndValidateExport, type RecordExport } from './recordExport';
+import { isNativeApp } from './native';
 import './demo-data.css';
 
 function OfflineStatus() {
+  if (isNativeApp) {
+    return (
+      <section className="panel demo-data-panel" aria-labelledby="offline-heading">
+        <div className="demo-data-heading">
+          <span className="demo-data-icon"><WifiOff size={20} aria-hidden="true" /></span>
+          <h2 id="offline-heading">Offline demo</h2>
+        </div>
+        <p role="status" className="demo-offline-status">
+          <CircleCheck size={16} aria-hidden="true" /> Bundled in app · works offline
+        </p>
+        <p className="muted">Every screen, model and the RadLab archive ship inside this app. Check-ins are saved on this device.</p>
+      </section>
+    );
+  }
+  return <WebOfflineStatus />;
+}
+
+function WebOfflineStatus() {
   const serviceWorker = navigator.serviceWorker;
   const [ready, setReady] = useState(() => Boolean(serviceWorker?.controller));
 

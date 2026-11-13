@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { METRIC_IDS, METRICS } from '../../contracts';
 import type { DailyCheckin, MetricId, Provenance } from '../../contracts';
 import { BASELINE_LOOKBACK_SOLS, MIN_BASELINE_READINGS } from '../../engine/rules';
+import { TOKENS } from '../../ui/tokens';
 import { buildTrendSeries } from './series';
 import type { TrendPoint } from './series';
 import './trends.css';
@@ -16,8 +17,8 @@ const provenanceLabels: Record<Provenance, string> = {
 };
 
 const readingFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
-const readingColor = '#a8422f';
-const baselineColor = '#4d6b5b';
+const readingColor = TOKENS.accent;
+const baselineColor = TOKENS.textSecondary;
 
 function readingLabel(point: TrendPoint, unit: string): string {
   if (point.value !== null) return `${readingFormat.format(point.value)} ${unit}`;
@@ -32,9 +33,9 @@ function TrendDot({ cx, cy, payload }: { cx?: number | null; cy?: number | null;
   if (cx == null || cy == null || payload?.value == null) return null;
   if (payload.provenance === 'user_entered') {
     return <rect x={cx - 3.5} y={cy - 3.5} width={7} height={7} fill={readingColor}
-      stroke="#fffefa" transform={`rotate(45 ${cx} ${cy})`} />;
+      stroke={TOKENS.bgSurface} transform={`rotate(45 ${cx} ${cy})`} />;
   }
-  return <circle cx={cx} cy={cy} r={3.2} fill="#fffefa" stroke={readingColor} strokeWidth={1.6} />;
+  return <circle cx={cx} cy={cy} r={3.2} fill={TOKENS.bgSurface} stroke={readingColor} strokeWidth={1.6} />;
 }
 
 function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId }) {
@@ -54,16 +55,17 @@ function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId
         ))}
         {hasBaseline && <span><span aria-hidden="true" className="trend-key trend-key-baseline" /> Personal baseline</span>}
       </figcaption>
+      <div className="chart-scroll" tabIndex={0} role="region" aria-label={`${label} chart, scroll sideways on small screens`}>
       <div className="trend-chart">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={points} margin={{ top: 9, right: 24, bottom: 5, left: 0 }}>
-            <CartesianGrid vertical={false} stroke="#ebe4da" strokeDasharray="3 4" />
-            <XAxis dataKey="sol" minTickGap={26} tickLine={false} axisLine={{ stroke: '#ded5c9' }}
-              tickMargin={9} tickFormatter={(sol: number) => `Sol ${sol}`} />
-            <YAxis width={45} axisLine={false} tickLine={false} tickMargin={7}
+            <CartesianGrid vertical={false} stroke={TOKENS.borderSubtle} strokeDasharray="3 4" />
+            <XAxis dataKey="sol" minTickGap={26} tickLine={false} axisLine={{ stroke: TOKENS.borderControl }}
+              tickMargin={9} tick={{ fill: TOKENS.textSecondary, fontSize: 13 }} tickFormatter={(sol: number) => `Sol ${sol}`} />
+            <YAxis width={45} axisLine={false} tickLine={false} tickMargin={7} tick={{ fill: TOKENS.textSecondary, fontSize: 13 }}
               domain={mood ? [1, 5] : ['auto', 'auto']} ticks={mood ? [1, 2, 3, 4, 5] : undefined}
               tickFormatter={(value: number) => readingFormat.format(value)} />
-            <Tooltip filterNull={false} cursor={{ stroke: '#beaa99', strokeDasharray: '4 3' }}
+            <Tooltip filterNull={false} cursor={{ stroke: TOKENS.borderControl, strokeDasharray: '4 3' }}
               content={({ active, label: activeSol }) => {
                 const point = active && points.find(({ sol }) => sol === Number(activeSol));
                 if (!point) return null;
@@ -78,10 +80,11 @@ function TrendChart({ points, metric }: { points: TrendPoint[]; metric: MetricId
             <Line type="linear" dataKey="baseline" name="Personal baseline" stroke={baselineColor} strokeWidth={2}
               strokeDasharray="6 5" dot={false} activeDot={false} connectNulls={false} isAnimationActive={false} />
             <Line type="linear" dataKey="value" name={label} stroke={readingColor} strokeWidth={2.5}
-              dot={<TrendDot />} activeDot={{ r: 5, fill: readingColor, stroke: '#fffefa', strokeWidth: 2 }}
+              dot={<TrendDot />} activeDot={{ r: 5, fill: readingColor, stroke: TOKENS.bgSurface, strokeWidth: 2 }}
               connectNulls={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
+      </div>
       </div>
       <p className="trend-chart-caption">Mission sol · {unitLabel}</p>
     </figure>
@@ -178,7 +181,7 @@ export function Trends({ records }: { records: readonly DailyCheckin[] }) {
         <details className="panel trend-records">
           <summary>View readings by sol <span className="muted">{points.length} sols</span></summary>
           <div className="trend-table-wrap" tabIndex={0} role="region" aria-label={`${label} readings by sol`}>
-            <table className="trend-table">
+            <table className="trend-table data-table">
               <caption className="sr-only">{label} readings and personal baseline</caption>
               <thead><tr><th scope="col">Sol</th><th scope="col">Reading</th><th scope="col">Baseline</th><th scope="col">Origin</th></tr></thead>
               <tbody>

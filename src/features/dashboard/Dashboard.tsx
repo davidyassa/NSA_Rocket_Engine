@@ -1,15 +1,17 @@
 import {
-  Activity, ArrowRight, Brain, CalendarClock, CircleAlert, CircleCheck, Flame, HeartPulse, Moon,
+  ArrowRight, Brain, CalendarClock, CircleAlert, Flame, HeartPulse, Moon,
   Radio, ShieldAlert, Smile, Stethoscope, Thermometer, TrendingDown, Waves,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { HEALTH_DOMAINS, METRICS } from '../../contracts';
-import type { DailyCheckin, DemoScenario, DomainStatus, HealthDomain, MetricId, RiskAssessment } from '../../contracts';
+import type { DailyCheckin, DemoScenario, HealthDomain, MetricId, RiskAssessment } from '../../contracts';
+import { ORIGIN_META, STATUS_META } from '../../ui/tokens';
 import craterPhoto from '../../ui/assets/gale-crater.webp';
 import { CrewBodyFigure, DOMAIN_TARGETS } from './CrewBodyFigure';
 import { RoutineChecklist } from './RoutineChecklist';
 import { calculateCheckinStreak } from './streak';
+import { useFollowUpStore } from '../followups/useFollowUpStore';
 import './dashboard.css';
 
 const domainInfo = {
@@ -21,18 +23,10 @@ const domainInfo = {
   symptoms: { label: 'Symptoms', Icon: Stethoscope },
 } satisfies Record<HealthDomain, { label: string; Icon: typeof HeartPulse }>;
 
-const statusInfo = {
-  no_change_detected: { label: 'No change detected', Icon: CircleCheck, tone: 'steady' },
-  change_from_baseline: { label: 'Change from baseline', Icon: CircleAlert, tone: 'watch' },
-  sustained_trend: { label: 'Sustained trend', Icon: Activity, tone: 'watch' },
-  baseline_not_established: { label: 'Baseline not established', Icon: CircleAlert, tone: 'muted' },
-  check_entry: { label: 'Check entry', Icon: CircleAlert, tone: 'watch' },
-  not_measured: { label: 'Not measured', Icon: CircleAlert, tone: 'muted' },
-} satisfies Record<DomainStatus, { label: string; Icon: typeof CircleCheck; tone: string }>;
 
 const numberFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 
-function domainReading(domain: HealthDomain, latest: DailyCheckin | null) {
+export function domainReading(domain: HealthDomain, latest: DailyCheckin | null) {
   const readings = new Map(latest?.measurements.map((measurement) => [measurement.metric, measurement]));
   const value = (metric: MetricId) => {
     const reading = readings.get(metric);
@@ -78,6 +72,8 @@ export function Dashboard({ scenario, records, latest, assessment }: {
 
   const activeRecords = records ?? (latest ? [latest] : scenario.history);
   const streak = useMemo(() => calculateCheckinStreak(activeRecords), [activeRecords]);
+  const { tasks } = useFollowUpStore();
+  const pendingTasks = tasks.filter(t => t.status !== 'resolved');
 
   return (
     <div className="dashboard">
@@ -125,6 +121,23 @@ export function Dashboard({ scenario, records, latest, assessment }: {
 
       <RoutineChecklist scenario={scenario} latest={latest} />
 
+      {pendingTasks.length > 0 && (
+        <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
+          <div>
+            <span className="eyebrow action-center-eyebrow">
+              <CircleAlert size={14} aria-hidden="true" /> Action required · Mission health action center
+            </span>
+            <p>
+              {pendingTasks[0].title}
+              {pendingTasks.length > 1 && ` (plus ${pendingTasks.length - 1} more pending)`}
+            </p>
+          </div>
+          <Link to="/assessment" className="button button-warning">
+            Review &amp; sign off <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </aside>
+      )}
+
       <section aria-labelledby="health-domains-heading" className="dashboard-health">
         <div className="section-title">
           <div>
@@ -132,8 +145,8 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             {latest && <p>From the Sol {latest.sol} check-in</p>}
           </div>
           <div className="status-provenance">
-            {hasSynthetic && <span className="badge badge-synthetic">Synthetic readings</span>}
-            {hasEntered && <span className="badge">User entered readings</span>}
+            {hasSynthetic && <span className={ORIGIN_META.synthetic_demo.className}>{ORIGIN_META.synthetic_demo.label}</span>}
+            {hasEntered && <span className={ORIGIN_META.user_entered.className}>{ORIGIN_META.user_entered.label}</span>}
           </div>
         </div>
 
@@ -146,7 +159,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         <div className="domain-grid">
           {HEALTH_DOMAINS.map((domain) => {
             const { label, Icon } = domainInfo[domain];
-            const status = statusInfo[assessment?.domainStatuses[domain] ?? 'not_measured'];
+            const status = STATUS_META[assessment?.domainStatuses[domain] ?? 'not_measured'];
             const domainReadings = readings.filter((reading) => METRICS[reading.metric].domain === domain);
             const origins = new Set(domainReadings.map((reading) => reading.provenance));
             const target = DOMAIN_TARGETS[domain];
@@ -164,13 +177,13 @@ export function Dashboard({ scenario, records, latest, assessment }: {
                 </div>
                 <p className="domain-value">{domainReading(domain, latest)}</p>
                 <span className={`domain-status status-${status.tone}`}><status.Icon size={14} aria-hidden="true" />{status.label}</span>
-                {hasSynthetic && hasEntered && origins.size === 1 && (
-                  <p className="domain-origin">{origins.has('synthetic_demo') ? 'Synthetic' : 'User-entered'}</p>
+                {origins.size === 1 && (
+                  <span className={`${ORIGIN_META[[...origins][0]].className} domain-origin-badge`}>{ORIGIN_META[[...origins][0]].label}</span>
                 )}
                 {origins.size > 1 && (
                   <ul className="domain-origin">
                     {domainReadings.map((reading) => (
-                      <li key={reading.id}>{METRICS[reading.metric].label} · {reading.provenance === 'synthetic_demo' ? 'Synthetic' : 'User-entered'}</li>
+                      <li key={reading.id}>{METRICS[reading.metric].label} · <span className={ORIGIN_META[reading.provenance].className}>{ORIGIN_META[reading.provenance].label}</span></li>
                     ))}
                   </ul>
                 )}
@@ -192,7 +205,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
           <p className="muted" style={{ fontSize: '0.85rem', margin: '0.2rem 0 0.8rem', lineHeight: 1.4 }}>
             NASA Brief Psychomotor Vigilance Task tracks astronaut readiness, reaction times, and lapses (&gt;500ms).
           </p>
-          <Link to="/cognitive" className="button button-secondary" style={{ width: 'fit-content', fontSize: '0.82rem' }}>
+          <Link to="/cognitive" className="button button-secondary" style={{ width: 'fit-content' }}>
             Run vigilance test →
           </Link>
         </article>
@@ -208,7 +221,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
           <p className="muted" style={{ fontSize: '0.85rem', margin: '0.2rem 0 0.8rem', lineHeight: 1.4 }}>
             Grounded in NASA HRP risk books: Radiation (Curiosity MSL-RAD), Behavioral Isolation, and Distance latency.
           </p>
-          <Link to="/hazards" className="button button-secondary" style={{ width: 'fit-content', fontSize: '0.82rem' }}>
+          <Link to="/hazards" className="button button-secondary" style={{ width: 'fit-content' }}>
             Explore NASA HRP evidence →
           </Link>
         </article>

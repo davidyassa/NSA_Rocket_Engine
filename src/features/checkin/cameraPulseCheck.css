@@ -18,7 +18,7 @@
   padding: 0.9rem;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: #faf8f2;
+  background: var(--bg-raised);
 }
 
 .camera-pulse-header {
@@ -40,7 +40,7 @@
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;
   border-radius: 999px;
-  background: #ede8dc;
+  background: var(--bg-raised);
   color: var(--muted);
 }
 
@@ -48,7 +48,7 @@
   margin: 0 0 0.75rem;
   font-size: 0.82rem;
   line-height: 1.45;
-  color: #4a453e;
+  color: var(--text-secondary);
 }
 
 .camera-pulse-consent-points {
@@ -82,7 +82,7 @@
   aspect-ratio: 4 / 3;
   border-radius: calc(var(--radius) - 3px);
   overflow: hidden;
-  background: #1e1e1c;
+  background: var(--bg-base);
   margin: 0.6rem auto 0.75rem;
   display: flex;
   align-items: center;
@@ -116,19 +116,19 @@
 }
 
 .camera-face-reticle.searching .camera-reticle-oval {
-  border: 2px dashed rgba(255, 255, 255, 0.45);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+  border: 2px dashed color-mix(in srgb, var(--border-subtle) 45%, transparent);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.29);
   animation: reticlePulse 2s infinite ease-in-out;
 }
 
 .camera-face-reticle.calibrating .camera-reticle-oval {
-  border: 2px solid #e09f3e;
-  box-shadow: 0 0 10px rgba(224, 159, 62, 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.2);
+  border: 2px solid var(--status-trend);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--status-trend) 40%, transparent), 0 0 0 9999px rgb(0 0 0 / 0.32);
 }
 
 .camera-face-reticle.good .camera-reticle-oval {
-  border: 2px solid #2d6a4f;
-  box-shadow: 0 0 12px rgba(45, 106, 79, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.15);
+  border: 2px solid var(--status-steady);
+  box-shadow: 0 0 12px rgb(0 0 0 / 0.6), 0 0 0 9999px rgb(0 0 0 / 0.24);
 }
 
 @keyframes reticlePulse {
@@ -141,18 +141,18 @@
   position: absolute;
   width: 12px;
   height: 12px;
-  border-color: rgba(255, 255, 255, 0.7);
+  border-color: color-mix(in srgb, var(--border-subtle) 70%, transparent);
   border-style: solid;
   border-width: 0;
   transition: border-color 0.3s ease;
 }
 
 .camera-face-reticle.calibrating .camera-reticle-bracket {
-  border-color: #e09f3e;
+  border-color: var(--status-trend);
 }
 
 .camera-face-reticle.good .camera-reticle-bracket {
-  border-color: #2d6a4f;
+  border-color: var(--status-steady);
 }
 
 .camera-reticle-bracket.top-left {
@@ -188,8 +188,8 @@
   bottom: 8px;
   left: 8px;
   right: 8px;
-  background: rgba(35, 36, 32, 0.82);
-  color: #f7f2e8;
+  background: color-mix(in srgb, var(--bg-base) 82%, transparent);
+  color: var(--text-primary);
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 0.75rem;
@@ -228,17 +228,17 @@
 
 .camera-pulse-sqi-fill {
   height: 100%;
-  background: #3b7d54;
+  background: var(--status-steady);
   border-radius: 3px;
   transition: width 0.3s ease;
 }
 
 .camera-pulse-sqi-fill.weak {
-  background: #b54a32;
+  background: var(--status-change);
 }
 
 .camera-pulse-sqi-fill.optimal {
-  background: #1e7040;
+  background: var(--status-steady);
 }
 
 .camera-pulse-sqi-pct {
@@ -256,18 +256,18 @@
 }
 
 .camera-sqi-badge.weak {
-  color: #a8422f;
-  background: #fde8e5;
+  color: var(--accent);
+  background: var(--bg-raised);
 }
 
 .camera-sqi-badge.good {
-  color: #2d6a4f;
-  background: #e6f4ea;
+  color: var(--status-steady);
+  background: var(--bg-raised);
 }
 
 .camera-sqi-badge.optimal {
-  color: #1b4332;
-  background: #ccead7;
+  color: var(--status-steady);
+  background: var(--bg-raised);
 }
 
 /* Real-time Movement & Environmental Coaching Banner */
@@ -282,18 +282,18 @@
 }
 
 .camera-movement-guide.guide-searching {
-  background: #f4efe6;
-  border: 1px solid #dfd7c5;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
 }
 
 .camera-movement-guide.guide-calibrating {
-  background: #fef7ee;
-  border: 1px solid #fbd38d;
+  background: var(--bg-raised);
+  border: 1px solid color-mix(in srgb, var(--status-change) 40%, transparent);
 }
 
 .camera-movement-guide.guide-good {
-  background: #f0f7f2;
-  border: 1px solid #b7dfca;
+  background: var(--bg-raised);
+  border: 1px solid color-mix(in srgb, var(--status-steady) 40%, transparent);
 }
 
 .camera-movement-guide-badge {
@@ -307,25 +307,25 @@
 }
 
 .guide-searching .camera-movement-guide-badge {
-  background: #5c564c;
-  color: #fff;
+  background: var(--bg-raised);
+  color: var(--text-primary);
 }
 
 .guide-calibrating .camera-movement-guide-badge {
-  background: #d97706;
-  color: #fff;
+  background: var(--status-trend);
+  color: var(--on-accent);
 }
 
 .guide-good .camera-movement-guide-badge {
-  background: #2d6a4f;
-  color: #fff;
+  background: var(--status-steady);
+  color: var(--on-accent);
 }
 
 .camera-movement-guide-text {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.38;
-  color: #2b2926;
+  color: var(--text-primary);
 }
 
 /* Collapsible Quality & Movement Tips Guide */
@@ -333,7 +333,7 @@
   margin-top: 0.65rem;
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) - 3px);
-  background: #ffffff;
+  background: var(--bg-surface);
   padding: 0.45rem 0.65rem;
   font-size: 0.8rem;
 }
@@ -398,15 +398,15 @@
   margin: 0.5rem 0 0.8rem;
   padding: 0.55rem 0.75rem;
   border-radius: 6px;
-  background: #fdf5f2;
-  border: 1px solid #f6cfc5;
+  background: var(--bg-surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .camera-troubleshoot-title {
   margin: 0 0 0.35rem;
   font-size: 0.8rem;
   font-weight: 650;
-  color: #9c3621;
+  color: var(--accent);
 }
 
 .camera-troubleshoot-list {
@@ -414,7 +414,7 @@
   padding-left: 1.1rem;
   font-size: 0.78rem;
   line-height: 1.4;
-  color: #554440;
+  color: var(--text-secondary);
 }
 
 .camera-troubleshoot-list li + li {
@@ -422,7 +422,7 @@
 }
 
 .camera-pulse-weak-alert {
-  color: #a8422f;
+  color: var(--accent);
   font-weight: 550;
   font-size: 0.8rem;
   margin: 0.4rem 0;
@@ -431,7 +431,7 @@
 .camera-pulse-result {
   margin: 0.5rem 0 0.85rem;
   padding: 0.75rem;
-  background: #fff;
+  background: var(--bg-surface);
   border: 1px solid var(--line);
   border-radius: calc(var(--radius) - 3px);
 }
@@ -463,7 +463,7 @@
   letter-spacing: 0.02em;
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  background: #f7ebe3;
+  background: var(--bg-raised);
   color: var(--accent);
   margin-bottom: 0.35rem;
 }
@@ -479,7 +479,7 @@
   margin: 0 0 0.45rem;
   font-size: 0.78rem;
   line-height: 1.4;
-  color: #4a453e;
+  color: var(--text-secondary);
 }
 
 .camera-pulse-method {
@@ -491,7 +491,7 @@
 .camera-pulse-window-progress {
   margin: 0.35rem 0 0.25rem;
   font-size: 0.78rem;
-  color: #4a453e;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -515,7 +515,7 @@
 }
 
 .camera-pulse-error-msg {
-  color: #a8422f;
+  color: var(--accent);
   font-size: 0.82rem;
   margin: 0.4rem 0 0.75rem;
   line-height: 1.4;

@@ -1,177 +1,181 @@
 import { useState } from 'react';
+import {
+  Activity, ArrowRight, Brain, Equal, ExternalLink, Globe, Radiation, SatelliteDish, Triangle, Weight, X,
+  type LucideIcon,
+} from 'lucide-react';
 import { NASA_FIVE_HAZARDS, type NasaHazard } from './hazardsData';
 import './hazards.css';
 
-export function NasaHazards() {
-  const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
+const HAZARD_ICONS: Record<string, LucideIcon> = {
+  radiation: Radiation,
+  isolation: Brain,
+  distance: SatelliteDish,
+  gravity: Weight,
+  environment: Globe,
+};
 
-  const selectedHazard = selectedHazardId
-    ? NASA_FIVE_HAZARDS.find(h => h.id === selectedHazardId) ?? null
-    : null;
+/** Status in three channels: icon + label + colour tone. */
+const STATE_META: Record<NasaHazard['sol43Status']['state'], { label: string; Icon: LucideIcon; tone: string }> = {
+  nominal: { label: 'Nominal', Icon: Equal, tone: 'steady' },
+  elevated: { label: 'Elevated', Icon: Triangle, tone: 'change' },
+  active_monitoring: { label: 'Active monitoring', Icon: Activity, tone: 'monitor' },
+};
+
+const INDICATOR_LABELS: Record<string, string> = {
+  msl_rad_curiosity: 'Curiosity RAD dose rate',
+  hourly_median_radiation: 'Hourly median dose',
+  peak_event_radiation: 'Peak event dose',
+  sleep_duration: 'Sleep duration',
+  mood: 'Mood',
+  pvt_reaction_time: 'PVT reaction time',
+  lapses_count: 'PVT lapses',
+  simulated_delay_sec: 'One-way comms delay',
+  autonomous_assessment_tier: 'Triage tier',
+  handoff_package: 'Ground handoff package',
+  bp_systolic: 'Systolic pressure',
+  bp_diastolic: 'Diastolic pressure',
+  muscle_symptoms: 'Muscle symptoms',
+  body_temp: 'Body temperature',
+  headache_symptom: 'Headache',
+  nausea_symptom: 'Nausea',
+  respiratory_symptoms: 'Breathing symptoms',
+};
+
+const PIPELINE = [
+  'Observation',
+  'Signal quality check',
+  'Personal baseline',
+  'Decision rule',
+  'Clinical rationale',
+  'Ground handoff',
+];
+
+function indicatorLabel(id: string) {
+  return INDICATOR_LABELS[id] ?? id.replace(/_/g, ' ');
+}
+
+export function NasaHazards() {
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const focused = focusedId ? NASA_FIVE_HAZARDS.find((h) => h.id === focusedId) ?? null : null;
 
   return (
     <div className="hazards-container">
       <header className="page-intro">
-        <div>
-          <p className="eyebrow">NASA Human Research Program (HRP)</p>
-          <h1>The Five Hazards of Human Spaceflight</h1>
-          <p className="muted">
-            Deep-space exploration to Mars subjects the human organism to five interconnected
-            environmental and operational stressors. Sol Check grounds every clinical indicator,
-            baseline rule, and follow-up recommendation in verified NASA HRP evidence.
-          </p>
-        </div>
+        <p className="eyebrow">NASA Human Research Program (HRP)</p>
+        <h1>The five hazards of human spaceflight</h1>
+        <p>
+          A Mars mission exposes crew to five connected hazards. Each card shows which Sol Check readings
+          relate to it, its Sol 43 status, and the NASA evidence behind it.
+        </p>
       </header>
 
-      {/* Selected Hazard Deep Dive Banner */}
-      {selectedHazard && (
-        <aside
-          className="hazard-card"
-          style={{
-            borderColor: 'var(--accent)',
-            backgroundColor: 'rgba(217, 83, 79, 0.04)',
-            marginBottom: '1rem',
-          }}
-          aria-live="polite"
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {focused && (
+        <aside className="hazard-focus" aria-live="polite" aria-label={`Focused hazard: ${focused.name}`}>
+          <div className="hazard-focus-head">
             <div>
-              <span className="hazard-id-badge">{selectedHazard.hrpRiskId}</span>
-              <h3 style={{ margin: '0.25rem 0' }}>Focus: {selectedHazard.name}</h3>
+              <p className="eyebrow">Focused hazard · {focused.hrpRiskId}</p>
+              <h2>{focused.name.replace(/^\d+\.\s*/, '')}</h2>
+              <p className="hazard-element">NASA HRP element: {focused.hrpElement}</p>
             </div>
-            <button
-              type="button"
-              className="button button-ghost"
-              style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
-              onClick={() => setSelectedHazardId(null)}
-            >
-              Clear Focus ✕
+            <button type="button" className="button button-sm button-ghost" onClick={() => setFocusedId(null)}>
+              <X size={16} aria-hidden="true" /> Clear focus
             </button>
           </div>
-          <p style={{ margin: '0.4rem 0 0', fontSize: '0.9rem' }}>
-            <strong>Immediate Operational Countermeasure:</strong>{' '}
-            {selectedHazard.operationalCountermeasures[0]}
+          <p className="hazard-focus-action">
+            <strong>First countermeasure:</strong> {focused.operationalCountermeasures[0]}
           </p>
         </aside>
       )}
 
-      {/* Five Hazards Cards Grid */}
       <div className="hazards-grid">
-        {NASA_FIVE_HAZARDS.map((hazard: NasaHazard) => {
-          const isSelected = selectedHazardId === hazard.id;
+        {NASA_FIVE_HAZARDS.map((hazard) => {
+          const Icon = HAZARD_ICONS[hazard.id] ?? Globe;
+          const state = STATE_META[hazard.sol43Status.state];
+          const isFocused = focusedId === hazard.id;
+          const headingId = `hazard-${hazard.id}`;
           return (
-            <article
-              key={hazard.id}
-              className={`hazard-card ${isSelected ? 'selected' : ''}`}
-              style={{
-                borderColor: isSelected ? 'var(--accent)' : 'var(--line)',
-                cursor: 'pointer',
-                boxShadow: isSelected ? '0 0 0 2px var(--accent)' : undefined,
-              }}
-              tabIndex={0}
-              role="button"
-              aria-pressed={isSelected}
-              onClick={() => setSelectedHazardId(prev => (prev === hazard.id ? null : hazard.id))}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setSelectedHazardId(prev => (prev === hazard.id ? null : hazard.id));
-                }
-              }}
-            >
-            <div className="hazard-card-header">
-              <div className="hazard-icon-title">
-                <span className="hazard-icon" aria-hidden="true">
-                  {hazard.symbol}
-                </span>
-                <div>
-                  <h2 className="hazard-name">{hazard.name}</h2>
-                  <span className="hazard-id-badge">{hazard.hrpRiskId}</span>
+            <article key={hazard.id} className={`hazard-card${isFocused ? ' is-focused' : ''}`} aria-labelledby={headingId}>
+              <div className="hazard-card-header">
+                <span className="hazard-icon" aria-hidden="true"><Icon size={22} strokeWidth={1.8} /></span>
+                <div className="hazard-title">
+                  <h2 className="hazard-name" id={headingId}>{hazard.name}</h2>
+                  <span className="hazard-id-badge" title="Sol Check internal reference, not an official NASA code">{hazard.hrpRiskId}</span>
                 </div>
+                <span className={`hazard-status-badge status-${state.tone}`}>
+                  <state.Icon size={13} aria-hidden="true" /> {state.label}
+                </span>
               </div>
-              <span className={`hazard-status-badge ${hazard.sol43Status.state}`}>
-                {hazard.sol43Status.state.replace('_', ' ')}
-              </span>
-            </div>
 
-            <p className="hazard-tagline">{hazard.tagline}</p>
+              <p className="hazard-tagline">{hazard.tagline}</p>
 
-            <div className="hazard-sol43-box">
-              <strong>Sol 43 Mission Status</strong>
-              <p>{hazard.sol43Status.summary}</p>
-            </div>
-
-            <div>
-              <span className="hazard-section-title">Sol Check Indicators:</span>
-              <div className="hazard-metrics-chips">
-                {hazard.solCheckMetrics.map(m => (
-                  <span key={m} className="hazard-metric-chip">
-                    {m.replace(/_/g, ' ')}
-                  </span>
-                ))}
+              <div className="hazard-sol43-box">
+                <strong>Sol 43 status</strong>
+                <p>{hazard.sol43Status.summary}</p>
               </div>
-            </div>
 
-            <div>
-              <span className="hazard-section-title">Clinical Spaceflight Impacts:</span>
-              <ul className="hazard-list">
-                {hazard.clinicalImpacts.map((ci, i) => (
-                  <li key={i}>{ci}</li>
-                ))}
-              </ul>
-            </div>
+              <section>
+                <h3 className="hazard-section-title">Sol Check indicators</h3>
+                <ul className="hazard-metrics-chips">
+                  {hazard.solCheckMetrics.map((m) => <li key={m} className="hazard-metric-chip">{indicatorLabel(m)}</li>)}
+                </ul>
+              </section>
 
-            <div>
-              <span className="hazard-section-title">NASA Countermeasures:</span>
-              <ul className="hazard-list">
-                {hazard.operationalCountermeasures.map((cm, i) => (
-                  <li key={i}>{cm}</li>
-                ))}
-              </ul>
-            </div>
+              <section>
+                <h3 className="hazard-section-title">Spaceflight health impacts</h3>
+                <ul className="hazard-list">
+                  {hazard.clinicalImpacts.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
 
-            <div className="hazard-ref-list">
-              <span style={{ fontWeight: 600 }}>Evidence Sources:</span>
-              <ul style={{ margin: '0.2rem 0 0', paddingLeft: '1rem' }}>
-                {hazard.officialReferences.map((ref, idx) => (
-                  <li key={idx}>
-                    {ref.link ? (
-                      <a href={ref.link} target="_blank" rel="noreferrer">
-                        {ref.title} ↗
-                      </a>
-                    ) : (
-                      <span>{ref.title}</span>
-                    )}{' '}
-                    <span style={{ opacity: 0.75 }}>({ref.publisher})</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </article>
-        );
-      })}
-    </div>
+              <section>
+                <h3 className="hazard-section-title">Countermeasures</h3>
+                <ul className="hazard-list">
+                  {hazard.operationalCountermeasures.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
 
-      {/* NASA Research-to-Action Integration Summary */}
-      <section className="hazard-card" style={{ marginTop: '0.5rem' }}>
-        <h3>Evidence-to-Action Architecture</h3>
-        <p style={{ fontSize: '0.88rem', lineHeight: 1.5, color: '#4a453e' }}>
-          Rather than functioning as a generic dashboard with arbitrary danger scores, Sol Check
-          implements a deterministic pipeline:
-        </p>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0.5rem 0' }}>
-          <span className="hazard-metric-chip">1. Direct / Sensor Observation</span>
-          <span>→</span>
-          <span className="hazard-metric-chip">2. Signal Quality Validation</span>
-          <span>→</span>
-          <span className="hazard-metric-chip">3. Personal Baseline Comparison</span>
-          <span>→</span>
-          <span className="hazard-metric-chip">4. NASA HRP Decision Rule</span>
-          <span>→</span>
-          <span className="hazard-metric-chip">5. Transparent Clinical Rationale</span>
-          <span>→</span>
-          <span className="hazard-metric-chip">6. Handoff Package to Earth Flight Surgeon</span>
-        </div>
+              <section className="hazard-ref-list">
+                <h3 className="hazard-section-title">Evidence sources</h3>
+                <ul className="hazard-list">
+                  {hazard.officialReferences.map((ref) => (
+                    <li key={ref.title}>
+                      {ref.link ? (
+                        <a href={ref.link} target="_blank" rel="noreferrer">
+                          {ref.title}<ExternalLink size={13} aria-hidden="true" className="external-icon" />
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      ) : <span>{ref.title}</span>}
+                      <span className="hazard-ref-publisher"> · {ref.publisher}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <button
+                type="button"
+                className={`button button-sm button-secondary tab-toggle hazard-focus-toggle${isFocused ? ' is-selected' : ''}`}
+                aria-pressed={isFocused}
+                onClick={() => setFocusedId(isFocused ? null : hazard.id)}
+              >
+                {isFocused ? 'Focused' : 'Focus this hazard'}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+
+      <section className="hazard-card hazard-pipeline" aria-labelledby="pipeline-heading">
+        <h2 id="pipeline-heading" className="hazard-name">Evidence-to-action pipeline</h2>
+        <p className="hazard-tagline">Every finding follows the same deterministic, inspectable steps. No opaque risk scores.</p>
+        <ol className="hazard-pipeline-steps">
+          {PIPELINE.map((step, index) => (
+            <li key={step}>
+              <span className="hazard-pipeline-num">{index + 1}</span>
+              <span>{step}</span>
+              {index < PIPELINE.length - 1 && <ArrowRight size={14} aria-hidden="true" className="hazard-pipeline-arrow" />}
+            </li>
+          ))}
+        </ol>
       </section>
     </div>
   );

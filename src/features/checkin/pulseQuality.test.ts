@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessPulseSamples,
+  assessPulseSession,
   cameraCaptureFromGate,
   estimateFromGate,
   isDisplayableSample,
@@ -8,6 +9,8 @@ import {
   median,
   MIN_ACCEPT_SAMPLES,
   PULSE_ALGORITHM,
+  PULSE_MAX_SAMPLE_AGE_MS,
+  PULSE_MIN_SESSION_MS,
   PULSE_SQI_ACCEPT_FLOOR,
   PULSE_WINDOW_SIZE,
   type PulseSample,
@@ -99,6 +102,66 @@ describe('pulse quality gate', () => {
     expect(isPhysiologicHeartRate(39.9)).toBe(false);
     expect(isPhysiologicHeartRate(200.1)).toBe(false);
     expect(isPhysiologicHeartRate(Number.NaN)).toBe(false);
+  });
+});
+
+describe('pulse session freshness', () => {
+  const sessionStartedAt = 1_700_000_000_000;
+  const readySamples = Array.from({ length: MIN_ACCEPT_SAMPLES }, (_, index) =>
+    sample(72, 0.85, sessionStartedAt + PULSE_MIN_SESSION_MS + index * 1_000));
+  const latestTimestamp = readySamples[readySamples.length - 1].timestamp;
+
+  it('rejects out-of-range SQI values', () => {
+    expect(assessPulseSamples(stable(72, 1.2)).ready).toBe(false);
+    expect(isDisplayableSample(sample(72, 1.2))).toBe(false);
+  });
+
+  it('accepts a fresh face-present session after the full warm-up', () => {
+    const gate = assessPulseSession(readySamples, {
+      sessionStartedAt,
+      facePresent: true,
+      now: latestTimestamp,
+    });
+    expect(gate).toMatchObject({ ready: true, medianHr: 72, reason: 'ready' });
+  });
+
+  it('withholds acceptance during warm-up or without a face', () => {
+    expect(assessPulseSession(readySamples, {
+      sessionStartedAt,
+      facePresent: true,
+      now: sessionStartedAt + PULSE_MIN_SESSION_MS - 1,
+    })).toMatchObject({ ready: false, medianHr: null, reason: 'warming_up' });
+    expect(assessPulseSession(readySamples, {
+      sessionStartedAt,
+      facePresent: false,
+      now: latestTimestamp,
+    })).toMatchObject({ ready: false, medianHr: null, reason: 'face_lost' });
+  });
+
+  it('rejects stale samples and gaps instead of accepting an old ready window', () => {
+    expect(assessPulseSession(readySamples, {
+      sessionStartedAt,
+      facePresent: true,
+      now: latestTimestamp + PULSE_MAX_SAMPLE_AGE_MS + 1,
+    })).toMatchObject({ ready: false, medianHr: null, reason: 'stale' });
+
+    const withGap = readySamples.map((entry, index) => index === readySamples.length - 1
+      ? { ...entry, timestamp: entry.timestamp + 5_000 }
+      : entry);
+    expect(assessPulseSession(withGap, {
+      sessionStartedAt,
+      facePresent: true,
+      now: withGap[withGap.length - 1].timestamp,
+    })).toMatchObject({ ready: false, medianHr: null, reason: 'stale' });
+  });
+
+  it('does not hide a new implausible sample behind older good samples', () => {
+    const samples = [...readySamples, sample(300, 0.95, latestTimestamp + 1_000)];
+    expect(assessPulseSession(samples, {
+      sessionStartedAt,
+      facePresent: true,
+      now: latestTimestamp + 1_000,
+    })).toMatchObject({ ready: false, medianHr: null });
   });
 });
 

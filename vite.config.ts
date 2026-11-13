@@ -27,6 +27,9 @@ function serveEsmMimePlugin(): Plugin {
   };
 }
 
+/** `SOLCHECK_TARGET=native` builds the bundle for the Capacitor iOS/Android shells (no service worker). */
+const isNativeBuild = process.env.SOLCHECK_TARGET === 'native';
+
 export default defineConfig({
   base: './',
   plugins: [
@@ -34,6 +37,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // Native shells ship every asset inside the app bundle; a service worker would only add stale-cache risk.
+      disable: isNativeBuild,
       injectRegister: 'script',
       registerType: 'autoUpdate',
       includeManifestIcons: false,
@@ -41,8 +46,8 @@ export default defineConfig({
         name: 'Sol Check',
         short_name: 'Sol Check',
         description: 'Crew health check-in and personal baseline review for a simulated Mars mission.',
-        theme_color: '#f5f3ed',
-        background_color: '#f5f3ed',
+        theme_color: '#070B14',
+        background_color: '#070B14',
         display: 'standalone',
         start_url: './',
         scope: './',
@@ -57,7 +62,7 @@ export default defineConfig({
         importScripts: ['sw-esm-mime.js'],
         maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         globPatterns: [
-          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz}',
+          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb}',
           '**/+esm',
         ],
       },

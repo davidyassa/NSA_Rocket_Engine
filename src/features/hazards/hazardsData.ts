@@ -10,8 +10,13 @@
 export interface NasaHazard {
   id: string;
   name: string;
+  /**
+   * Sol Check internal reference (SC-…). NASA does not publish risk codes in
+   * this form; the official link is the HRP element and hazard name below.
+   */
   hrpRiskId: string;
-  symbol: string;
+  /** Current NASA HRP research element that owns this area. */
+  hrpElement: string;
   tagline: string;
   spaceflightMechanism: string;
   solCheckMetrics: string[];
@@ -32,8 +37,8 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
   {
     id: 'radiation',
     name: '1. Space Radiation',
-    hrpRiskId: 'HRP-RAD-01',
-    symbol: '☢️',
+    hrpRiskId: 'SC-RAD-01',
+    hrpElement: 'Space Radiation (SR)',
     tagline: 'Galactic Cosmic Rays (GCR) & Solar Particle Events (SPE)',
     spaceflightMechanism:
       'Mars lacks a global geomagnetic field and dense atmosphere. Energetic protons and heavy HZE ions penetrate spacecraft walls, causing continuous cellular ionizations.',
@@ -68,8 +73,8 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
   {
     id: 'isolation',
     name: '2. Isolation and Confinement',
-    hrpRiskId: 'HRP-BHP-01',
-    symbol: '🧠',
+    hrpRiskId: 'SC-BHP-01',
+    hrpElement: 'Human Factors and Behavioral Performance (HFBP)',
     tagline: 'Circadian Disruption, Sleep Restriction & Sensory Monotony',
     spaceflightMechanism:
       'Living in a small, closed habitat with a 6-person crew for 900+ sols causes circadian drift (Mars sol = 24h 39m), sensory monotony, and cumulative sleep debt.',
@@ -103,8 +108,8 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
   {
     id: 'distance',
     name: '3. Distance from Earth',
-    hrpRiskId: 'HRP-EXMC-01',
-    symbol: '📡',
+    hrpRiskId: 'SC-EXMC-01',
+    hrpElement: 'Exploration Medical Capability (ExMC)',
     tagline: '20-Minute Light-Speed Delay & Autonomous Medical Care',
     spaceflightMechanism:
       'Mars orbital distance creates a one-way communication latency of 4 to 22 minutes (Sol 43 simulation: 20 min one-way, 40 min round-trip). Immediate telemedicine is physically impossible.',
@@ -134,8 +139,8 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
   {
     id: 'gravity',
     name: '4. Altered Gravity Fields',
-    hrpRiskId: 'HRP-HHC-01',
-    symbol: '⚖️',
+    hrpRiskId: 'SC-HHC-01',
+    hrpElement: 'Human Health Countermeasures (HHC)',
     tagline: 'Microgravity Transit (0g) & Martian Surface Gravity (0.38g)',
     spaceflightMechanism:
       'Transition between 0g (transit), 0.38g (Mars), and 1g (Earth) alters hydrostatic pressure gradients, vestibular perception, and mechanical bone/muscle loading.',
@@ -165,8 +170,8 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
   {
     id: 'environment',
     name: '5. Hostile / Closed Environments',
-    hrpRiskId: 'HRP-SHFH-01',
-    symbol: '🏕️',
+    hrpRiskId: 'SC-ENV-01',
+    hrpElement: 'Human Factors and Behavioral Performance (HFBP), habitability',
     tagline: 'Cabin Atmosphere, Trace Gases & Toxic Martian Perchlorates',
     spaceflightMechanism:
       'A completely closed life support system concentrates carbon dioxide, particulate matter, off-gassed VOCs, and fine reactive Martian regolith dust tracked into the airlock.',

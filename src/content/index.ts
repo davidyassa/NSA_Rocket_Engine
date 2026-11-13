@@ -88,32 +88,94 @@ export const SOURCES: Record<string, SourceRecord> = {
   },
 };
 
-const bloodPressureGuide = {
+export interface MeasurementGuide {
+  /** One-line summary kept for exports and compact views. */
+  text: string;
+  /** Three concise procedural steps. */
+  steps: [string, string, string];
+  /** Why the indicator matters in microgravity / on a deep-space mission. */
+  whyInSpace: string;
+  /** General adult reference range (not a spaceflight standard, not personal advice). */
+  typicalRange: string;
+  /** Symptoms that commonly go with readings outside the range. */
+  watchFor: string;
+  sourceId: string;
+}
+
+const bloodPressureGuide: MeasurementGuide = {
   text: 'Sit quietly before measuring. Use an upper-arm cuff on bare skin with your arm supported at heart level. Enter both numbers from the same reading.',
+  steps: [
+    'Sit still for 5 minutes with your back supported, feet anchored and the cuff arm resting at heart level.',
+    'Wrap the upper-arm cuff on bare skin and stay silent while it inflates and deflates.',
+    'Enter the top number as systolic and the bottom number as diastolic, both from the same reading.',
+  ],
+  whyInSpace: 'Without gravity, body fluids shift toward the head and the cardiovascular system adapts to a lighter workload. Tracking pressure against your own baseline shows how that adaptation is going and supports readiness for standing and walking in partial gravity.',
+  typicalRange: 'Adults on Earth: under 120/80 mmHg is classed as normal; 130/80 mmHg or higher is classed as high.',
+  watchFor: 'Light-headedness when moving upright, headache, blurred vision, or a reading far from your usual values.',
   sourceId: 'aha-pressure',
 };
 
-export const MEASUREMENT_GUIDES: Record<MetricId, { text: string; sourceId: string }> = {
+export const MEASUREMENT_GUIDES: Record<MetricId, MeasurementGuide> = {
   heart_rate: {
     text: 'Measure after resting. For a manual reading, feel your wrist pulse with two fingers and count the beats for one minute.',
+    steps: [
+      'Rest quietly for 5 minutes before measuring, ideally at the same time each sol.',
+      'Place two fingers on the thumb side of your inner wrist until you feel the pulse.',
+      'Count the beats for a full 60 seconds (or use the optional camera estimate) and enter the number.',
+    ],
+    whyInSpace: 'Fluid shifts and lower physical workload in reduced gravity change how the heart works. A resting rate that drifts from your personal baseline can reflect deconditioning, poor sleep, stress or illness.',
+    typicalRange: 'Adults at rest: about 60 to 100 beats per minute. Trained individuals can be lower.',
+    watchFor: 'A racing, pounding or irregular pulse, dizziness, chest discomfort or shortness of breath.',
     sourceId: 'medline-pulse',
   },
   bp_systolic: bloodPressureGuide,
   bp_diastolic: bloodPressureGuide,
   body_temp: {
     text: 'Follow the thermometer instructions. Use the same measurement site each time when possible and enter the reading in °C.',
+    steps: [
+      'Wait 15 minutes after eating, drinking or exercise.',
+      'Measure at the same site each time (for example, under the tongue) following the thermometer instructions.',
+      'Read the display once it signals completion and enter the value in °C.',
+    ],
+    whyInSpace: 'In a closed habitat, heat leaves the body less easily, and exercise, suits and infection all change core temperature. A rise from your own baseline is an early signal worth checking.',
+    typicalRange: 'Adults: about 36.1 to 37.2 °C. A reading of 38.0 °C or higher is usually treated as fever.',
+    watchFor: 'Chills, sweating, unusual tiredness, aching muscles or feeling hot or cold for no reason.',
     sourceId: 'medline-temperature',
   },
   blood_glucose: {
     text: 'Follow the glucose meter and test strip instructions. Check that the display is in mg/dL before entering the result.',
+    steps: [
+      'Wash and dry your hands, then insert a new test strip into the meter.',
+      'Prick the side of a fingertip and touch the drop of blood to the strip.',
+      'Check that the display reads mg/dL, note whether you have eaten, and enter the value.',
+    ],
+    whyInSpace: 'Less physical loading, changed diet and disrupted sleep can affect how the body handles sugar. Regular readings show whether energy intake and activity are in balance.',
+    typicalRange: 'Adults, fasting: about 70 to 99 mg/dL. Below 70 mg/dL is low.',
+    watchFor: 'Shakiness, sweating, confusion or hunger (low); strong thirst, frequent urination or blurred vision (high).',
     sourceId: 'fda-glucose',
   },
   sleep_duration: {
     text: 'Estimate the hours actually spent asleep during your last sleep period. Leave time spent awake out of the total.',
+    steps: [
+      'Note when you fell asleep and when you finally woke at the end of your last sleep period.',
+      'Subtract any time you lay awake or got up during the night.',
+      'Enter the remaining hours of actual sleep, rounded to the nearest quarter hour.',
+    ],
+    whyInSpace: 'Missing daylight cues, noise, workload and schedule shifts (a Mars sol is about 24 hours 40 minutes) disrupt sleep. Short sleep slows reaction time and raises error risk on demanding tasks.',
+    typicalRange: 'Adults: 7 hours or more per night is recommended.',
+    watchFor: 'Daytime sleepiness, slower reactions, irritability, headaches or trouble concentrating.',
     sourceId: 'nih-sleep',
   },
   mood: {
     text: 'Choose the number closest to how you feel right now. Use 1 for very low and 5 for very positive.',
+    steps: [
+      'Pause for a moment and notice how you feel overall right now.',
+      'Pick 1 for very low, 3 for neutral and 5 for very positive.',
+      'Answer honestly; the value is compared only with your own recent sols.',
+    ],
+    whyInSpace: 'Isolation, confinement and distance from Earth are recognized behavioral-health hazards. Several low sols in a row are easier to notice and act on when tracked daily.',
+    typicalRange: 'No clinical range for this demo scale; what matters is change from your own baseline.',
+    watchFor: 'Several low sols in a row, withdrawing from crewmates, irritability, or loss of interest in usual tasks.',
     sourceId: 'demo-method',
   },
 };

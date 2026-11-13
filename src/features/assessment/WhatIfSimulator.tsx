@@ -45,10 +45,10 @@ export function WhatIfSimulator({ currentRecord, records }: WhatIfSimulatorProps
   const projectedAssessment = evaluateCheckin(hypotheticalCheckin, records);
 
   return (
-    <div className="panel assessment-action what-if-panel" style={{ borderTop: '3px solid #2a9d8f' }}>
+    <div className="panel assessment-action what-if-panel" style={{ borderTop: '3px solid var(--accent)' }}>
       <p className="eyebrow">D4 · Deterministic Scenario Comparison</p>
       <h3>What-If Projection (Sol {nextSol})</h3>
-      <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: '#4a453e', margin: '0.3rem 0 0.6rem' }}>
+      <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem' }}>
         Explore how hypothetical future observations on Sol {nextSol} alter deterministic rule evaluation.
         Clearly exploratory — not a clinical forecast.
       </p>
@@ -87,21 +87,21 @@ export function WhatIfSimulator({ currentRecord, records }: WhatIfSimulatorProps
         </div>
       </div>
 
-      <div style={{ background: '#f8f9fa', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.82rem', marginTop: '0.5rem' }}>
+      <div style={{ background: 'var(--bg-raised)', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.82rem', marginTop: '0.5rem' }}>
         <p style={{ margin: 0 }}>
           <strong>Projected Route:</strong>{' '}
           <span
             className="badge"
             style={{
-              background: projectedAssessment.recommendedTier === 'crew_medical_officer' ? '#fdf2e9' : '#eafaf1',
-              color: projectedAssessment.recommendedTier === 'crew_medical_officer' ? '#d35400' : '#27ae60',
+              background: projectedAssessment.recommendedTier === 'crew_medical_officer' ? 'var(--bg-raised)' : 'var(--bg-raised)',
+              color: projectedAssessment.recommendedTier === 'crew_medical_officer' ? 'var(--status-trend)' : 'var(--status-steady)',
               fontWeight: 600,
             }}
           >
             {projectedAssessment.recommendedTier === 'crew_medical_officer' ? 'Crew Medical Officer' : 'Self-care'}
           </span>
         </p>
-        <p style={{ margin: '0.25rem 0 0', color: '#555', fontSize: '0.78rem' }}>
+        <p style={{ margin: '0.25rem 0 0', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
           {projectedAssessment.recommendedTier === 'crew_medical_officer'
             ? 'Sustained lower trend rule would remain active across the 5-sol rolling lookback window.'
             : 'Sustained lower trend rule clears. Indicator returns within personal baseline bounds.'}

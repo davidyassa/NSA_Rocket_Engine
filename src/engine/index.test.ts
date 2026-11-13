@@ -12,7 +12,7 @@ import { evaluateCheckin, metricBaseline, RULES, validateCheckinMeasurements } f
 function checkin(
   sol: number,
   values: Partial<Record<MetricId, number>>,
-  { astronautId = 'crew-1', revision = 0, fatigue = false } = {},
+  { astronautId = 'crew-1', revision = 0, fatigue = false, chestDiscomfort = false } = {},
 ): DailyCheckin {
   const submittedAtUtc = new Date(Date.UTC(2039, 0, sol, 10, revision)).toISOString();
   const id = `${astronautId}:${sol}:${revision}`;
@@ -33,7 +33,10 @@ function checkin(
         provenance: 'synthetic_demo',
       }];
     }),
-    symptoms: [{ id: 'fatigue', label: 'Fatigue', present: fatigue }],
+    symptoms: [
+      { id: 'fatigue', label: 'Fatigue', present: fatigue },
+      { id: 'chest_discomfort', label: 'Chest discomfort', present: chestDiscomfort },
+    ],
     note: '',
   };
 }
@@ -175,6 +178,38 @@ describe('explainable assessment', () => {
       summary: 'Fatigue was reported on 3 of the last 5 sols.',
     }));
     expect(assessment.recommendedTier).toBe('self_care');
+  });
+
+  it('escalates concerning symptoms even when another reading needs correction', () => {
+    const current = checkin(43, {
+      heart_rate: 68,
+      bp_systolic: 76,
+      bp_diastolic: 118,
+    }, { chestDiscomfort: true });
+    const assessment = evaluateCheckin(current, []);
+
+    expect(assessment.overallState).toBe('escalation_recommended');
+    expect(assessment.recommendedTier).toBe('crew_medical_officer');
+    expect(assessment.dataQualityWarnings).toHaveLength(1);
+    expect(assessment.findings[0]).toMatchObject({
+      ruleId: 'urgent-symptoms',
+      reviewStatus: 'needs_clinical_review',
+    });
+    expect(assessment.actionCardIds).toContain('crew-review');
+  });
+
+  it('excludes rejected or superseded readings from current assessments and baselines', () => {
+    const current = checkin(43, { heart_rate: 74 });
+    current.measurements[0].status = 'rejected_low_quality';
+    current.measurements[0].signalQuality = 0.2;
+    const history = [60, 62, 70, 78, 80].map((value, index) => checkin(index + 1, { heart_rate: value }));
+    history[0].measurements[0].status = 'corrected';
+
+    const assessment = evaluateCheckin(current, history);
+    expect(assessment.overallState).toBe('remeasurement_recommended');
+    expect(assessment.dataQualityWarnings[0]).toContain('signal quality was insufficient');
+    expect(assessment.domainStatuses.cardiovascular).toBe('check_entry');
+    expect(metricBaseline('heart_rate', current, history)).toBeNull();
   });
 
   it('publishes a valid reviewable rule definition for each rule', () => {

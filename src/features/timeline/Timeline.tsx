@@ -7,12 +7,13 @@ import {
 } from '../../data/nasa';
 import { usableMeasurement } from '../../engine';
 import { radlabEventSol, replaySolAt } from '../../sim';
+import { ORIGIN_META, TOKENS } from '../../ui/tokens';
 import { TimelinePlot } from './TimelinePlot';
 import './timeline.css';
 
-const sleepColor = '#a8422f';
-const moodColor = '#66528c';
-const archiveColor = '#22646c';
+const sleepColor = TOKENS.accent;
+const moodColor = TOKENS.textSecondary;
+const archiveColor = TOKENS.nasaArchive;
 const numberFormat = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 const archiveDate = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
@@ -29,8 +30,7 @@ function utcLabel(timestamp: string) {
 }
 
 function Origin({ origin }: { origin: Provenance }) {
-  const tone = origin === 'nasa_archive' ? 'timeline-badge-archive' : origin === 'synthetic_demo' ? 'badge-synthetic' : '';
-  return <span className={`badge ${tone}`}>{provenanceNames[origin]}</span>;
+  return <span className={ORIGIN_META[origin].className}>{provenanceNames[origin]}</span>;
 }
 
 function ProvenanceDetails({ label, origins, children }: {
@@ -390,7 +390,7 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
             <details className="timeline-hourly">
               <summary>Hourly archive readings for Sol {selectedSol}</summary>
               <div className="timeline-table-wrap" tabIndex={0} role="region" aria-label="Hourly NASA archive readings">
-                <table>
+                <table className="data-table">
                   <thead><tr><th scope="col">Archive hour (UTC)</th><th scope="col">Absorbed dose rate ({RADLAB_UNIT})</th><th scope="col">Original readings (UTC)</th></tr></thead>
                   <tbody>
                     {inspectedHours.map(({ hour }) => (

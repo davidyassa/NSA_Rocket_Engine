@@ -95,7 +95,7 @@ const ruleDefinitions = {
       'Normal or missing measurements do not cancel this recommendation.',
     ],
     contextRequirements: ['A current symptom report.'],
-    priority: 95,
+    priority: 110,
     reason: 'A conservative prototype safety override keeps potentially concerning symptoms visible for onboard medical review; it does not identify a disease or replace the mission medical procedure.',
     sourceRefs: ['demo-method', 'nasa-monitoring', 'nasa-eimo'],
     reviewStatus: 'needs_clinical_review',

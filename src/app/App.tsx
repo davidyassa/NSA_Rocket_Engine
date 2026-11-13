@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, LayoutGrid, Orbit, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, X } from 'lucide-react';
+import { Activity, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Orbit, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { CheckinEntry } from '../contracts';
 import { RADLAB_MANIFEST } from '../data/nasa';
@@ -10,9 +10,11 @@ import { CognitiveLab } from '../features/cognitive/CognitiveLab';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { NasaHazards } from '../features/hazards/NasaHazards';
 import { Timeline } from '../features/timeline/Timeline';
+import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
 import { radlabEventSol } from '../sim';
 import { DemoData } from './DemoData';
+import { confirmTap } from './native';
 import { entryFromCheckin, useMissionStore } from './store';
 
 const Trends = lazy(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
@@ -23,10 +25,14 @@ const navigation = [
   { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
   { to: '/hazards', label: 'NASA 5 hazards', Icon: ShieldAlert },
   { to: '/assessment', label: 'Assessment', Icon: Activity },
+  { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
   { to: '/trends', label: 'Trends', Icon: ChartNoAxesCombined },
   { to: '/timeline', label: 'Timeline', Icon: RouteIcon },
   { to: '/demo', label: 'Demo and data', Icon: Database },
 ];
+
+/** Phone bottom bar: Dashboard · Assessment · Check-in (centre) · Timeline · More (CMO, trends, cognitive, hazards, demo). */
+const bottomNavigation = ['/', '/assessment', '/check-in', '/timeline'] as const;
 
 export function App() {
   const { pathname } = useLocation();
@@ -38,6 +44,7 @@ export function App() {
   const resetDemo = useMissionStore((state) => state.resetDemo);
   const [resetError, setResetError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
 
@@ -66,16 +73,24 @@ export function App() {
     document.title = `Sol Check · ${section}`;
     window.scrollTo(0, 0);
     if (pathname !== '/') main.current?.focus({ preventScroll: true });
+    setMoreOpen(false);
   }, [pathname, section]);
 
   function submit(entry: CheckinEntry) {
     saveCheckin(entry);
+    void confirmTap();
     navigate('/assessment');
   }
 
   function switchScenario(scenarioId: ScenarioId) {
     loadScenario(scenarioId);
     navigate('/');
+  }
+
+  function openReset() {
+    setMoreOpen(false);
+    setResetError('');
+    resetDialog.current?.showModal();
   }
 
   function confirmReset() {
@@ -111,11 +126,8 @@ export function App() {
         </div>
 
         <div className="sidebar-footer">
-          <button type="button" className="reset-link" onClick={() => {
-            setResetError('');
-            resetDialog.current?.showModal();
-          }}>
-            <RotateCcw size={16} aria-hidden="true" /> Reset demo
+          <button type="button" className="reset-link" onClick={openReset}>
+            <RotateCcw size={16} aria-hidden="true" /> <span>Reset demo</span>
           </button>
           <div className="crew-profile">
             <span className="crew-avatar" aria-hidden="true">{initials}</span>
@@ -154,6 +166,7 @@ export function App() {
             <Route path="/cognitive" element={<CognitiveLab currentSol={startSol} />} />
             <Route path="/hazards" element={<NasaHazards />} />
             <Route path="/assessment" element={<Assessment key={`${mission.scenarioId}:${revision}`} assessment={assessment} records={records} mission={scenario.missionContext} />} />
+            <Route path="/cmo" element={<CrewMedicalOfficer scenario={scenario} latest={latest} assessment={assessment} records={records} />} />
             <Route path="/trends" element={
               <Suspense fallback={<p role="status">Loading trends…</p>}>
                 <Trends key={mission.scenarioId} records={records} />
@@ -168,6 +181,34 @@ export function App() {
             Research-informed prototype · Not a diagnosis
           </footer>
         </main>
+      </div>
+
+      <nav className="bottom-nav" aria-label="Main navigation (compact)">
+        {bottomNavigation.map((to) => {
+          const item = navigation.find((entry) => entry.to === to)!;
+          const isCheckin = to === '/check-in';
+          return (
+            <NavLink end={to === '/'} key={to} to={to} className={isCheckin ? 'bottom-nav-checkin' : undefined}>
+              <item.Icon size={isCheckin ? 24 : 20} strokeWidth={1.75} aria-hidden="true" />
+              <span>{isCheckin ? 'Check-in' : item.label}</span>
+            </NavLink>
+          );
+        })}
+        <button type="button" aria-expanded={moreOpen} aria-controls="more-sheet" onClick={() => setMoreOpen((open) => !open)}>
+          <Ellipsis size={20} aria-hidden="true" />
+          <span>More</span>
+        </button>
+      </nav>
+      <div id="more-sheet" className="more-sheet" data-open={moreOpen} hidden={!moreOpen}>
+        {navigation.filter(({ to }) => !(bottomNavigation as readonly string[]).includes(to)).map(({ to, label, Icon }) => (
+          <NavLink key={to} to={to}>
+            <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+        <button type="button" onClick={openReset}>
+          <RotateCcw size={18} aria-hidden="true" /> <span>Reset demo</span>
+        </button>
       </div>
 
       <dialog className="reset-dialog" ref={resetDialog} aria-labelledby="reset-title">

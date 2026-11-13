@@ -28,6 +28,51 @@ export function getVendorUrls() {
   };
 }
 
+export function clearVitalCameraInferenceState(): Promise<boolean> {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(true);
+
+  return new Promise(resolve => {
+    let settled = false;
+    let request: IDBOpenDBRequest;
+    const finish = (cleared: boolean, db?: IDBDatabase) => {
+      if (settled) return;
+      settled = true;
+      db?.close();
+      resolve(cleared);
+    };
+
+    try {
+      request = indexedDB.open('VitalCameraSDK', 1);
+    } catch {
+      finish(false);
+      return;
+    }
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('states')) db.createObjectStore('states');
+    };
+    request.onerror = () => finish(false);
+    request.onblocked = () => finish(false);
+    request.onsuccess = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('states')) {
+        finish(true, db);
+        return;
+      }
+      try {
+        const transaction = db.transaction('states', 'readwrite');
+        transaction.objectStore('states').delete('inferenceState');
+        transaction.oncomplete = () => finish(true, db);
+        transaction.onerror = () => finish(false, db);
+        transaction.onabort = () => finish(false, db);
+      } catch {
+        finish(false, db);
+      }
+    };
+  });
+}
+
 export class VitalCameraService {
   private adapter: BrowserAdapter | null = null;
   private stream: MediaStream | null = null;
@@ -111,6 +156,18 @@ export class VitalCameraService {
     }
 
     // 3. Initialize BrowserAdapter with feature switches and runtimeBaseUrls
+    const stateCleared = await clearVitalCameraInferenceState();
+    if (!stateCleared) {
+      this.releaseStream();
+      const error = new Error('Saved camera inference state could not be cleared. Clear this site’s stored data or enter your heart rate manually.');
+      callbacks.onError(error);
+      throw error;
+    }
+    if (this.isDestroyed) {
+      this.releaseStream();
+      return;
+    }
+
     try {
       this.adapter = new BrowserAdapter({
         videoElement: videoEl,
@@ -172,7 +229,7 @@ export class VitalCameraService {
 
         this.adapter.vitalcamera.on('face', (face: FaceData | null) => {
           if (!this.isDestroyed) {
-            callbacks.onFaceDetected(Boolean(face && face.box));
+            callbacks.onFaceDetected(Boolean(face?.detected && face.box));
           }
         });
 
@@ -221,5 +278,7 @@ export class VitalCameraService {
       }
       this.adapter = null;
     }
+
+    await clearVitalCameraInferenceState();
   }
 }

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Armchair, Camera, Check, Hand, Lightbulb, ScanFace, Settings2, Sun } from 'lucide-react';
 import { VitalCameraService } from './vitalCameraService';
 import {
-  assessPulseSamples,
+  assessPulseSession,
   estimateFromGate,
   isDisplayableSample,
   MIN_ACCEPT_SAMPLES,
   PULSE_ALGORITHM,
+  PULSE_MIN_SESSION_MS,
   PULSE_SQI_ACCEPT_FLOOR,
   PULSE_SQI_DISPLAY_FLOOR,
   PULSE_WINDOW_SIZE,
@@ -41,36 +43,76 @@ function QualityTipsGuide({ defaultOpen = false }: { defaultOpen?: boolean }) {
   return (
     <details className="camera-quality-guide" open={defaultOpen}>
       <summary aria-label="How to get best sample quality">
-        <span aria-hidden="true">💡</span> Tips for best sample quality
+        <Lightbulb size={16} aria-hidden="true" className="inline-icon" /> Tips for best sample quality
       </summary>
       <div className="camera-quality-tips">
         <div className="camera-tip-card">
-          <span className="camera-tip-icon" aria-hidden="true">🛑</span>
+          <span className="camera-tip-icon" aria-hidden="true"><Hand size={18} /></span>
           <div>
             <strong>Hold completely still:</strong>
             <p>Minute skin color flushes are tracked at 30 fps. Even small head turns or nodding disrupt the signal.</p>
           </div>
         </div>
         <div className="camera-tip-card">
-          <span className="camera-tip-icon" aria-hidden="true">☀️</span>
+          <span className="camera-tip-icon" aria-hidden="true"><Sun size={18} /></span>
           <div>
             <strong>Frontal, even lighting:</strong>
             <p>Face a desk lamp or window directly. Avoid backlight (lamps/windows behind you) or moving shadows.</p>
           </div>
         </div>
         <div className="camera-tip-card">
-          <span className="camera-tip-icon" aria-hidden="true">👤</span>
+          <span className="camera-tip-icon" aria-hidden="true"><ScanFace size={18} /></span>
           <div>
             <strong>Clear forehead &amp; cheeks:</strong>
             <p>Ensure skin is visible. Push back hair bangs and adjust glasses if they reflect bright glare.</p>
           </div>
         </div>
         <div className="camera-tip-card">
-          <span className="camera-tip-icon" aria-hidden="true">🪑</span>
+          <span className="camera-tip-icon" aria-hidden="true"><Armchair size={18} /></span>
           <div>
             <strong>Rest chin &amp; avoid talking:</strong>
             <p>Rest your elbows or chin on a table to prevent body sway. Do not talk, smile, or chew while scanning.</p>
           </div>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function MeasurementQualityPanel({
+  sampleCount,
+  sqi,
+  fps = 30,
+}: {
+  sampleCount: number;
+  sqi: number | null;
+  fps?: number;
+}) {
+  return (
+    <details className="camera-quality-diagnostic" style={{ marginTop: '0.5rem', fontSize: '0.78rem' }}>
+      <summary aria-label="Measurement Quality & Diagnostics" style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--accent)' }}>
+        <Settings2 size={14} aria-hidden="true" className="inline-icon" /> Diagnostics &amp; Quality Index (SQI)
+      </summary>
+      <div style={{ marginTop: '0.4rem', padding: '8px 10px', background: 'var(--bg-raised)', borderRadius: '6px', border: '1px solid var(--border-subtle)', lineHeight: 1.45 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px', marginBottom: '6px' }}>
+          <div><strong>Algorithm:</strong> <span>{PULSE_ALGORITHM}</span></div>
+          <div><strong>Engine:</strong> <span>LiteRT WASM (v0.6.9)</span></div>
+          <div><strong>Sampling rate:</strong> <span>~{fps} fps</span></div>
+          <div><strong>Window buffer:</strong> <span>{sampleCount} / {PULSE_WINDOW_SIZE} frames</span></div>
+        </div>
+        {sqi !== null && (
+          <div style={{ margin: '4px 0 6px', fontSize: '0.75rem' }}>
+            <strong>Instant SQI:</strong> {Math.round(sqi * 100)}% ({sqi >= PULSE_SQI_ACCEPT_FLOOR ? 'Meets gate floor' : 'Below gate floor'})
+          </div>
+        )}
+        <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '6px', fontSize: '0.74rem', color: 'var(--accent)' }}>
+          <strong>Signal Quality Gate Criteria:</strong>
+          <ul style={{ margin: '3px 0 0', paddingLeft: '16px' }}>
+            <li>Minimum stable window: <strong>{MIN_ACCEPT_SAMPLES}</strong> samples</li>
+            <li>Acceptance SQI threshold: <strong>{Math.round(PULSE_SQI_ACCEPT_FLOOR * 100)}%</strong></li>
+            <li>Display cutoff: <strong>{Math.round(PULSE_SQI_DISPLAY_FLOOR * 100)}%</strong> (sub-38% filtered as noise)</li>
+            <li>Physiologic boundary: <strong>40 – 200 bpm</strong></li>
+          </ul>
         </div>
       </div>
     </details>
@@ -93,20 +135,66 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
   const [populatedIntoForm, setPopulatedIntoForm] = useState(false);
   const [scanLog, setScanLog] = useState<ScanLogEntry[]>([]);
   const [scanLogMessage, setScanLogMessage] = useState('');
+  const [now, setNow] = useState(() => Date.now());
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const serviceRef = useRef<VitalCameraService | null>(null);
   const samplesRef = useRef<PulseSample[]>([]);
+  const faceDetectedRef = useRef(false);
+  const sessionStartedAtRef = useRef<number | null>(null);
+  const populatedCaptureRef = useRef<string | null>(null);
 
-  const gate = useMemo(() => assessPulseSamples(samples), [samples]);
+  const gate = useMemo(() => assessPulseSession(samples, {
+    sessionStartedAt: sessionStartedAtRef.current ?? now,
+    facePresent: faceDetected,
+    now,
+  }), [samples, faceDetected, now]);
   const latest = samples.at(-1) ?? null;
   const latestDisplayable = latest ? isDisplayableSample(latest) : false;
+  const sessionStartedAt = sessionStartedAtRef.current;
+  const warmupRemainingSeconds = sessionStartedAt === null
+    ? Math.ceil(PULSE_MIN_SESSION_MS / 1000)
+    : Math.max(0, Math.ceil((PULSE_MIN_SESSION_MS - (now - sessionStartedAt)) / 1000));
+  const guidance = !faceDetected
+    ? {
+      badge: 'Align Face',
+      text: 'Center your face inside the oval guide at arm’s length (50 cm) with frontal light.',
+    }
+    : gate.ready
+      ? {
+        badge: 'Stable Window',
+        text: `Stable window acquired from ${gate.usableSamples} samples. Keep holding this posture until you accept.`,
+      }
+      : gate.reason === 'warming_up'
+        ? {
+          badge: 'Warming Up',
+          text: `Collecting a fresh ${PULSE_MIN_SESSION_MS / 1000}-second session. ${warmupRemainingSeconds}s remaining; early calibration samples cannot be accepted.`,
+        }
+        : gate.reason === 'stale'
+          ? {
+            badge: 'Signal Paused',
+            text: 'The latest signal is stale or interrupted. Keep your face visible while a fresh continuous window is collected.',
+          }
+          : gate.reason === 'implausible'
+            ? {
+              badge: 'Recalibrating',
+              text: 'Current samples are outside the accepted physiologic range and will not be displayed as a pulse estimate.',
+            }
+            : {
+              badge: 'Hold Still',
+              text: 'Rest your chin or elbows on a desk. Keep your head still and avoid talking or chewing.',
+            };
 
-  // Clean teardown on unmount or route leave
+  useEffect(() => {
+    if (status !== 'measuring') return;
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [status]);
+
   useEffect(() => {
     return () => {
       if (serviceRef.current) {
-        serviceRef.current.stop();
+        void serviceRef.current.stop();
         serviceRef.current = null;
       }
     };
@@ -118,11 +206,15 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
   }
 
   async function handleConsentAndStart() {
+    setNow(Date.now());
     setStatus('requesting');
     setErrorMessage('');
     setFaceDetected(false);
     setAcceptedEstimate(null);
     setPopulatedIntoForm(false);
+    faceDetectedRef.current = false;
+    sessionStartedAtRef.current = null;
+    populatedCaptureRef.current = null;
     resetSamples();
 
     const service = new VitalCameraService();
@@ -140,14 +232,24 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
 
       await service.start(videoEl, {
         onHeartRate: data => {
-          if (serviceRef.current !== service) return;
+          if (serviceRef.current !== service || !faceDetectedRef.current) return;
+          sessionStartedAtRef.current ??= Date.now();
           const sample: PulseSample = { hr: data.hr, sqi: data.sqi, timestamp: data.timestamp };
           samplesRef.current = [...samplesRef.current, sample].slice(-PULSE_WINDOW_SIZE);
           setSamples(samplesRef.current);
         },
         onFaceDetected: detected => {
           if (serviceRef.current !== service) return;
+          const changed = faceDetectedRef.current !== detected;
+          faceDetectedRef.current = detected;
           setFaceDetected(detected);
+          if (!detected) {
+            sessionStartedAtRef.current = null;
+            if (changed || samplesRef.current.length > 0) resetSamples();
+          } else if (changed) {
+            sessionStartedAtRef.current = Date.now();
+            resetSamples();
+          }
         },
         onError: err => {
           if (serviceRef.current !== service) return;
@@ -184,33 +286,44 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
   }
 
   function acceptEstimate(estimate: CameraPulseEstimate) {
-    if (!onAcceptEstimate) return;
+    if (!onAcceptEstimate || populatedCaptureRef.current === estimate.capturedAtUtc) return;
+    populatedCaptureRef.current = estimate.capturedAtUtc;
     onAcceptEstimate(estimate);
     setPopulatedIntoForm(true);
-    setScanLog(previous => [...previous, {
-      id: crypto.randomUUID(),
-      capturedAtUtc: estimate.capturedAtUtc,
-      estimatedBpm: estimate.bpm,
-      medianSqi: Math.round(estimate.sqi * 1000) / 1000,
-      samples: estimate.sampleCount,
-      algorithm: estimate.algorithm,
-      referenceBpm: null,
-      referenceDevice: null,
-    }]);
+    setScanLog(previous => previous.some(scan => scan.capturedAtUtc === estimate.capturedAtUtc)
+      ? previous
+      : [...previous, {
+        id: crypto.randomUUID(),
+        capturedAtUtc: estimate.capturedAtUtc,
+        estimatedBpm: estimate.bpm,
+        medianSqi: Math.round(estimate.sqi * 1000) / 1000,
+        samples: estimate.sampleCount,
+        algorithm: estimate.algorithm,
+        referenceBpm: null,
+        referenceDevice: null,
+      }]);
   }
 
   function resolveCapture() {
-    const at = latest && Number.isFinite(latest.timestamp) ? new Date(latest.timestamp) : new Date();
-    return estimateFromGate(assessPulseSamples(samplesRef.current), at);
+    const sessionStartedAt = sessionStartedAtRef.current;
+    if (sessionStartedAt === null) return null;
+    const now = Date.now();
+    return estimateFromGate(assessPulseSession(samplesRef.current, {
+      sessionStartedAt,
+      facePresent: faceDetectedRef.current,
+      now,
+    }), new Date(now));
   }
 
   async function handleStop(accept = false) {
+    const estimate = resolveCapture();
     if (serviceRef.current) {
       await serviceRef.current.stop();
       serviceRef.current = null;
     }
+    faceDetectedRef.current = false;
+    sessionStartedAtRef.current = null;
 
-    const estimate = resolveCapture();
     if (estimate) {
       setAcceptedEstimate(estimate);
       if (accept) acceptEstimate(estimate);
@@ -230,18 +343,22 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
       await serviceRef.current.stop();
       serviceRef.current = null;
     }
+    faceDetectedRef.current = false;
+    sessionStartedAtRef.current = null;
+    populatedCaptureRef.current = null;
     setStatus('idle');
     resetSamples();
     setFaceDetected(false);
     setAcceptedEstimate(null);
+    setPopulatedIntoForm(false);
   }
 
   function downloadScanLog() {
     const payload = {
       schemaVersion: '1.0.0',
       exportedAtUtc: new Date().toISOString(),
-      purpose: 'Local camera pulse-check scan log for offline validation. Fill referenceBpm from a pulse oximeter or ECG reading taken during the same window, then run npm run validation:report.',
-      privacy: 'No video, images, or facial data are included. Scans are held in memory for this session only.',
+      purpose: 'Local camera pulse-check scan log for external validation. Fill referenceBpm from a pulse oximeter or ECG reading taken during the same window. Sol Check does not calculate an accuracy report.',
+      privacy: 'No video, images, or facial data are included. Scans are held in memory for this session only unless you download this file.',
       scans: scanLog,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -264,7 +381,7 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
           onClick={() => setStatus('consent')}
           aria-label="Open optional camera pulse check"
         >
-          <span aria-hidden="true">📷</span> Camera pulse check (optional)
+          <Camera size={16} aria-hidden="true" /> Camera pulse check (optional)
         </button>
       </div>
     );
@@ -287,10 +404,16 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
             <QualityTipsGuide defaultOpen={false} />
             <ul className="camera-pulse-consent-points">
               <li>
-                <strong>Strictly on-device:</strong> Processing runs locally via WebAssembly. No video, images, or biometric data are transmitted or stored.
+                <strong>Local processing:</strong> Video is processed on this device via WebAssembly and is not transmitted by Sol Check.
+                Sol Check does not retain video, images, or facial keypoints.
               </li>
               <li>
-                <strong>Temporary:</strong> The estimate is volatile and remains in memory for this session only.
+                <strong>Temporary SDK state:</strong> The camera SDK may temporarily persist numeric inference state in this browser.
+                Sol Check deletes that inference-state entry before and after every scan.
+              </li>
+              <li>
+                <strong>You choose what to keep:</strong> Using an estimate only populates the check-in form.
+                Its value and provenance are stored locally only if you submit the check-in; downloading a scan log is separate and optional.
               </li>
               <li>
                 <strong>Manual entry remains available:</strong> You can cancel at any time and enter your heart rate manually.
@@ -377,7 +500,7 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
               <div className="camera-video-overlay" aria-live="polite">
                 {status === 'requesting'
                   ? 'Initializing local models...'
-                  : (faceDetected ? '✓ Face detected · Hold still' : 'Position face inside the frame')}
+                  : (faceDetected ? <><Check size={14} aria-hidden="true" className="inline-icon" /> Face detected · Hold still</> : 'Position face inside the frame')}
               </div>
             </div>
 
@@ -394,16 +517,10 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
                   role="status"
                 >
                   <span className="camera-movement-guide-badge">
-                    {!faceDetected
-                      ? 'Align Face'
-                      : (gate.ready ? 'Stable Window' : 'Hold Still')}
+                    {guidance.badge}
                   </span>
                   <p className="camera-movement-guide-text">
-                    {!faceDetected
-                      ? 'Center your face inside the oval guide at arm’s length (50 cm) with frontal light.'
-                      : (gate.ready
-                        ? `Stable window acquired from ${gate.usableSamples} samples. Keep holding this posture until you accept.`
-                        : 'Rest your chin or elbows on desk. Keep head completely still and avoid talking or chewing.')}
+                    {guidance.text}
                   </p>
                 </div>
               )}
@@ -426,9 +543,11 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
 
               {status === 'measuring' && (
                 <p className="camera-pulse-window-progress" aria-live="polite">
-                  Stable window: <strong>{Math.min(gate.usableSamples, MIN_ACCEPT_SAMPLES)} / {MIN_ACCEPT_SAMPLES}</strong> samples
-                  {gate.usableSamples > MIN_ACCEPT_SAMPLES && ` (${gate.usableSamples} collected)`}
-                  {' · '}median SQI must reach {Math.round(PULSE_SQI_ACCEPT_FLOOR * 100)}%.
+                  {gate.reason === 'warming_up'
+                    ? <>Warm-up: <strong>{warmupRemainingSeconds}s remaining</strong>{' · '}</>
+                    : <>Stable window: <strong>{Math.min(gate.usableSamples, MIN_ACCEPT_SAMPLES)} / {MIN_ACCEPT_SAMPLES}</strong> samples
+                      {gate.usableSamples > MIN_ACCEPT_SAMPLES && ` (${gate.usableSamples} collected)`}{' · '}</>}
+                  median SQI must reach {Math.round(PULSE_SQI_ACCEPT_FLOOR * 100)}%.
                 </p>
               )}
 
@@ -444,13 +563,20 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
                 </p>
               )}
 
+              {gate.reason === 'stale' && (
+                <p className="camera-pulse-weak-alert" role="status">
+                  No fresh continuous window is available. Acceptance is disabled until new samples arrive.
+                </p>
+              )}
+
               {gate.ready && gate.medianHr !== null && (
-                <p className="camera-pulse-status-msg" style={{ color: '#2d6a4f', marginTop: '0.3rem' }}>
+                <p className="camera-pulse-status-msg" style={{ color: 'var(--status-steady)', marginTop: '0.3rem' }}>
                   Stable estimate {Math.round(gate.medianHr)} bpm from {gate.usableSamples} samples
                   (median SQI {Math.round((gate.medianSqi ?? 0) * 100)}%).
                 </p>
               )}
 
+              <MeasurementQualityPanel sampleCount={samples.length} sqi={latest?.sqi ?? null} />
               <QualityTipsGuide />
             </div>
 
@@ -530,9 +656,9 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
                 <span className="camera-pulse-disclaimer">Not a diagnosis</span>
               </div>
               <p className="camera-pulse-privacy-note">
-                Nothing is saved unless you choose to use this estimate in your check-in. If you do, the
-                value is stored with source <code>camera_estimate</code>, its signal quality, algorithm and capture time.
-                No video, images, or facial data are retained.
+                Using this estimate populates the check-in form; it is not added to the mission record until you submit that check-in.
+                A submitted value includes source <code>camera_estimate</code>, signal quality, algorithm, device and capture time.
+                No video, images, or facial keypoints are included in the check-in or scan log.
               </p>
             </div>
 
@@ -542,8 +668,9 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
                   type="button"
                   className="button button-primary"
                   onClick={handleUseEstimate}
+                  disabled={populatedIntoForm}
                 >
-                  {populatedIntoForm ? '✓ Populated in check-in' : `Use ${acceptedEstimate.bpm} bpm in check-in`}
+                  {populatedIntoForm ? <><Check size={16} aria-hidden="true" /> Populated in check-in form</> : `Use ${acceptedEstimate.bpm} bpm in check-in`}
                 </button>
               )}
               <button
@@ -569,7 +696,7 @@ export function CameraPulseCheck({ onAcceptEstimate }: {
                 </button>
                 <p className="muted">
                   {scanLog.length} accepted scan{scanLog.length === 1 ? '' : 's'} held in memory. Add a pulse-oximeter
-                  reference to each entry before running the validation report.
+                  reference to each downloaded entry for external validation; Sol Check does not generate an accuracy report.
                 </p>
                 {scanLogMessage && <p className="muted" role="status">{scanLogMessage}</p>}
               </div>
