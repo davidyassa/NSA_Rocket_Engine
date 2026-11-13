@@ -695,13 +695,8 @@
 .domain-value { font-family: var(--font-display); font-size: clamp(1.02rem, 1.8vw, 1.45rem); }
 .domain-icon { border-radius: 50%; }
 .dashboard-intel-image {
-  --intel-photo: url('../../ui/assets/nasa/crew-lab.webp');
-  min-height: 260px;
-  justify-content: flex-end;
+  justify-content: center;
   align-items: flex-start;
-  background-image: linear-gradient(0deg, #141211 16%, #141211cf 55%, #14121112 100%), var(--intel-photo);
-  background-position: center;
-  background-size: cover;
 }
 .hazards-feature { --intel-photo: url('../../ui/assets/nasa/crew-orbit.webp'); }
 .dashboard-intel-image p { margin: 6px 0 14px; color: var(--text-secondary); font-size: 0.92rem; }

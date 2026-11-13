@@ -182,7 +182,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
       </section>
 
       <section className="dashboard-quick-intel-grid" aria-label="Operational Health Intelligence">
-        <HabitatAir environment={scenario.environment} sol={startSol} />
+        {/* <HabitatAir environment={scenario.environment} sol={startSol} /> */}
         <article className="panel dashboard-intel-card dashboard-intel-image cognitive-feature">
           <div className="flags-title">
             <span className="domain-icon"><Brain size={18} aria-hidden="true" /></span>
@@ -190,15 +190,6 @@ export function Dashboard({ scenario, records, latest, assessment }: {
           </div>
           <p>Check reaction time and lapses with the brief vigilance test.</p>
           <Link to="/cognitive" className="button button-secondary">Open lab <ArrowUpRight size={16} aria-hidden="true" /></Link>
-        </article>
-
-        <article className="panel dashboard-intel-card dashboard-intel-image hazards-feature">
-          <div className="flags-title">
-            <span className="domain-icon"><ShieldAlert size={18} aria-hidden="true" /></span>
-            <h2>NASA’s five hazards</h2>
-          </div>
-          <p>See how radiation, isolation, distance, gravity and habitat conditions connect to crew readings.</p>
-          <Link to="/hazards" className="button button-secondary">Explore the hazards <ArrowUpRight size={16} aria-hidden="true" /></Link>
         </article>
       </section>
 
