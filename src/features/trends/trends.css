@@ -41,9 +41,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 13px 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg-raised);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .trend-summary div { min-width: 0; padding: 12px; }
 .trend-summary div + div { border-left: 1px solid var(--line); }
@@ -59,9 +58,9 @@
 .trend-key-entered { width: 7px; height: 7px; transform: rotate(45deg); background: var(--accent); }
 .trend-key-baseline { width: 18px; height: 0; border-top: 2px dashed var(--border-control); }
 .trend-chart { width: 100%; height: clamp(220px, 37vw, 318px); min-width: 0; overflow: clip; }
-.trend-chart .recharts-cartesian-axis-tick-value { fill: var(--muted); font: 0.67rem var(--mono); }
+.trend-chart .recharts-cartesian-axis-tick-value { fill: var(--muted); font: 0.8rem var(--mono); }
 .trend-chart .recharts-wrapper:focus-visible { outline-offset: -3px; }
-.trend-chart-caption { margin-top: 1px; color: var(--muted); text-align: center; font: 0.65rem var(--mono); }
+.trend-chart-caption { margin-top: 1px; color: var(--muted); text-align: center; font: 0.8rem var(--font-body); }
 .trend-tooltip {
   display: grid;
   gap: 3px;
@@ -91,6 +90,6 @@
 @media (max-width: 490px) {
   .trend-metric span { padding-inline: 9px; font-size: 0.8rem; }
   .trend-summary div { padding: 9px; }
-  .trend-summary dt { font-size: 0.73rem; }
+  .trend-summary dt { font-size: 0.8rem; }
   .trend-table { font-size: 0.77rem; }
 }

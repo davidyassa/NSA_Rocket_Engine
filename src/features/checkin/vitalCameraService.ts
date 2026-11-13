@@ -3,6 +3,8 @@ import { BrowserAdapter, type HeartRateData, type FaceData } from 'vitalcamera-s
 export interface PulseCheckCallbacks {
   onHeartRate: (data: { hr: number; sqi: number; timestamp: number }) => void;
   onFaceDetected: (detected: boolean) => void;
+  /** Face centre and width as fractions of the camera frame (raw, not mirrored); null when no face. */
+  onFaceBox?: (box: { cx: number; cy: number; size: number } | null) => void;
   onError: (error: Error) => void;
 }
 
@@ -73,7 +75,39 @@ export function clearVitalCameraInferenceState(): Promise<boolean> {
   });
 }
 
+type TrackCapabilitiesLike = { whiteBalanceMode?: string[]; exposureMode?: string[] };
+type TrackSettingsLike = { colorTemperature?: number; exposureTime?: number; frameRate?: number };
+
 export class VitalCameraService {
+  /**
+   * Auto-exposure and auto white balance keep nudging brightness and colour,
+   * which drowns the tiny pulse signal. Once the camera has settled (about 2 s),
+   * lock both at their current values where the device allows it (most Android
+   * phones; browsers without support simply ignore this). Best effort only.
+   */
+  private async stabilizeCamera(): Promise<void> {
+    const track = this.stream?.getVideoTracks()[0];
+    if (!track || typeof track.getCapabilities !== 'function') return;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (this.isDestroyed || track.readyState !== 'live') return;
+    try {
+      const caps = track.getCapabilities() as TrackCapabilitiesLike;
+      const settings = track.getSettings() as TrackSettingsLike;
+      const advanced: Record<string, unknown> = {};
+      if (caps.whiteBalanceMode?.includes('manual')) {
+        advanced.whiteBalanceMode = 'manual';
+        if (settings.colorTemperature) advanced.colorTemperature = settings.colorTemperature;
+      }
+      if (caps.exposureMode?.includes('manual') && settings.exposureTime) {
+        advanced.exposureMode = 'manual';
+        advanced.exposureTime = settings.exposureTime;
+      }
+      if (Object.keys(advanced).length) await track.applyConstraints({ advanced: [advanced as MediaTrackConstraintSet] });
+    } catch {
+      // Unsupported on this device; auto settings stay on.
+    }
+  }
+
   private adapter: BrowserAdapter | null = null;
   private stream: MediaStream | null = null;
   private videoEl: HTMLVideoElement | null = null;
@@ -92,7 +126,8 @@ export class VitalCameraService {
     // 1. Request video-only stream
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        // 30 fps matters: the pulse is a tiny colour change, and slow cameras blur it away.
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, min: 15 } },
         audio: false,
       });
     } catch (err) {
@@ -118,6 +153,7 @@ export class VitalCameraService {
     } catch {
       // Ignore autoplay errors if component already unmounted
     }
+    void this.stabilizeCamera();
 
     if (this.isDestroyed) {
       this.releaseStream();
@@ -229,7 +265,16 @@ export class VitalCameraService {
 
         this.adapter.vitalcamera.on('face', (face: FaceData | null) => {
           if (!this.isDestroyed) {
-            callbacks.onFaceDetected(Boolean(face?.detected && face.box));
+            const detected = Boolean(face?.detected && face.box);
+            callbacks.onFaceDetected(detected);
+            if (callbacks.onFaceBox) {
+              const box = face?.box;
+              const width = face?.videoWidth ?? 0;
+              const height = face?.videoHeight ?? 0;
+              callbacks.onFaceBox(detected && box && width > 0 && height > 0
+                ? { cx: (box.x + box.w / 2) / width, cy: (box.y + box.h / 2) / height, size: box.w / width }
+                : null);
+            }
           }
         });
 

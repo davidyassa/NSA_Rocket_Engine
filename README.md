@@ -2,6 +2,9 @@
 
 Sol Check is a research-informed prototype for one synthetic crew member on a Mars surface mission. Not a diagnosis.
 
+> 📖 **Team Architecture & Workflow Manual:** See [docs/TEAM_MISSION_ARCHITECTURE_AND_WORKFLOW.md](docs/TEAM_MISSION_ARCHITECTURE_AND_WORKFLOW.md) for the complete end-to-end system manual, clinical decision rules, directory catalog, and judging alignment.  
+> 🖨️ **Printable PDF Team Guide:** Open `http://localhost:4173/team-guide.html` in your browser and press `Cmd + P` / `Ctrl + P` to export a publication-grade PDF.
+
 ## Run the production demo
 
 Use Node.js 22.12 or later.
@@ -68,6 +71,21 @@ Sol Check implements a research-informed, offline-first medical intelligence sui
 11. **Check-in Streak (F15)**:
    - A consecutive-sol check-in counter is integrated into the dashboard mission metrics. The counter tallies each sol once, breaks sequence at any missing sol, maintains scenario isolation, and clearly identifies seeded synthetic history versus user-entered contributions.
 
+## Crew-health gap coverage (team review)
+
+Added after a teammate's review against NASA's human-spaceflight risks. Every rule is deterministic, explained in the evidence passport, and cites its source.
+
+| Risk | What Sol Check now does | What still needs flight hardware |
+| --- | --- | --- |
+| Orthostatic intolerance | Optional **stand-up test** (seated vs 3 minutes standing). Flags a fall of ≥20 mmHg systolic or ≥10 diastolic, or a pulse rise of ≥30 bpm, and routes it to the Crew Medical Officer ([consensus definition](https://pubmed.ncbi.nlm.nih.gov/21431947/)) | Continuous ECG / tilt testing |
+| Muscle atrophy and bone loss | Daily **exercise minutes**; flags below-target exercise on 3 of 5 sols as a countermeasure gap, not a muscle or bone measurement | Ultrasound, EMG, force sensors; DXA and blood/urine biomarkers |
+| Dehydration | Daily **fluid intake**; flags low intake (demo minimum 2 L) | Urine and body-weight monitoring, core temperature |
+| Space motion sickness | Vertigo, vomiting and balance symptoms; a two-symptom cluster rule; vomiting goes to the Crew Medical Officer | Eye-tracking camera and motion sensors (IMU) |
+| SANS (fluid shift) | Vision-change and head-fullness symptoms; a vision change prompts an eye check | OCT, fundus imaging, eye ultrasound |
+| CO2 exposure | **Habitat CO2 and cabin temperature** per sol (simulated life-support feed) on the dashboard; headaches on sols at or above NASA's 3 mmHg limit are linked as context ([NASA OCHMO-TB-004](https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf)) | Real ECLSS CO2/O2/humidity sensors |
+
+The Hazards page lists, for each hazard, what Sol Check tracks and what needs flight hardware. Engine version 1.4.0.
+
 ## Flight-console design system
 
 Dark NASA flight-console palette (tokens in `src/ui/theme.css`, hex mirrors in `src/ui/tokens.ts`). Space Grotesk headings, Inter body text (16 px base) and JetBrains Mono numerals are bundled locally.
@@ -84,6 +102,7 @@ Dark NASA flight-console palette (tokens in `src/ui/theme.css`, hex mirrors in `
 An optional on-device optical pulse estimation tool is integrated beside manual heart-rate entry in the daily check-in form:
 
 - **Optional and Non-Intrusive**: Manual heart-rate entry remains accessible and fully editable throughout.
+- **Guided capture**: The face check coaches one instruction at a time (face in the oval, light, distance, stillness) and, when the signal stays weak, names the limiting factor (slow camera, face too small, too little light). It requests 30 fps and locks exposure and white balance where the device allows.
 - **Informed Consent & Privacy First**: Requires an explicit, deliberate per-session consent action before requesting camera access. Camera requests are video-only (no audio).
 - **Strictly On-Device Processing**: Powered by VitalCamera SDK (v0.6.9) with the bundled FacePhys rPPG model and BlazeFace detector. All neural network inference executes entirely on-device using local WebAssembly via self-hosted Google LiteRT and MediaPipe tasks-vision runtimes (`runtimeBaseUrls`). No video frames, face crops, or biometric signals are ever saved to disk or transmitted across the network.
 - **100% Offline Precached**: All model weights (`.tflite`, `.gz`), worker scripts, and WebAssembly binaries (`.wasm`, `+esm`) are bundled locally under `public/vendor/` and precached in the service worker manifest for complete offline functionality on both root and static subpaths.
@@ -101,7 +120,7 @@ An optional on-device optical pulse estimation tool is integrated beside manual 
 
 ## Rehearse the Sol 43 demo
 
-1. Open **Dashboard → Start check-in**. Open the blood pressure measurement guide, select **Fill demo readings**, mark **Fatigue**, and select **Save and assess**.
+1. Open **Dashboard → Start check-in**. The check-in is one page per measurement (heart rate by hand or camera, blood pressure, temperature, blood sugar, sleep, mood, how you feel) with **Next**, **Skip** and **Back**. Select **Fill demo readings** to jump to **Review & save**, use **Edit** on *How you feel* to tick **Fatigue**, then select **Save and assess**.
 2. Open **Why this finding?** under the sleep finding. Inspect the five readings, personal baseline, rule and sources. The sleep and mood readings each meet the demo delta on three of the last five sols. The suggested route is Crew Medical Officer.
 3. Select **Prepare summary for ground**. Inspect the local draft, the simulated 20-minute one-way delay and the 40-minute earliest possible reply. **Copy summary** copies the draft to the local clipboard. Notes are opt-in.
 4. In **Trends**, inspect the sleep baseline, then choose another indicator. In **Timeline**, select **Sol 41** and open **NASA archive provenance**. Confirm the original UTC date, instrument, units and coverage.

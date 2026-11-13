@@ -42,11 +42,10 @@
   color: var(--ink);
 }
 .demo-export-scope {
-  background: var(--bg-raised);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 14px 16px;
+  padding: 14px 0;
   margin-bottom: 16px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .demo-export-scope h3 {
   margin: 0 0 10px;

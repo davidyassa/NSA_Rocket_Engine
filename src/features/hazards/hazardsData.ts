@@ -20,6 +20,10 @@ export interface NasaHazard {
   tagline: string;
   spaceflightMechanism: string;
   solCheckMetrics: string[];
+  /** What Sol Check measures or tracks today for this hazard. */
+  measuredBy: string[];
+  /** What a full flight system would add: specialist medical hardware or habitat sensors. */
+  needsHardware: string[];
   sol43Status: {
     state: 'nominal' | 'elevated' | 'active_monitoring';
     summary: string;
@@ -43,6 +47,11 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     spaceflightMechanism:
       'Mars lacks a global geomagnetic field and dense atmosphere. Energetic protons and heavy HZE ions penetrate spacecraft walls, causing continuous cellular ionizations.',
     solCheckMetrics: ['msl_rad_curiosity', 'hourly_median_radiation', 'peak_event_radiation'],
+    measuredBy: [
+      'Real Curiosity RAD dose-rate readings replayed on the mission timeline (Sol 41 solar particle event)',
+      'Nausea and fatigue symptoms reported in the daily check-in',
+    ],
+    needsHardware: ['Personal radiation dosimeter for each crew member', 'Blood counts after a large solar particle event'],
     sol43Status: {
       state: 'active_monitoring',
       summary:
@@ -79,6 +88,12 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     spaceflightMechanism:
       'Living in a small, closed habitat with a 6-person crew for 900+ sols causes circadian drift (Mars sol = 24h 39m), sensory monotony, and cumulative sleep debt.',
     solCheckMetrics: ['sleep_duration', 'mood', 'pvt_reaction_time', 'lapses_count'],
+    measuredBy: [
+      'Sleep hours and mood compared with your own 14-sol baseline, with a combined sleep-and-mood trend rule',
+      'PVT-B reaction-time test for alertness and lapses',
+      'Fatigue reported in the daily check-in',
+    ],
+    needsHardware: ['Wearable sleep tracker (actigraphy) and heart-rate variability (HRV)', 'Camera-based drowsiness and eye-closure monitoring'],
     sol43Status: {
       state: 'elevated',
       summary:
@@ -114,6 +129,11 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     spaceflightMechanism:
       'Mars orbital distance creates a one-way communication latency of 4 to 22 minutes (Sol 43 simulation: 20 min one-way, 40 min round-trip). Immediate telemedicine is physically impossible.',
     solCheckMetrics: ['simulated_delay_sec', 'autonomous_assessment_tier', 'handoff_package'],
+    measuredBy: [
+      'Fully offline assessment on the device, routed to self-care, the Crew Medical Officer or Earth',
+      'Ground summary and handoff package prepared for the 20-minute one-way delay',
+    ],
+    needsHardware: ['Mission telemedicine link and store-and-forward data relay'],
     sol43Status: {
       state: 'active_monitoring',
       summary:
@@ -144,21 +164,34 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: 'Microgravity Transit (0g) & Martian Surface Gravity (0.38g)',
     spaceflightMechanism:
       'Transition between 0g (transit), 0.38g (Mars), and 1g (Earth) alters hydrostatic pressure gradients, vestibular perception, and mechanical bone/muscle loading.',
-    solCheckMetrics: ['bp_systolic', 'bp_diastolic', 'muscle_symptoms', 'body_temp'],
+    solCheckMetrics: ['bp_systolic', 'bp_diastolic', 'stand_test', 'exercise_minutes', 'fluid_intake', 'motion_sickness_symptoms', 'vision_changes', 'muscle_symptoms'],
+    measuredBy: [
+      'Stand-up test: blood pressure and pulse sitting, then after 3 minutes standing (orthostatic intolerance)',
+      'Daily exercise minutes against a target (the countermeasure for muscle and bone loss)',
+      'Fluid intake (hydration before gravity changes)',
+      'Dizziness, vertigo, nausea, vomiting and balance problems (space motion sickness)',
+      'Vision changes and puffy face or head fullness (SANS screening, prompts an eye check)',
+    ],
+    needsHardware: [
+      'OCT, fundus imaging or eye ultrasound for SANS',
+      'DXA scan and blood/urine biomarkers for bone density',
+      'Ultrasound, EMG and force sensors for muscle mass and strength',
+      'Eye-tracking camera and motion sensors (IMU) for balance and nystagmus',
+    ],
     sol43Status: {
       state: 'nominal',
       summary:
-        'Blood pressure 116/74 mmHg and core body temp 36.7 °C remain within normal physiological ranges. Crew body map indicates no localized musculoskeletal symptoms.',
+        'Blood pressure 116/74 mmHg and core body temp 36.7 °C remain within normal physiological ranges. Crew body map indicates no localized musculoskeletal symptoms. Normal blood pressure and temperature do not rule out muscle or bone loss, which need dedicated measurements (ultrasound, DXA, biomarkers).',
     },
     clinicalImpacts: [
-      'Cephalad fluid shift causing venous engorgement, facial edema, and intracranial pressure alterations (SANS)',
+      'Headward fluid shift causing facial swelling and eye/vision changes (SANS, spaceflight-associated neuro-ocular syndrome); the role of intracranial pressure is not established and the mechanism is still being researched',
       'Orthostatic intolerance upon gravitational transition (impaired baroreflex regulation)',
       'Bone mineral density loss (1–1.5% monthly in weight-bearing bones) and muscle fiber atrophy',
     ],
     operationalCountermeasures: [
-      'Daily 2.5-hour countermeasure exercise regimen (resistive exercise + cycle ergometer)',
+      'Daily exercise block of about 2.5 hours on the ISS schedule, including equipment setup and cleanup (roughly 2 hours of actual resistive, treadmill and cycle exercise)',
       'Validated blood pressure pair verification (systolic > diastolic gating) and trend monitoring',
-      'Pre-EVA hydration and electrolyte loading protocols',
+      'Fluid and salt loading in the hours before returning to gravity (re-entry/landing) to reduce orthostatic intolerance; not the same as drinking water during EVA',
     ],
     officialReferences: [
       {
@@ -175,7 +208,13 @@ export const NASA_FIVE_HAZARDS: NasaHazard[] = [
     tagline: 'Cabin Atmosphere, Trace Gases & Toxic Martian Perchlorates',
     spaceflightMechanism:
       'A completely closed life support system concentrates carbon dioxide, particulate matter, off-gassed VOCs, and fine reactive Martian regolith dust tracked into the airlock.',
-    solCheckMetrics: ['headache_symptom', 'nausea_symptom', 'respiratory_symptoms'],
+    solCheckMetrics: ['habitat_co2', 'cabin_temperature', 'headache_symptom', 'nausea_symptom', 'respiratory_symptoms'],
+    measuredBy: [
+      'Habitat CO2 and cabin temperature per sol (simulated life-support feed) against NASA’s 3 mmHg CO2 limit',
+      'Headaches linked to high-CO2 sols, with the caveat that timing alone does not prove a cause',
+      'Headache, nausea and breathing symptoms reported in the daily check-in',
+    ],
+    needsHardware: ['Real habitat CO2, O2, humidity and trace-gas sensors connected to Sol Check', 'Core-temperature sensor and urine monitoring for heat strain and dehydration'],
     sol43Status: {
       state: 'nominal',
       summary:

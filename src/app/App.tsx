@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Orbit, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Orbit, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { CheckinEntry } from '../contracts';
 import { RADLAB_MANIFEST } from '../data/nasa';
@@ -14,10 +14,12 @@ import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
 import { radlabEventSol } from '../sim';
 import { DemoData } from './DemoData';
+import { RouteErrorBoundary, lazyWithReload } from './lazyRoute';
 import { confirmTap } from './native';
+import { GLOSSARY } from '../content/plainLanguage';
 import { entryFromCheckin, useMissionStore } from './store';
 
-const Trends = lazy(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
+const Trends = lazyWithReload(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
 
 const navigation = [
   { to: '/', label: 'Dashboard', Icon: LayoutGrid },
@@ -46,6 +48,7 @@ export function App() {
   const [revision, setRevision] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
+  const glossaryDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
 
   const { scenario, prefill } = DEMO_OPTIONS[mission.scenarioId];
@@ -61,6 +64,7 @@ export function App() {
         sol: radlabEventSol(scenario.missionContext),
         date: RADLAB_MANIFEST.verifiedEventReading.timestampArchive.slice(0, 10),
       },
+      environment: scenario.environment,
     }) : null,
     [latest, records, scenario],
   );
@@ -145,6 +149,9 @@ export function App() {
             <span>Mission</span><ChevronRight size={13} aria-hidden="true" /><strong>{section}</strong>
           </div>
           <div className="topbar-meta">
+            <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
+              <BookOpen size={16} aria-hidden="true" /> <span>Words explained</span>
+            </button>
             <span className="topbar-sol">SOL {startSol}</span>
             <span className="badge badge-synthetic"><span className="badge-dot" /> Synthetic demo</span>
           </div>
@@ -168,9 +175,11 @@ export function App() {
             <Route path="/assessment" element={<Assessment key={`${mission.scenarioId}:${revision}`} assessment={assessment} records={records} mission={scenario.missionContext} />} />
             <Route path="/cmo" element={<CrewMedicalOfficer scenario={scenario} latest={latest} assessment={assessment} records={records} />} />
             <Route path="/trends" element={
-              <Suspense fallback={<p role="status">Loading trends…</p>}>
-                <Trends key={mission.scenarioId} records={records} />
-              </Suspense>
+              <RouteErrorBoundary name="Trends">
+                <Suspense fallback={<p role="status">Loading trends…</p>}>
+                  <Trends key={mission.scenarioId} records={records} />
+                </Suspense>
+              </RouteErrorBoundary>
             } />
             <Route path="/timeline" element={<Timeline key={mission.scenarioId} scenario={scenario} records={records} />} />
             <Route path="/demo" element={<DemoData scenario={scenario} records={records} scenarioId={mission.scenarioId} onLoad={switchScenario} />} />
@@ -210,6 +219,25 @@ export function App() {
           <RotateCcw size={18} aria-hidden="true" /> <span>Reset demo</span>
         </button>
       </div>
+
+      <dialog className="reset-dialog glossary-dialog" ref={glossaryDialog} aria-labelledby="glossary-title">
+        <button type="button" className="dialog-close" aria-label="Close" onClick={() => glossaryDialog.current?.close()}>
+          <X size={20} />
+        </button>
+        <h2 id="glossary-title">Words explained</h2>
+        <p>Health words used in Sol Check, in everyday language.</p>
+        <dl className="glossary-list">
+          {GLOSSARY.map(({ term, meaning }) => (
+            <div key={term}>
+              <dt>{term}</dt>
+              <dd>{meaning}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="dialog-actions">
+          <button type="button" className="button button-secondary" autoFocus onClick={() => glossaryDialog.current?.close()}>Close</button>
+        </div>
+      </dialog>
 
       <dialog className="reset-dialog" ref={resetDialog} aria-labelledby="reset-title">
         <button type="button" className="dialog-close" aria-label="Close" onClick={() => resetDialog.current?.close()}>

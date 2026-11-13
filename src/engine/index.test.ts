@@ -213,7 +213,7 @@ describe('explainable assessment', () => {
   });
 
   it('publishes a valid reviewable rule definition for each rule', () => {
-    expect(Object.keys(RULES).length).toBeLessThanOrEqual(8);
+    expect(Object.keys(RULES).length).toBeLessThanOrEqual(14);
     for (const [ruleId, rule] of Object.entries(RULES)) {
       expect(rule.ruleId).toBe(ruleId);
       expect(ruleDefinitionSchema.safeParse(rule).success).toBe(true);

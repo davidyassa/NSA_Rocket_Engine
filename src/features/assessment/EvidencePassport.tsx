@@ -46,7 +46,7 @@ export function EvidencePassport({ finding, readings, assessment, tasks = [] }: 
           <ShieldCheck size={16} style={{ color: 'var(--accent)' }} />
           <strong style={{ fontSize: '0.88rem' }}>Health Evidence Passport · 6-Layer Audit Chain</strong>
         </div>
-        <span className="badge" style={{ fontSize: '0.7rem' }}>
+        <span className="badge" style={{ fontSize: '0.8rem' }}>
           Rule: <code>{finding.ruleId}</code>
         </span>
       </div>
@@ -89,7 +89,7 @@ export function EvidencePassport({ finding, readings, assessment, tasks = [] }: 
               return (
                 <li key={id}>
                   <strong>{meta.label}:</strong> {item.measurement.value} {meta.unitLabel} (Sol {item.sol}) ·{' '}
-                  <span className="badge" style={{ fontSize: '0.68rem' }}>
+                  <span className="badge" style={{ fontSize: '0.8rem' }}>
                     {provenanceLabels[item.measurement.provenance] || item.measurement.provenance}
                   </span>
                 </li>
@@ -126,7 +126,7 @@ export function EvidencePassport({ finding, readings, assessment, tasks = [] }: 
                   <p style={{ margin: '2px 0 0', color: 'var(--accent)' }}>
                     Rolling Median: <strong>{b.median} {METRICS[b.metric].unitLabel}</strong> · MAD Spread: <strong>±{b.mad ?? 0} {METRICS[b.metric].unitLabel}</strong>
                   </p>
-                  <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.74rem' }}>
+                  <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.8rem' }}>
                     Calculated over {b.count} valid historical sols in prior {b.lookbackSols}-sol window.
                   </p>
                 </div>
@@ -193,7 +193,7 @@ export function EvidencePassport({ finding, readings, assessment, tasks = [] }: 
               })}
             </ul>
           </div>
-          <div style={{ background: 'var(--bg-raised)', border: '1px solid color-mix(in srgb, var(--status-change) 40%, transparent)', padding: '6px 8px', borderRadius: '4px', marginTop: '6px', fontSize: '0.74rem', color: 'var(--status-trend)' }}>
+          <div style={{ background: 'var(--bg-raised)', border: '1px solid color-mix(in srgb, var(--status-change) 40%, transparent)', padding: '6px 8px', borderRadius: '4px', marginTop: '6px', fontSize: '0.8rem', color: 'var(--status-trend)' }}>
             <strong>Extrapolation Limit:</strong> Spaceflight evidence guides monitoring heuristics and rest scheduling; it does not substitute for clinical medical procedures or terrestrial hospital diagnosis.
           </div>
         </div>

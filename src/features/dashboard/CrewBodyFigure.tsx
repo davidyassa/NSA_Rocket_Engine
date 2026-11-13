@@ -5,15 +5,16 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { HEALTH_DOMAINS, type DailyCheckin, type HealthDomain, type RiskAssessment } from '../../contracts';
 import { STATUS_META } from '../../ui/tokens';
+import { PLAIN_DOMAIN, PLAIN_STATUS } from '../../content/plainLanguage';
 import { CrewBody3D, type DomainSummary } from './CrewBody3D';
 
 export const DOMAIN_TARGETS: Record<HealthDomain, { path: string; label: string; region: string; shortcut: string }> = {
-  behavioral: { path: '/trends?metric=mood', label: 'Behavioral health', region: 'Head (mind & mood)', shortcut: 'Head' },
-  sleep: { path: '/trends?metric=sleep_duration', label: 'Sleep', region: 'Head (rest & sleep)', shortcut: 'Visor' },
-  cardiovascular: { path: '/trends?metric=heart_rate', label: 'Cardiovascular', region: 'Chest (heart & pressure)', shortcut: 'Chest' },
-  temperature: { path: '/trends?metric=body_temp', label: 'Temperature', region: 'Torso (core temp)', shortcut: 'Torso' },
-  metabolic: { path: '/trends?metric=blood_glucose', label: 'Metabolic', region: 'Abdomen (blood glucose)', shortcut: 'Abdomen' },
-  symptoms: { path: '/assessment', label: 'Symptoms', region: 'Systemic (reported symptoms)', shortcut: 'Limbs' },
+  behavioral: { path: '/trends?metric=mood', label: PLAIN_DOMAIN.behavioral, region: 'Head (mind & mood)', shortcut: 'Head' },
+  sleep: { path: '/trends?metric=sleep_duration', label: PLAIN_DOMAIN.sleep, region: 'Head (rest & sleep)', shortcut: 'Visor' },
+  cardiovascular: { path: '/trends?metric=heart_rate', label: PLAIN_DOMAIN.cardiovascular, region: 'Chest (heart & pressure)', shortcut: 'Chest' },
+  temperature: { path: '/trends?metric=body_temp', label: PLAIN_DOMAIN.temperature, region: 'Torso (core temp)', shortcut: 'Torso' },
+  metabolic: { path: '/trends?metric=blood_glucose', label: PLAIN_DOMAIN.metabolic, region: 'Abdomen (blood glucose)', shortcut: 'Abdomen' },
+  symptoms: { path: '/assessment', label: PLAIN_DOMAIN.symptoms, region: 'Systemic (reported symptoms)', shortcut: 'Limbs' },
 };
 
 const domainIcons = {
@@ -277,6 +278,7 @@ export function CrewBodyFigure({
                           <span className="crew-figure-region-tag">{region}</span>
                         </div>
                         <p className="crew-figure-reading-val">{value}</p>
+                        <p className="crew-figure-plain">{PLAIN_STATUS[assessment?.domainStatuses[domain] ?? 'not_measured']}</p>
                       </div>
                     </div>
 

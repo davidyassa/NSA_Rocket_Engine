@@ -5,6 +5,60 @@ const retrievedOn = '2026-11-12';
 
 export const SOURCES: Record<string, SourceRecord> = {
   [RADLAB_SOURCE.id]: RADLAB_SOURCE,
+  'orthostatic-consensus': {
+    id: 'orthostatic-consensus',
+    title: 'Consensus statement on the definition of orthostatic hypotension (Freeman et al., 2011)',
+    publisher: 'Clinical Autonomic Research · PubMed',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/21431947/',
+    retrievedOn: '2026-11-13',
+    supports: 'A sustained fall of at least 20 mmHg systolic or 10 mmHg diastolic within 3 minutes of standing defines orthostatic hypotension.',
+    doesNotSupport: 'Diagnosing a cause, or how a spaceflight medical team should act on the result.',
+  },
+  'orthostatic-hr-review': {
+    id: 'orthostatic-hr-review',
+    title: 'Postural tachycardia syndrome: a review (heart-rate rise on standing)',
+    publisher: 'PubMed Central',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC4978226/',
+    retrievedOn: '2026-11-13',
+    supports: 'In adults the heart rate normally rises by no more than about 30 bpm on standing.',
+    doesNotSupport: 'A diagnosis of postural tachycardia syndrome from a single stand test.',
+  },
+  'nasa-co2-brief': {
+    id: 'nasa-co2-brief',
+    title: 'Carbon Dioxide technical brief (OCHMO-TB-004)',
+    publisher: 'NASA Office of the Chief Health & Medical Officer',
+    url: 'https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf',
+    retrievedOn: '2026-11-13',
+    supports: 'Headaches linked to cabin CO2 around 2.8–4.5 mmHg; NASA-STD-3001 limits the 1-hour average to 3 mmHg; a 7-day average under 2.5 mmHg keeps headache risk below 1%.',
+    doesNotSupport: 'That a particular headache was caused by CO2; fluid shifts can cause similar headaches.',
+  },
+  'sans-review': {
+    id: 'sans-review',
+    title: 'Spaceflight-associated neuro-ocular syndrome (systematic review)',
+    publisher: 'PubMed Central',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8956714/',
+    retrievedOn: '2026-11-13',
+    supports: 'Headward fluid shift is the leading hypothesis; the role of raised intracranial pressure is unproven; vision and eye changes need specialist eye imaging to assess.',
+    doesNotSupport: 'Detecting SANS from symptoms alone.',
+  },
+  'nasa-exercise': {
+    id: 'nasa-exercise',
+    title: 'Exercise, research and computer upgrades keep crew busy (ISS blog, 2025)',
+    publisher: 'NASA',
+    url: 'https://www.nasa.gov/blogs/spacestation/2025/09/23/exercise-research-and-computer-upgrades-keep-crew-busy-on-tuesday',
+    retrievedOn: '2026-11-13',
+    supports: 'ISS crews exercise about two hours a day to counter muscle and bone loss.',
+    doesNotSupport: 'A specific exercise target for a Mars surface crew, or that logged minutes measure muscle or bone health.',
+  },
+  'shuttle-fluid-loading': {
+    id: 'shuttle-fluid-loading',
+    title: 'Fluid loading with salt tablets before landing (NASA technical paper, 1994)',
+    publisher: 'NASA Technical Reports Server',
+    url: 'https://ntrs.nasa.gov/api/citations/19940019071/downloads/19940019071.pdf',
+    retrievedOn: '2026-11-13',
+    supports: 'Crews drank water with salt tablets in the 1–2 hours before touchdown to reduce orthostatic intolerance.',
+    doesNotSupport: 'Daily drinking targets during a surface mission.',
+  },
   'nasa-monitoring': {
     id: 'nasa-monitoring',
     title: 'NASA-STD-3001 Volume 1 · Health and Medical Care',
@@ -115,7 +169,7 @@ const bloodPressureGuide: MeasurementGuide = {
   sourceId: 'aha-pressure',
 };
 
-export const MEASUREMENT_GUIDES: Record<MetricId, MeasurementGuide> = {
+export const MEASUREMENT_GUIDES = {
   heart_rate: {
     text: 'Measure after resting. For a manual reading, feel your wrist pulse with two fingers and count the beats for one minute.',
     steps: [
@@ -178,6 +232,47 @@ export const MEASUREMENT_GUIDES: Record<MetricId, MeasurementGuide> = {
     watchFor: 'Several low sols in a row, withdrawing from crewmates, irritability, or loss of interest in usual tasks.',
     sourceId: 'demo-method',
   },
+} as Record<MetricId, MeasurementGuide>;
+
+const standingGuide: MeasurementGuide = {
+  text: 'After your seated blood pressure and pulse, stand up and measure again after 3 minutes.',
+  steps: [
+    'Take your seated blood pressure and pulse first (the earlier pages).',
+    'Stand up with the cuff still on. Stand still near something to hold on to.',
+    'After 3 minutes of standing, measure again and type the standing numbers here. Sit down at once if you feel faint.',
+  ],
+  whyInSpace: 'After time in low gravity, the body is slow to keep blood flowing to the brain when you stand (orthostatic intolerance). It matters most when moving from microgravity to Mars or Earth gravity.',
+  typicalRange: 'A drop of 20 mmHg or more in the top number, 10 mmHg or more in the bottom number, or a pulse rise of 30 bpm or more within 3 minutes of standing is a warning sign.',
+  watchFor: 'Light-headedness, blurred or greying vision, nausea or feeling faint when you stand.',
+  sourceId: 'orthostatic-consensus',
+};
+
+MEASUREMENT_GUIDES.heart_rate_standing = standingGuide;
+MEASUREMENT_GUIDES.bp_systolic_standing = standingGuide;
+MEASUREMENT_GUIDES.bp_diastolic_standing = standingGuide;
+MEASUREMENT_GUIDES.fluid_intake = {
+  text: 'Add up the water and drinks you had since the last check-in, in litres.',
+  steps: [
+    'Count each drink pouch or bottle you finished since your last check-in.',
+    'Add them up in litres (1 litre = 1000 mL).',
+    'Type the total. Include water used to rehydrate food only if you drank it.',
+  ],
+  whyInSpace: 'In low gravity you feel less thirsty, and fluid shifts toward the head. Low intake raises the risk of dehydration, headaches, kidney stones and feeling faint.',
+  typicalRange: 'Sol Check uses 2 litres a day as a demo minimum. Your medical team sets your real target.',
+  watchFor: 'Thirst, dark urine, headache, dizziness or tiredness.',
+  sourceId: 'demo-method',
+};
+MEASUREMENT_GUIDES.exercise_minutes = {
+  text: 'Log the minutes you actually exercised today (resistance, treadmill or cycle), not set-up time.',
+  steps: [
+    'Count only the time you were actually exercising, not setting up or cleaning the equipment.',
+    'Add resistance training, treadmill and cycling together.',
+    'Type the total minutes for today.',
+  ],
+  whyInSpace: 'Without regular loading, muscles shrink and bones lose density (about 1–1.5% a month in weight-bearing bones). Daily exercise is the main countermeasure.',
+  typicalRange: 'ISS crews exercise about 2 hours a day. Sol Check uses 90 minutes as a demo target.',
+  watchFor: 'Weakness, back pain, or feeling less steady on your feet. Logged minutes do not measure muscle or bone; that needs ultrasound, DXA or blood tests.',
+  sourceId: 'nasa-exercise',
 };
 
 export const ACTION_CARDS: Record<string, ActionCard> = {
@@ -212,6 +307,73 @@ export const ACTION_CARDS: Record<string, ActionCard> = {
       'If they request ground input, prepare a summary for the flight surgeon.',
     ],
     sourceRefs: ['nasa-monitoring', 'nasa-eimo'],
+    reviewStatus: 'sourced',
+  },
+  'orthostatic-care': {
+    id: 'orthostatic-care',
+    title: 'Stand up slowly and get your stand test reviewed',
+    tier: 'crew_medical_officer',
+    steps: [
+      'Sit or lie down if you feel light-headed. Rise slowly in stages.',
+      'Show the seated and standing readings to the Crew Medical Officer.',
+      'Repeat the stand test at your next check-in.',
+    ],
+    sourceRefs: ['orthostatic-consensus', 'shuttle-fluid-loading'],
+    reviewStatus: 'needs_clinical_review',
+  },
+  'hydrate': {
+    id: 'hydrate',
+    title: 'Drink more through the day',
+    tier: 'self_care',
+    steps: [
+      'Keep a drink pouch within reach and sip regularly; thirst is weaker in low gravity.',
+      'Log your fluid intake again at the next check-in.',
+    ],
+    sourceRefs: ['demo-method'],
+    reviewStatus: 'demo_heuristic',
+  },
+  'exercise-plan': {
+    id: 'exercise-plan',
+    title: 'Get your exercise back on schedule',
+    tier: 'self_care',
+    steps: [
+      'Plan today’s resistance and aerobic sessions into the timeline.',
+      'If schedule or fatigue keeps blocking exercise, raise it with the Crew Medical Officer.',
+    ],
+    sourceRefs: ['nasa-exercise'],
+    reviewStatus: 'sourced',
+  },
+  'motion-sickness-care': {
+    id: 'motion-sickness-care',
+    title: 'Manage motion sickness symptoms',
+    tier: 'self_care',
+    steps: [
+      'Keep your head still, fix your eyes on a stable reference and avoid fast head turns.',
+      'Sip fluids. If you are vomiting, tell the Crew Medical Officer; medication is only given under medical supervision.',
+    ],
+    sourceRefs: ['nasa-monitoring'],
+    reviewStatus: 'needs_clinical_review',
+  },
+  'eye-check': {
+    id: 'eye-check',
+    title: 'Ask for an eye check',
+    tier: 'crew_medical_officer',
+    steps: [
+      'Tell the Crew Medical Officer about the vision change and when it started.',
+      'Eye changes from fluid shift (SANS) need eye imaging such as OCT or ultrasound to assess.',
+    ],
+    sourceRefs: ['sans-review'],
+    reviewStatus: 'needs_clinical_review',
+  },
+  'co2-check': {
+    id: 'co2-check',
+    title: 'Check the habitat air',
+    tier: 'self_care',
+    steps: [
+      'Report the headaches and the CO2 readings to the crew member responsible for life support.',
+      'Spend time in better-ventilated areas until CO2 is back under the limit.',
+    ],
+    sourceRefs: ['nasa-co2-brief'],
     reviewStatus: 'sourced',
   },
 };

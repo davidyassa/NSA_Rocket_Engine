@@ -74,10 +74,9 @@ export function HandoffSimulator({ pkg }: { pkg: MedicalHandoffPackage }) {
   }
 
   return (
-    <section className="panel panel-padded" style={{ marginTop: '14px', borderTop: '3px solid var(--accent)' }} aria-labelledby="delay-rehearsal-title">
+    <section className="panel panel-padded" style={{ marginTop: '14px' }} aria-labelledby="delay-rehearsal-title">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
-          <p className="eyebrow" style={{ color: 'var(--accent)' }}>Local communication rehearsal</p>
           <h3 id="delay-rehearsal-title" style={{ margin: '2px 0', fontSize: '1.12rem' }}>Round-trip delay timer</h3>
         </div>
         <span className="badge">{status.replace(/_/g, ' ').toUpperCase()}</span>
@@ -162,7 +161,7 @@ export function HandoffSimulator({ pkg }: { pkg: MedicalHandoffPackage }) {
               }}
             >
               <strong>{importResult.message}</strong>
-              {importResult.details && <p style={{ margin: '2px 0 0', fontSize: '0.74rem' }}>{importResult.details}</p>}
+              {importResult.details && <p style={{ margin: '2px 0 0', fontSize: '0.8rem' }}>{importResult.details}</p>}
             </div>
           )}
         </div>

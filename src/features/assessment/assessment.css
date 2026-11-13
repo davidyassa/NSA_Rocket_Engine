@@ -1,7 +1,3 @@
-.assessment-intro .eyebrow {
-  margin: 0 0 0.55rem;
-  font-size: 0.72rem;
-}
 
 .assessment-notice {
   display: flex;
@@ -133,9 +129,6 @@
   list-style: decimal;
 }
 
-.assessment-action .eyebrow {
-  margin: 0;
-}
 
 .assessment-action li + li {
   margin-top: 0.35rem;
@@ -154,7 +147,7 @@
   gap: 0.13rem;
   margin: 0;
   padding: 0.55rem 0.7rem;
-  border-left: 2px solid var(--line);
+  border-left: 1px solid var(--line);
   font-size: 0.87rem;
 }
 
@@ -201,7 +194,7 @@
 }
 
 .assessment-sources li {
-  border-left: 2px solid var(--border-subtle);
+  border-left: 1px solid var(--border-subtle);
   padding-left: 0.65rem;
   overflow-wrap: anywhere;
 }

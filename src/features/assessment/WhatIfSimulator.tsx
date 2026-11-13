@@ -45,8 +45,7 @@ export function WhatIfSimulator({ currentRecord, records }: WhatIfSimulatorProps
   const projectedAssessment = evaluateCheckin(hypotheticalCheckin, records);
 
   return (
-    <div className="panel assessment-action what-if-panel" style={{ borderTop: '3px solid var(--accent)' }}>
-      <p className="eyebrow">D4 · Deterministic Scenario Comparison</p>
+    <div className="panel assessment-action what-if-panel">
       <h3>What-If Projection (Sol {nextSol})</h3>
       <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem' }}>
         Explore how hypothetical future observations on Sol {nextSol} alter deterministic rule evaluation.

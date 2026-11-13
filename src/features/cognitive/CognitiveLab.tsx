@@ -158,7 +158,6 @@ export function CognitiveLab({ currentSol = 43 }: { currentSol?: number }) {
     <div className="cognitive-container">
       <header className="page-intro">
         <div>
-          <p className="eyebrow">Neurobehavioral readiness</p>
           <h1>Cognitive Performance Laboratory</h1>
           <p className="muted">
             Standard NASA Brief Psychomotor Vigilance Task (PVT-B) used aboard the ISS to detect

@@ -1,5 +1,5 @@
-import { ExternalLink } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { ArrowLeft, ArrowRight, Check, ExternalLink, Pencil } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   METRIC_IDS,
   METRICS,
@@ -13,6 +13,7 @@ import {
 import { MEASUREMENT_GUIDES, SOURCES } from '../../content';
 import { CameraPulseCheck } from './CameraPulseCheck';
 import type { CameraPulseEstimate } from './pulseQuality';
+import { FIELD_HINTS, PLAIN_FIELD_LABEL } from '../../content/plainLanguage';
 import './checkin.css';
 
 interface CheckinProps {
@@ -23,14 +24,33 @@ interface CheckinProps {
   onSubmit: (entry: CheckinEntry) => void;
 }
 
-const groups = [
-  ['heart_rate'],
-  ['bp_systolic', 'bp_diastolic'],
-  ['body_temp'],
-  ['blood_glucose'],
-  ['sleep_duration'],
-  ['mood'],
-] as const satisfies readonly (readonly MetricId[])[];
+/** One short page per measurement, then symptoms, then a review. */
+const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: string }[] = [
+  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Type your resting pulse, or let the camera measure it for you.' },
+  { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic'], intro: 'Use the arm cuff, then type both numbers from the screen.' },
+  { id: 'stand', title: 'Stand-up test', metrics: ['bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Optional, about 3 minutes. Stand up and measure again to check how your body copes with gravity. Skip it if you feel unwell.' },
+  { id: 'temperature', title: 'Body temperature', metrics: ['body_temp'], intro: 'Use the thermometer and type the reading in °C.' },
+  { id: 'sugar', title: 'Blood sugar', metrics: ['blood_glucose'], intro: 'Use the finger-prick meter and type the number in mg/dL.' },
+  { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'How many hours did you actually sleep last night?' },
+  { id: 'mood', title: 'Mood', metrics: ['mood'], intro: 'Pick the number closest to how you feel right now.' },
+  { id: 'water', title: 'Water & exercise', metrics: ['fluid_intake', 'exercise_minutes'], intro: 'Your daily countermeasures: what you drank and how long you exercised.' },
+  { id: 'feel', title: 'How you feel', metrics: [], intro: 'Tick anything you noticed today. Leave it empty if you feel fine.' },
+  { id: 'review', title: 'Review & save', metrics: [], intro: 'Check your answers. Tap Edit to change anything.' },
+];
+const REVIEW_STEP = STEPS.length - 1;
+const FEEL_STEP = STEPS.findIndex(step => step.id === 'feel');
+const MEASUREMENT_STEPS = STEPS.filter(step => step.metrics.length > 0);
+
+/** Symptom checkboxes grouped so related ones sit together. */
+const SYMPTOM_GROUPS: { title: string; ids: string[] }[] = [
+  { title: 'General', ids: ['headache', 'fatigue', 'muscle_ache', 'chest_discomfort', 'shortness_of_breath', 'digestive_discomfort'] },
+  { title: 'Dizziness and balance (motion sickness)', ids: ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] },
+  { title: 'Eyes and head (fluid shift)', ids: ['vision_changes', 'head_fullness'] },
+];
+
+function stepForMetric(metric: MetricId): number {
+  return Math.max(0, STEPS.findIndex(step => step.metrics.includes(metric)));
+}
 
 const moodChoices = [
   '1 · Very low',
@@ -83,6 +103,27 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   const [saveError, setSaveError] = useState('');
   const [capture, setCapture] = useState<CheckinEntry['capture']>(() => initialEntry?.capture ?? {});
   const formRef = useRef<HTMLFormElement>(null);
+  // Editing an existing check-in opens on the review page; a new one starts at heart rate.
+  const [step, setStep] = useState(initialEntry ? REVIEW_STEP : 0);
+  const [reviewVisited, setReviewVisited] = useState(Boolean(initialEntry));
+  const [focusTarget, setFocusTarget] = useState<string | null>(null);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const firstRender = useRef(true);
+
+  function goTo(next: number, focusId?: string) {
+    const clamped = Math.min(REVIEW_STEP, Math.max(0, next));
+    if (clamped === REVIEW_STEP) setReviewVisited(true);
+    setStep(clamped);
+    setFocusTarget(focusId ?? null);
+  }
+
+  // Move focus to the new page (or a field with an error) so keyboard and screen-reader users follow along.
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    const target = focusTarget ? formRef.current?.querySelector<HTMLElement>(`#${focusTarget}`) : stepHeading.current;
+    target?.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step, focusTarget]);
 
   function edit(metric: MetricId, value: string) {
     setDraft(previous => ({ ...previous, [metric]: value }));
@@ -111,6 +152,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     setCapture({});
     setErrors({});
     setSaveError('');
+    goTo(REVIEW_STEP);
   }
 
   function acceptCameraEstimate(estimate: CameraPulseEstimate) {
@@ -131,11 +173,12 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
       delete next.heart_rate;
       return next;
     });
+    // Reading accepted: move on to the next page automatically.
+    window.setTimeout(() => goTo(1), 700);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSaveError('');
+  /** Parse and check every reading; returns values plus any problems. */
+  function validate() {
     const values: CheckinEntry['values'] = {};
     const provenance: CheckinEntry['provenance'] = {};
     const issues: Partial<Record<MetricId, string>> = {};
@@ -157,18 +200,56 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     const diastolic = values.bp_diastolic;
     if (!issues.bp_systolic && !issues.bp_diastolic) {
       if (systolic === undefined && diastolic !== undefined) {
-        issues.bp_systolic = 'Enter systolic pressure to complete the pair.';
+        issues.bp_systolic = 'Enter the top number (systolic) too.';
       } else if (diastolic === undefined && systolic !== undefined) {
-        issues.bp_diastolic = 'Enter diastolic pressure to complete the pair.';
+        issues.bp_diastolic = 'Enter the bottom number (diastolic) too.';
       } else if (systolic !== undefined && diastolic !== undefined && systolic <= diastolic) {
-        issues.bp_systolic = 'Systolic pressure must be greater than diastolic pressure.';
+        issues.bp_systolic = 'Systolic pressure must be greater than diastolic pressure. The top number should be the bigger one.';
       }
     }
+    return { values, provenance, issues };
+  }
+
+  /** Next: check only this page's readings, then continue. */
+  function next() {
+    const { issues } = validate();
+    const pageIssues = Object.fromEntries(
+      Object.entries(issues).filter(([metric]) => STEPS[step].metrics.includes(metric as MetricId)),
+    ) as Partial<Record<MetricId, string>>;
+    setErrors(pageIssues);
+    const firstError = STEPS[step].metrics.find(metric => pageIssues[metric]);
+    if (firstError) {
+      formRef.current?.querySelector<HTMLElement>(`#reading-${firstError}`)?.focus();
+      return;
+    }
+    goTo(step + 1);
+  }
+
+  function skip() {
+    setDraft(previous => {
+      const nextDraft = { ...previous };
+      for (const metric of STEPS[step].metrics) delete nextDraft[metric];
+      return nextDraft;
+    });
+    setErrors({});
+    goTo(step + 1);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+    if (submitter?.dataset.action !== 'save' && step !== REVIEW_STEP) {
+      next(); // Enter key or Next button
+      return;
+    }
+    setSaveError('');
+    const { values, provenance, issues } = validate();
 
     const firstError = METRIC_IDS.find(metric => issues[metric]);
     setErrors(issues);
     if (firstError) {
-      formRef.current?.querySelector<HTMLElement>(`#reading-${firstError}`)?.focus();
+      // Jump back to the page with the problem and put the cursor in that field.
+      goTo(stepForMetric(firstError), `reading-${firstError}`);
       return;
     }
     const captureForSubmit: CheckinEntry['capture'] = {};
@@ -187,11 +268,10 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
   function readingField(metric: MetricId) {
     const metadata = METRICS[metric];
     const id = `reading-${metric}`;
-    const label = metric === 'bp_systolic' ? 'Systolic'
-      : metric === 'bp_diastolic' ? 'Diastolic' : metadata.label;
+    const label = PLAIN_FIELD_LABEL[metric] ?? metadata.label;
     const isSynthetic = prefilled.includes(metric);
     const cameraCapture = capture[metric]?.source === 'camera_estimate' ? capture[metric] : undefined;
-    const descriptions = [`${id}-unit`];
+    const descriptions = [`${id}-hint`, `${id}-unit`];
     if (isSynthetic) descriptions.push(`${id}-origin`);
     if (cameraCapture) descriptions.push(`${id}-origin`);
     if (errors[metric]) descriptions.push(`${id}-error`);
@@ -205,6 +285,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     return (
       <div className="reading-field" key={metric}>
         <label htmlFor={id}>{label}</label>
+        <p className="reading-hint" id={`${id}-hint`}>{FIELD_HINTS[metric]}</p>
         <div className="reading-control">
           {metric === 'mood' ? (
             <select {...fieldProps} onChange={event => edit(metric, event.target.value)}>
@@ -242,78 +323,171 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, onSubmit }: C
     );
   }
 
+  const current = STEPS[step];
+  const progress = Math.round(((step + 1) / STEPS.length) * 100);
+  const displayValue = (metric: MetricId) => {
+    const raw = draft[metric]?.trim();
+    if (!raw) return null;
+    if (metric === 'mood') return moodChoices[Number(raw) - 1] ?? raw;
+    return `${raw} ${METRICS[metric].unitLabel}`;
+  };
+
   return (
     <>
       <header className="page-intro checkin-intro">
         <div>
-          <p className="eyebrow">Sol {sol} · Daily log</p>
           <h1>Check-in</h1>
-          <p className="muted">Record your measurements for {profile.displayName}. Blank readings stay unmeasured.</p>
+          <p className="muted">Sol {sol}. One question at a time for {profile.displayName}. You can skip anything you did not measure.</p>
         </div>
-        {profile.isSynthetic && <span className="badge badge-synthetic">Synthetic crew profile</span>}
+        <div className="checkin-intro-actions">
+          {profile.isSynthetic && <span className="badge badge-synthetic">Synthetic crew profile</span>}
+          <button className="button button-sm button-secondary" type="button" onClick={fillDemo}>
+            Fill demo readings
+          </button>
+        </div>
       </header>
 
-      <form ref={formRef} className="checkin-layout" noValidate onSubmit={submit}>
-        <section className="panel checkin-readings" aria-labelledby="checkin-readings-title">
-          <div className="checkin-panel-heading">
-            <h2 id="checkin-readings-title">Measurements</h2>
-            <button className="button button-secondary" type="button" onClick={fillDemo}>
-              Fill demo readings
-            </button>
-          </div>
-          <p className="checkin-demo-status" aria-live="polite">
-            {prefilled.length > 0 && 'Synthetic readings loaded. Edited readings are marked as user-entered.'}
+      <form ref={formRef} className="checkin-wizard" noValidate onSubmit={submit}>
+        <nav className="wizard-progress" aria-label="Check-in steps">
+          <p className="wizard-progress-label">
+            Step {step + 1} of {STEPS.length} · <strong>{current.title}</strong>
           </p>
-          <div className="checkin-metric-grid">
-            {groups.map(group => (
-              <fieldset className="checkin-metric" key={group[0]}>
-                {group.length > 1 && <legend>Blood pressure</legend>}
-                <div className={group.length > 1 ? 'pressure-grid' : undefined}>
-                  {group.map(readingField)}
+          <div className="wizard-progress-track" role="progressbar" aria-label="Check-in progress"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <div className="wizard-progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <ol className="wizard-steps">
+            {STEPS.map((item, index) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={`wizard-step-chip${index === step ? ' is-current' : ''}${index < step ? ' is-done' : ''}`}
+                  aria-current={index === step ? 'step' : undefined}
+                  onClick={() => goTo(index)}
+                >
+                  <span aria-hidden="true">{index < step ? <Check size={12} /> : index + 1}</span>
+                  {item.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        <p className="checkin-demo-status" aria-live="polite">
+          {prefilled.length > 0 && 'Demo readings loaded. Anything you change is saved as your own entry.'}
+        </p>
+
+        {STEPS.map((item, index) => (
+          <section
+            key={item.id}
+            className="panel wizard-page"
+            hidden={index !== step}
+            aria-labelledby={`step-title-${item.id}`}
+          >
+            <h2 id={`step-title-${item.id}`} ref={index === step ? stepHeading : undefined} tabIndex={-1}>{item.title}</h2>
+            <p className="wizard-intro">{item.intro}</p>
+
+            {item.metrics.length > 0 && (
+              <fieldset className="checkin-metric">
+                {item.metrics.length > 1 && <legend className="sr-only">{item.title}</legend>}
+                <div className={item.metrics.length > 1 ? 'pressure-grid' : undefined}>
+                  {item.metrics.map(readingField)}
                 </div>
-                {group[0] === 'heart_rate' && (
+                {/* The camera only runs while the heart-rate page is open. */}
+                {item.id === 'heart' && index === step && (
                   <CameraPulseCheck onAcceptEstimate={acceptCameraEstimate} />
                 )}
-                {group[0] === 'heart_rate' && capture.heart_rate?.source === 'camera_estimate' && (
+                {item.id === 'heart' && capture.heart_rate?.source === 'camera_estimate' && (
                   <p className="checkin-capture-note">
-                    This value came from the optional camera estimate. Typing a new value clears the camera
-                    attribution and records it as manual entry.
+                    This value came from the camera. Typing a new number replaces it with your own entry.
                   </p>
                 )}
-                <MeasurementGuide metric={group[0]} label={group.length > 1 ? 'blood pressure' : METRICS[group[0]].label} />
+                <MeasurementGuide metric={item.metrics[0]} label={item.metrics.length > 1 ? item.title : METRICS[item.metrics[0]].label} />
               </fieldset>
-            ))}
-          </div>
-        </section>
+            )}
 
-        <section className="panel checkin-context" aria-labelledby="checkin-context-title">
-          <h2 id="checkin-context-title">Symptoms</h2>
-          <p className="muted">Select any symptoms you noticed this sol.</p>
-          <div className="symptom-list">
-            {SYMPTOM_OPTIONS.map(symptom => (
-              <label key={symptom.id} className="symptom-option">
-                <input
-                  type="checkbox"
-                  checked={symptomIds.includes(symptom.id)}
-                  onChange={event => {
-                    const checked = event.target.checked;
-                    setSymptomIds(previous => checked
-                      ? [...previous, symptom.id]
-                      : previous.filter(id => id !== symptom.id));
-                  }}
-                />
-                {symptom.label}
-              </label>
-            ))}
-          </div>
-          <label className="checkin-note-label" htmlFor="checkin-note">Note <span>Optional</span></label>
-          <textarea id="checkin-note" rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
-        </section>
+            {item.id === 'feel' && (
+              <div className="checkin-context">
+                {SYMPTOM_GROUPS.map(group => (
+                <fieldset className="symptom-group" key={group.title}>
+                <legend>{group.title}</legend>
+                <div className="symptom-list">
+                  {SYMPTOM_OPTIONS.filter(symptom => group.ids.includes(symptom.id)).map(symptom => (
+                    <label key={symptom.id} className="symptom-option" htmlFor={`symptom-${symptom.id}`}>
+                      <input
+                        id={`symptom-${symptom.id}`}
+                        type="checkbox"
+                        value={symptom.id}
+                        checked={symptomIds.includes(symptom.id)}
+                        onChange={event => {
+                          const checked = event.target.checked;
+                          setSymptomIds(previous => checked
+                            ? [...previous, symptom.id]
+                            : previous.filter(id => id !== symptom.id));
+                        }}
+                      />
+                      {symptom.label}
+                    </label>
+                  ))}
+                </div>
+                </fieldset>
+                ))}
+                <label className="checkin-note-label" htmlFor="checkin-note">Anything else? <span>Optional</span></label>
+                <textarea id="checkin-note" rows={3} maxLength={500} value={note} onChange={event => setNote(event.target.value)} />
+              </div>
+            )}
 
-        <div className="checkin-actions">
-          {Object.keys(errors).length > 0 && <p className="reading-error">Recheck the original measurements and units before saving.</p>}
+            {item.id === 'review' && (
+              <dl className="review-list">
+                {MEASUREMENT_STEPS.map(page => (
+                  <div key={page.id} className={page.metrics.some(metric => errors[metric]) ? 'has-error' : undefined}>
+                    <dt>{page.title}</dt>
+                    <dd>
+                      {page.metrics.map(metric => displayValue(metric)).filter(Boolean).join(' / ') || <span className="muted">Not measured</span>}
+                    </dd>
+                    <button type="button" className="button button-sm button-ghost" onClick={() => goTo(STEPS.indexOf(page))}>
+                      <Pencil size={14} aria-hidden="true" /> Edit<span className="sr-only"> {page.title}</span>
+                    </button>
+                  </div>
+                ))}
+                <div>
+                  <dt>How you feel</dt>
+                  <dd>
+                    {symptomIds.length
+                      ? SYMPTOM_OPTIONS.filter(option => symptomIds.includes(option.id)).map(option => option.label).join(', ')
+                      : <span className="muted">Nothing ticked</span>}
+                    {note.trim() && <span className="review-note">Note: {note.trim()}</span>}
+                  </dd>
+                  <button type="button" className="button button-sm button-ghost" onClick={() => goTo(FEEL_STEP)}>
+                    <Pencil size={14} aria-hidden="true" /> Edit<span className="sr-only"> how you feel</span>
+                  </button>
+                </div>
+              </dl>
+            )}
+          </section>
+        ))}
+
+        <div className="wizard-nav">
+          {Object.keys(errors).length > 0 && <p className="reading-error">Please check the highlighted number before going on.</p>}
           {saveError && <p className="reading-error" role="alert">{saveError}</p>}
-          <button className="button button-primary" type="submit">Save and assess <span aria-hidden="true">→</span></button>
+          <div className="wizard-nav-buttons">
+            <button className="button button-secondary" type="button" onClick={() => goTo(step - 1)} disabled={step === 0}>
+              <ArrowLeft size={16} aria-hidden="true" /> Back
+            </button>
+            {step < REVIEW_STEP && current.metrics.length > 0 && (
+              <button className="button button-ghost" type="button" onClick={skip} aria-label="Skip, not measured today">Skip</button>
+            )}
+            {step < REVIEW_STEP && (
+              <button className={`button ${reviewVisited ? 'button-secondary' : 'button-primary'}`} type="submit" data-action="next">
+                Next <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            )}
+            {/* Always in the page so a fix made on any page can be saved straight away. */}
+            <button className="button button-primary" type="submit" data-action="save"
+              hidden={step !== REVIEW_STEP && !reviewVisited}>
+              Save and assess <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </form>
     </>

@@ -3,6 +3,9 @@ import { z } from 'zod';
 export const METRIC_IDS = [
   'heart_rate', 'bp_systolic', 'bp_diastolic', 'body_temp',
   'blood_glucose', 'sleep_duration', 'mood',
+  // Optional readings added from the crew-health gap review:
+  'heart_rate_standing', 'bp_systolic_standing', 'bp_diastolic_standing', // stand-up (orthostatic) test
+  'fluid_intake', 'exercise_minutes', // hydration and the muscle/bone countermeasure
 ] as const;
 export const HEALTH_DOMAINS = [
   'cardiovascular', 'metabolic', 'temperature', 'sleep', 'behavioral', 'symptoms',
@@ -10,7 +13,7 @@ export const HEALTH_DOMAINS = [
 
 const metricIdSchema = z.enum(METRIC_IDS);
 const healthDomainSchema = z.enum(HEALTH_DOMAINS);
-const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h']);
+const unitSchema = z.enum(['bpm', 'mmHg', 'degC', 'mg_dL', 'h', 'score_1_5', 'uGy_per_h', 'L', 'min']);
 const provenanceSchema = z.enum(['user_entered', 'synthetic_demo', 'nasa_archive', 'derived']);
 const findingKindSchema = z.enum(['observation', 'trend', 'contextual_association', 'data_quality', 'data_unavailable']);
 const domainStatusSchema = z.enum([
@@ -33,7 +36,18 @@ export type EscalationTier = z.infer<typeof escalationTierSchema>;
 export type ReviewStatus = z.infer<typeof reviewStatusSchema>;
 export type MissionEventKind = z.infer<typeof missionEventKindSchema>;
 
-export const METRICS: Record<MetricId, { label: string; unit: Unit; unitLabel: string; domain: HealthDomain }> = {
+export interface MetricInfo {
+  label: string;
+  unit: Unit;
+  unitLabel: string;
+  domain: HealthDomain;
+  /** Optional readings: skipping them is normal and never produces a "not measured" finding. */
+  optional?: boolean;
+  /** Countermeasure logs (exercise, fluids) inform rules but never set a body-area status. */
+  countermeasure?: boolean;
+}
+
+export const METRICS: Record<MetricId, MetricInfo> = {
   heart_rate: { label: 'Heart rate', unit: 'bpm', unitLabel: 'bpm', domain: 'cardiovascular' },
   bp_systolic: { label: 'Systolic pressure', unit: 'mmHg', unitLabel: 'mmHg', domain: 'cardiovascular' },
   bp_diastolic: { label: 'Diastolic pressure', unit: 'mmHg', unitLabel: 'mmHg', domain: 'cardiovascular' },
@@ -41,6 +55,11 @@ export const METRICS: Record<MetricId, { label: string; unit: Unit; unitLabel: s
   blood_glucose: { label: 'Blood glucose', unit: 'mg_dL', unitLabel: 'mg/dL', domain: 'metabolic' },
   sleep_duration: { label: 'Sleep duration', unit: 'h', unitLabel: 'h', domain: 'sleep' },
   mood: { label: 'Mood', unit: 'score_1_5', unitLabel: 'of 5', domain: 'behavioral' },
+  heart_rate_standing: { label: 'Standing heart rate', unit: 'bpm', unitLabel: 'bpm', domain: 'cardiovascular', optional: true },
+  bp_systolic_standing: { label: 'Standing systolic pressure', unit: 'mmHg', unitLabel: 'mmHg', domain: 'cardiovascular', optional: true },
+  bp_diastolic_standing: { label: 'Standing diastolic pressure', unit: 'mmHg', unitLabel: 'mmHg', domain: 'cardiovascular', optional: true },
+  fluid_intake: { label: 'Fluid intake', unit: 'L', unitLabel: 'L', domain: 'metabolic', optional: true, countermeasure: true },
+  exercise_minutes: { label: 'Exercise', unit: 'min', unitLabel: 'min', domain: 'metabolic', optional: true, countermeasure: true },
 };
 
 export const SYMPTOM_OPTIONS = [
@@ -52,6 +71,13 @@ export const SYMPTOM_OPTIONS = [
   { id: 'chest_discomfort', label: 'Chest discomfort' },
   { id: 'digestive_discomfort', label: 'Digestive discomfort' },
   { id: 'muscle_ache', label: 'Muscle ache' },
+  // Space motion sickness and balance
+  { id: 'vertigo', label: 'Spinning or vertigo' },
+  { id: 'vomiting', label: 'Vomiting' },
+  { id: 'balance_problems', label: 'Balance problems' },
+  // SANS (fluid shift and eye) screening
+  { id: 'vision_changes', label: 'Blurred or changed vision' },
+  { id: 'head_fullness', label: 'Puffy face or head fullness' },
 ] as const;
 
 export const SOL_LENGTH_SECONDS = 88_775;
@@ -68,6 +94,14 @@ export function measurementValueError(metric: MetricId, value: number): string |
   }
   if (metric === 'body_temp') {
     if (value <= -273.15) return 'Enter a temperature above absolute zero.';
+    return;
+  }
+  if (metric === 'fluid_intake') {
+    if (value < 0 || value > 15) return 'Enter litres from 0 to 15.';
+    return;
+  }
+  if (metric === 'exercise_minutes') {
+    if (!Number.isInteger(value) || value < 0 || value > 600) return 'Enter whole minutes from 0 to 600.';
     return;
   }
   if (value <= 0) return 'Enter a value greater than zero.';
@@ -192,6 +226,15 @@ export const actionCardSchema = z.object({
   sourceRefs: z.array(z.string()),
   reviewStatus: reviewStatusSchema,
 });
+/** Synthetic habitat environment reading for one sol (Environmental Control and Life Support). */
+export const habitatSampleSchema = z.object({
+  sol,
+  /** Daily mean cabin CO2 partial pressure, mmHg. */
+  co2Mmhg: z.number().nonnegative(),
+  /** Daily mean cabin air temperature, °C. */
+  cabinTempC: z.number(),
+  provenance: provenanceSchema,
+});
 export const demoScenarioSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -200,6 +243,7 @@ export const demoScenarioSchema = z.object({
   missionContext: missionContextSchema,
   history: z.array(dailyCheckinSchema),
   events: z.array(missionEventSchema),
+  environment: z.array(habitatSampleSchema).optional(),
   startSol: sol,
 });
 export const auditEventSchema = z.object({
@@ -227,11 +271,14 @@ export type RiskAssessment = z.infer<typeof riskAssessmentSchema>;
 export type AssessmentState = z.infer<typeof assessmentStateSchema>;
 export type ActionCard = z.infer<typeof actionCardSchema>;
 export type DemoScenario = z.infer<typeof demoScenarioSchema>;
+export type HabitatSample = z.infer<typeof habitatSampleSchema>;
 export type AuditEvent = z.infer<typeof auditEventSchema>;
 
 export type AssessmentContext = {
   events: readonly MissionEvent[];
   archiveEvent: { sol: number; date: string };
+  /** Simulated habitat environment by sol (CO2, cabin temperature). */
+  environment?: readonly HabitatSample[];
 };
 
 export type CheckinEntry = {

@@ -1,6 +1,5 @@
 import {
   HEALTH_DOMAINS,
-  METRIC_IDS,
   METRICS,
   measurementValueError,
   type AssessmentContext,
@@ -16,6 +15,12 @@ import {
 } from '../contracts';
 import {
   BASELINE_LOOKBACK_SOLS,
+  CO2_LIMIT_MMHG,
+  CORE_METRIC_IDS,
+  EXERCISE_TARGET_MIN,
+  FLUID_TARGET_L,
+  MOTION_SICKNESS_SYMPTOMS,
+  ORTHOSTATIC,
   DEMO_DELTAS,
   MIN_BASELINE_READINGS,
   MIN_TREND_READINGS,
@@ -93,6 +98,23 @@ function reviewCheckin(checkin: DailyCheckin): ReviewedCheckin {
       issues.set('bp_diastolic', issues.get('bp_diastolic') ?? pairIssue);
       measurements.delete('bp_systolic');
       measurements.delete('bp_diastolic');
+    }
+  }
+
+  const standingSystolic = measurements.get('bp_systolic_standing');
+  const standingDiastolic = measurements.get('bp_diastolic_standing');
+  if (seen.has('bp_systolic_standing') || seen.has('bp_diastolic_standing')) {
+    let pairIssue: string | undefined;
+    if (!standingSystolic || !standingDiastolic) {
+      pairIssue = 'Enter both standing blood pressure values together.';
+    } else if (standingSystolic.value <= standingDiastolic.value) {
+      pairIssue = 'Standing systolic blood pressure must be greater than diastolic.';
+    }
+    if (pairIssue) {
+      issues.set('bp_systolic_standing', issues.get('bp_systolic_standing') ?? pairIssue);
+      issues.set('bp_diastolic_standing', issues.get('bp_diastolic_standing') ?? pairIssue);
+      measurements.delete('bp_systolic_standing');
+      measurements.delete('bp_diastolic_standing');
     }
   }
 
@@ -259,6 +281,85 @@ function assessSymptoms(current: DailyCheckin, recent: readonly ReviewedCheckin[
   return { status, findings };
 }
 
+function present(checkin: DailyCheckin, id: string): boolean {
+  return checkin.symptoms.some((symptom) => symptom.id === id && symptom.present);
+}
+
+/** Stand-up test: seated vs standing on the same check-in. */
+function assessOrthostatic(current: ReviewedCheckin): Finding | null {
+  const m = current.measurements;
+  const seatedSys = m.get('bp_systolic'); const seatedDia = m.get('bp_diastolic'); const seatedHr = m.get('heart_rate');
+  const standSys = m.get('bp_systolic_standing'); const standDia = m.get('bp_diastolic_standing'); const standHr = m.get('heart_rate_standing');
+  const parts: string[] = [];
+  const inputs: string[] = [];
+  if (seatedSys && seatedDia && standSys && standDia) {
+    const sysDrop = seatedSys.value - standSys.value;
+    const diaDrop = seatedDia.value - standDia.value;
+    if (sysDrop >= ORTHOSTATIC.systolicDrop || diaDrop >= ORTHOSTATIC.diastolicDrop) {
+      parts.push(`blood pressure fell by ${sysDrop}/${diaDrop} mmHg`);
+      inputs.push(seatedSys.id, seatedDia.id, standSys.id, standDia.id);
+    }
+  }
+  if (seatedHr && standHr) {
+    const rise = standHr.value - seatedHr.value;
+    if (rise >= ORTHOSTATIC.heartRateRise) {
+      parts.push(`pulse rose by ${rise} bpm`);
+      inputs.push(seatedHr.id, standHr.id);
+    }
+  }
+  if (!parts.length) return null;
+  return finding('orthostatic-check', 'observation', `On standing, ${parts.join(' and ')} (stand-up test). Show the Crew Medical Officer.`, inputs);
+}
+
+/** Count recent logged sols where a reading meets a condition. */
+function countRecent(metric: MetricId, recent: readonly ReviewedCheckin[], test: (value: number) => boolean) {
+  const readings = metricReadings(metric, recent);
+  return { readings, count: readings.filter(({ value }) => test(value)).length };
+}
+
+function assessHydration(current: ReviewedCheckin, recent: readonly ReviewedCheckin[]): Finding | null {
+  const today = current.measurements.get('fluid_intake');
+  if (!today || today.value >= FLUID_TARGET_L) return null;
+  const { readings, count } = countRecent('fluid_intake', recent, (value) => value < FLUID_TARGET_L);
+  if (count >= MIN_TREND_READINGS) {
+    return finding('hydration-low', 'trend', `Fluid intake was below ${FLUID_TARGET_L} L on ${count} of the last ${TREND_LOOKBACK_SOLS} sols.`, readings.map(({ id }) => id));
+  }
+  return finding('hydration-low', 'observation', `Fluid intake was ${today.value} L, below the ${FLUID_TARGET_L} L demo minimum.`, [today.id]);
+}
+
+function assessExercise(current: ReviewedCheckin, recent: readonly ReviewedCheckin[]): Finding | null {
+  if (!current.measurements.get('exercise_minutes')) return null;
+  const { readings, count } = countRecent('exercise_minutes', recent, (value) => value < EXERCISE_TARGET_MIN);
+  if (count < MIN_TREND_READINGS) return null;
+  return finding('countermeasure-adherence', 'trend', `Exercise was below the ${EXERCISE_TARGET_MIN}-minute target on ${count} of the last ${TREND_LOOKBACK_SOLS} sols. This tracks the countermeasure, not muscle or bone directly.`, readings.map(({ id }) => id));
+}
+
+function assessMotionSickness(checkin: DailyCheckin): Finding | null {
+  const reported = MOTION_SICKNESS_SYMPTOMS.filter((id) => present(checkin, id));
+  if (reported.length < 2) return null;
+  const labels = checkin.symptoms.filter((s) => (reported as readonly string[]).includes(s.id)).map((s) => s.label.toLowerCase());
+  return finding('motion-sickness-pattern', 'observation', `Possible space motion sickness: ${labels.join(', ')} reported together.`);
+}
+
+function assessSans(checkin: DailyCheckin): Finding | null {
+  const vision = present(checkin, 'vision_changes');
+  const fullness = present(checkin, 'head_fullness');
+  if (!vision && !fullness) return null;
+  return finding('sans-screen', 'observation', vision
+    ? 'Blurred or changed vision reported. A Crew Medical Officer eye check is recommended (fluid shift can affect the eyes).'
+    : 'Puffy face or head fullness reported, a sign of fluid shift. Keep watching and report any vision change.');
+}
+
+function assessCo2(recent: readonly ReviewedCheckin[], context?: AssessmentContext): Finding | null {
+  const environment = context?.environment;
+  if (!environment?.length) return null;
+  const hits = recent.filter(({ checkin }) => present(checkin, 'headache')
+    && (environment.find((sample) => sample.sol === checkin.sol)?.co2Mmhg ?? 0) >= CO2_LIMIT_MMHG);
+  if (!hits.length) return null;
+  const detail = hits.map(({ checkin }) => `Sol ${checkin.sol} (${environment.find((s) => s.sol === checkin.sol)?.co2Mmhg} mmHg)`).join(', ');
+  return finding('co2-headache-context', 'contextual_association', `Headaches were reported when habitat CO2 was at or above ${CO2_LIMIT_MMHG} mmHg: ${detail}. Timing alone cannot establish a cause.`);
+}
+
 export function evaluateCheckin(
   checkin: DailyCheckin,
   history: readonly DailyCheckin[],
@@ -277,7 +378,7 @@ export function evaluateCheckin(
     findings.push(finding('entry-quality', 'data_quality', dataQualityWarnings.join(' '), inputIds));
   }
 
-  for (const metric of METRIC_IDS) {
+  for (const metric of CORE_METRIC_IDS) {
     const { domain } = METRICS[metric];
     const result = assessMetric(metric, current, prior, recent);
     if (statusPriority[result.status] > statusPriority[domainStatuses[domain]]) domainStatuses[domain] = result.status;
@@ -322,11 +423,33 @@ export function evaluateCheckin(
       `${urgentSymptoms.map(symptom => symptom.label).join(' and ')} reported. Crew Medical Officer review is recommended without waiting for a baseline or trend.`,
     ));
   }
+  // Entry problems in the optional readings (e.g. a reversed standing pair) mark the cardiovascular area for re-entry.
+  if (current.issues.has('bp_systolic_standing') || current.issues.has('heart_rate_standing')) {
+    domainStatuses.cardiovascular = 'check_entry';
+  }
+  const orthostatic = assessOrthostatic(current);
+  if (orthostatic) {
+    findings.push(orthostatic);
+    if (statusPriority.change_from_baseline > statusPriority[domainStatuses.cardiovascular]) domainStatuses.cardiovascular = 'change_from_baseline';
+  }
+  const hydration = assessHydration(current, recent);
+  if (hydration) findings.push(hydration);
+  const exercise = assessExercise(current, recent);
+  if (exercise) findings.push(exercise);
+  const motionSickness = assessMotionSickness(checkin);
+  if (motionSickness) findings.push(motionSickness);
+  const sans = assessSans(checkin);
+  if (sans) findings.push(sans);
+  const co2 = assessCo2(recent, context);
+  if (co2) findings.push(co2);
+  const needsMedicalOfficer = urgentSymptoms.length > 0 || Boolean(sleep && mood) || Boolean(orthostatic)
+    || present(checkin, 'vision_changes') || present(checkin, 'vomiting');
+
   findings.sort((left, right) => RULES[right.ruleId].priority - RULES[left.ruleId].priority);
   const actionCardIds = [...new Set(findings.flatMap(({ ruleId }) => RULES[ruleId].actionCardIds))];
 
   let overallState: AssessmentState = 'no_concern_identified';
-  if (urgentSymptoms.length > 0 || (sleep && mood)) {
+  if (needsMedicalOfficer) {
     overallState = 'escalation_recommended';
   } else if (dataQualityWarnings.length > 0) {
     overallState = 'remeasurement_recommended';
@@ -343,9 +466,9 @@ export function evaluateCheckin(
     findings,
     domainStatuses,
     dataQualityWarnings,
-    recommendedTier: urgentSymptoms.length > 0 || (sleep && mood) ? 'crew_medical_officer' : 'self_care',
+    recommendedTier: needsMedicalOfficer ? 'crew_medical_officer' : 'self_care',
     actionCardIds: actionCardIds.length > 0 ? actionCardIds : ['record-and-monitor'],
-    engineVersion: '1.3.0',
+    engineVersion: '1.4.0',
     overallState,
   };
 }

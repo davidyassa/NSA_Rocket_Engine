@@ -10,17 +10,19 @@ import { ORIGIN_META, STATUS_META } from '../../ui/tokens';
 import craterPhoto from '../../ui/assets/gale-crater.webp';
 import { CrewBodyFigure, DOMAIN_TARGETS } from './CrewBodyFigure';
 import { RoutineChecklist } from './RoutineChecklist';
+import { HabitatAir } from './HabitatAir';
 import { calculateCheckinStreak } from './streak';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
+import { PLAIN_DOMAIN, PLAIN_STATUS } from '../../content/plainLanguage';
 import './dashboard.css';
 
 const domainInfo = {
-  cardiovascular: { label: 'Cardiovascular', Icon: HeartPulse },
-  metabolic: { label: 'Metabolic', Icon: Waves },
-  temperature: { label: 'Temperature', Icon: Thermometer },
-  sleep: { label: 'Sleep', Icon: Moon },
-  behavioral: { label: 'Behavioral health', Icon: Smile },
-  symptoms: { label: 'Symptoms', Icon: Stethoscope },
+  cardiovascular: { label: PLAIN_DOMAIN.cardiovascular, Icon: HeartPulse },
+  metabolic: { label: PLAIN_DOMAIN.metabolic, Icon: Waves },
+  temperature: { label: PLAIN_DOMAIN.temperature, Icon: Thermometer },
+  sleep: { label: PLAIN_DOMAIN.sleep, Icon: Moon },
+  behavioral: { label: PLAIN_DOMAIN.behavioral, Icon: Smile },
+  symptoms: { label: PLAIN_DOMAIN.symptoms, Icon: Stethoscope },
 } satisfies Record<HealthDomain, { label: string; Icon: typeof HeartPulse }>;
 
 
@@ -85,8 +87,8 @@ export function Dashboard({ scenario, records, latest, assessment }: {
       <section className="mission-hero" aria-labelledby="mission-sol">
         <div className="mission-photo" style={{ backgroundImage: `url(${craterPhoto})` }} aria-hidden="true" />
         <div className="mission-hero-content">
-          <p className="eyebrow"><span className="mission-beacon" /> {missionContext.habitat}</p>
           <h2 id="mission-sol">Sol {startSol}</h2>
+          <p className="mission-habitat">{missionContext.habitat}</p>
           <p>{logged ? 'Today’s check-in is recorded.' : 'Your daily check-in is ready.'}</p>
           <Link to={logged ? '/assessment' : '/check-in'} className="button button-primary">
             {logged ? 'View today’s assessment' : 'Start check-in'} <ArrowRight size={17} aria-hidden="true" />
@@ -124,10 +126,8 @@ export function Dashboard({ scenario, records, latest, assessment }: {
       {pendingTasks.length > 0 && (
         <aside className="panel action-center-banner" aria-label="Pending clinical follow-up tasks">
           <div>
-            <span className="eyebrow action-center-eyebrow">
-              <CircleAlert size={14} aria-hidden="true" /> Action required · Mission health action center
-            </span>
-            <p>
+            <p className="action-center-title">
+              <CircleAlert size={16} aria-hidden="true" /> Action required:{' '}
               {pendingTasks[0].title}
               {pendingTasks.length > 1 && ` (plus ${pendingTasks.length - 1} more pending)`}
             </p>
@@ -177,6 +177,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
                 </div>
                 <p className="domain-value">{domainReading(domain, latest)}</p>
                 <span className={`domain-status status-${status.tone}`}><status.Icon size={14} aria-hidden="true" />{status.label}</span>
+                <p className="domain-plain">{PLAIN_STATUS[assessment?.domainStatuses[domain] ?? 'not_measured']}</p>
                 {origins.size === 1 && (
                   <span className={`${ORIGIN_META[[...origins][0]].className} domain-origin-badge`}>{ORIGIN_META[[...origins][0]].label}</span>
                 )}
@@ -194,6 +195,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
       </section>
 
       <section className="dashboard-quick-intel-grid" aria-label="Operational Health Intelligence">
+        <HabitatAir environment={scenario.environment} sol={startSol} />
         <article className="panel dashboard-intel-card">
           <div className="section-title">
             <div className="flags-title">
@@ -206,7 +208,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             NASA Brief Psychomotor Vigilance Task tracks astronaut readiness, reaction times, and lapses (&gt;500ms).
           </p>
           <Link to="/cognitive" className="button button-secondary" style={{ width: 'fit-content' }}>
-            Run vigilance test →
+            Run vigilance test <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </article>
 
@@ -222,7 +224,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
             Grounded in NASA HRP risk books: Radiation (Curiosity MSL-RAD), Behavioral Isolation, and Distance latency.
           </p>
           <Link to="/hazards" className="button button-secondary" style={{ width: 'fit-content' }}>
-            Explore NASA HRP evidence →
+            Explore NASA HRP evidence <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </article>
       </section>

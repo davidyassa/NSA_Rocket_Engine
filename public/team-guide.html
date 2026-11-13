@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sol Check — Complete System Architecture, Clinical Workflow & Engineering Diagrams</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="./vendor/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #070B14;
+      --card-bg: #0d1527;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: #1e293b;
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    .print-bar {
+      position: sticky;
+      top: 0;
+      background: rgba(7, 11, 20, 0.95);
+      backdrop-filter: blur(8px);
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .print-btn {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .print-btn:hover {
+      background: #0369a1;
+    }
+
+    header {
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .badge-nasa {
+      background: #ef4444;
+      color: #ffffff;
+    }
+
+    .badge-accent {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .badge-success {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--success);
+      border: 1px solid var(--success);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      margin: 8px 0;
+    }
+
+    .lead {
+      color: var(--text-muted);
+      font-size: 17px;
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 22px;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      font-size: 17px;
+      color: #e2e8f0;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    p, li {
+      color: #cbd5e1;
+      font-size: 14.5px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .diagram-container {
+      background: #090f1d;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0 28px 0;
+      overflow-x: auto;
+      text-align: center;
+    }
+
+    .diagram-title {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 15px;
+      margin-bottom: 16px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    th {
+      background: #0f172a;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    code {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    pre {
+      background: #050811;
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .highlight-box {
+      border-left: 4px solid var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 20px 0;
+    }
+
+    /* Print Stylesheet for High-DPI PDF Output */
+    @media print {
+      .print-bar {
+        display: none !important;
+      }
+      body {
+        background: #070B14 !important;
+        color: #f1f5f9 !important;
+        font-size: 10pt;
+      }
+      .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+      h1 {
+        color: #ffffff !important;
+        font-size: 20pt;
+      }
+      h2 {
+        color: #38bdf8 !important;
+        border-bottom: 2px solid #1e293b !important;
+        page-break-after: avoid;
+        font-size: 14pt;
+        margin-top: 32px;
+      }
+      h3 {
+        color: #e2e8f0 !important;
+        page-break-after: avoid;
+      }
+      .card, .diagram-container {
+        page-break-inside: avoid;
+        margin-bottom: 18px;
+        background: #0b1325 !important;
+        border: 1px solid #1e293b !important;
+      }
+      table {
+        page-break-inside: avoid;
+      }
+      th {
+        background: #0f172a !important;
+        color: #38bdf8 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-bar">
+    <div>
+      <strong style="color: #38bdf8;">🚀 Sol Check Visual Architecture Suite</strong>
+      <span style="color: #64748b; margin-left: 12px; font-size: 13px;">NASA Space Apps Challenge 2026</span>
+    </div>
+    <button class="print-btn" onclick="window.print()">
+      🖨️ Save as PDF / Print Document
+    </button>
+  </div>
+
+  <div class="container">
+    <header>
+      <div class="badge-bar">
+        <span class="badge badge-nasa">NASA Space Apps 2026</span>
+        <span class="badge badge-accent">Autonomous Deep-Space Flight Deck</span>
+        <span class="badge badge-success">21 Suites Passed (124 Tests)</span>
+      </div>
+      <h1>Sol Check — End-to-End System Architecture, Clinical Workflow & Diagram Suite</h1>
+      <p class="lead">Complete operational architecture manual for autonomous crew health evaluation on Mars Sol 43 under 20–40 minute round-trip interplanetary communication latency.</p>
+    </header>
+
+    <div class="highlight-box">
+      <strong>Operational Mission Context:</strong> At an average orbital distance of 225 million kilometers from Earth, electromagnetic signals face a 20-minute one-way delay (40 minutes round-trip). In acute clinical anomalies, post-solar particle events, or insidious physiological deconditioning, astronauts cannot wait for Mission Control on Earth. Clinical intelligence must be autonomous, explainable, and air-gapped on-device.
+    </div>
+
+    <!-- DIAGRAM 1: MASTER ARCHITECTURE -->
+    <h2>1. Master System Architecture Flowchart</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 1.1: End-to-End 5-Layer System Architecture & Telemetry Pipeline</div>
+      <pre class="mermaid">
+flowchart TD
+    subgraph Inputs ["1. Crew Telemetry & Hardware Inputs"]
+        CAM["Device Camera (Live Video Feed)"]
+        MANUAL["Manual Physiological Check-in Form"]
+        PVT_IN["ISS PVT-B Cognitive Vigilance Test"]
+        RAD_IN["NASA Curiosity Rover Gale Crater Radiation"]
+    end
+
+    subgraph EdgeRuntime ["2. Air-Gapped Local Runtime Layer"]
+        MP["MediaPipe BlazeFace WASM (Face Tracking)"]
+        LITERT["LiteRT WASM Engine (Neural Denoising)"]
+        VC["VitalCamera rPPG Core (BVP Pulse Extraction)"]
+        SW["Workbox Service Worker (33 Precached Assets)"]
+        THREE["Three.js WebGL Engine (Blender GLB Host)"]
+    end
+
+    subgraph CoreEngine ["3. Deterministic Clinical Core (Zero LLM Hallucinations)"]
+        ZOD["Zod Type Contracts & Validation Gates"]
+        STORE["Zustand Reactive Offline State Store"]
+        BASELINE["Rolling 14-Sol Median & MAD Spread"]
+        RULES["7 Deterministic Clinical Decision Rules"]
+    end
+
+    subgraph Presentation ["4. Crew Flight Deck & 3D Digital Twin"]
+        TWIN["3D Astronaut Twin (Pulsating Heart Node)"]
+        HUD["Sol 43 Habitat Telemetry HUD"]
+        ACTIONS["Closed-Loop Clinical Action Center"]
+        HAZARDS["NASA Five Hazards Risk Matrix"]
+        CMO["Crew Medical Officer (CMO) Console"]
+    end
+
+    subgraph Uplink ["5. Delay-Tolerant Telemetry (20-40 min Latency)"]
+        HASH["FNV-1a-32 Cryptographic Checksum"]
+        JSON_PAYLOAD["Exploration Medical JSON (v1.1.0)"]
+        MD_BRIEF["Flight Surgeon Clinical Markdown Briefing"]
+        DSN["Deep Space Network (DSN) Burst Uplink to Earth"]
+    end
+
+    CAM --> MP
+    MP --> LITERT
+    LITERT --> VC
+    VC --> STORE
+    MANUAL --> ZOD
+    PVT_IN --> STORE
+    RAD_IN --> STORE
+    ZOD --> STORE
+    SW -.-> CoreEngine
+
+    STORE --> BASELINE
+    BASELINE --> RULES
+    RULES --> TWIN
+    RULES --> HUD
+    RULES --> ACTIONS
+    RULES --> HAZARDS
+    RULES --> CMO
+
+    ACTIONS --> HASH
+    CMO --> HASH
+    STORE --> JSON_PAYLOAD
+    RULES --> MD_BRIEF
+    HASH --> JSON_PAYLOAD
+    JSON_PAYLOAD --> DSN
+    MD_BRIEF --> DSN
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 2: OPERATIONAL SEQUENCE -->
+    <h2>2. Astronaut Daily Operational Routine Sequence</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 2.1: Sol 43 Daily Autonomous Check-in & Uplink Sequence</div>
+      <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Astronaut as 👨‍🚀 Mars Crew Member
+    participant Camera as 📷 Device Camera
+    participant EdgeAI as 🧠 On-Device rPPG AI
+    participant Engine as ⚙️ Clinical Decision Engine
+    participant Twin3D as 🪐 3D Digital Twin
+    participant ActionQueue as 📋 Action Center
+    participant FlightSurgeon as 🌍 Earth Flight Surgeon
+
+    Astronaut->>Camera: Initiates contactless pulse check
+    Camera->>EdgeAI: Streams RGB video frames (30 fps)
+    EdgeAI->>EdgeAI: Local BlazeFace ROI tracking + LiteRT denoising
+    EdgeAI-->>Astronaut: Returns verified Heart Rate (bpm) + SQI score
+    
+    Astronaut->>Engine: Logs sleep, mood, glucose & symptoms
+    Engine->>Engine: Computes 14-sol rolling median baseline & MAD spread
+    Engine->>Engine: Evaluates 7 deterministic clinical rules
+    
+    Engine->>Twin3D: Updates anatomical hotspots & pulses chest node live
+    Engine->>ActionQueue: Generates clinical follow-up task (if anomalies detected)
+    
+    opt Anomaly Detected (e.g. Combined Sleep/Mood Drift)
+        Engine->>Astronaut: Alerts crew with explainable evidence breakdown
+        Astronaut->>ActionQueue: Acknowledges countermeasure (e.g. duty rest)
+    end
+
+    Engine->>Engine: Bundles medical telemetry & computes FNV-1a checksum
+    Engine->>FlightSurgeon: Uplinks delay-tolerant briefing via Deep Space Network (20m latency)
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 3: ON-DEVICE VISION AI -->
+    <h2>3. Contactless Facial rPPG Optical AI Pipeline</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 3.1: Air-Gapped WebAssembly rPPG Biometric Extraction</div>
+      <pre class="mermaid">
+flowchart LR
+    FRAME["RGB Video Frames (30 fps)"] --> BLAZE["MediaPipe BlazeFace WASM"]
+    BLAZE --> ROI["Forehead & Cheeks Region-of-Interest"]
+    ROI --> COLOR["Sub-Surface Micro-Color Fluctuations"]
+    COLOR --> BVP["Raw Blood Volume Pulse (BVP)"]
+    BVP --> LITERT["LiteRT WASM Neural Model"]
+    LITERT --> FILTER["Motion Denoising & SQI Filter"]
+    FILTER --> OUTPUT["Instant Heart Rate (bpm) + Pulse Waveform"]
+    
+    subgraph PrivacyBoundary ["100% On-Device Privacy Boundary (Zero Cloud)"]
+        BLAZE
+        ROI
+        COLOR
+        BVP
+        LITERT
+        FILTER
+    end
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 4: 3D DIGITAL TWIN -->
+    <h2>4. 3D Astronaut Digital Twin Interactive Mapping</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 4.1: Blender Model Hotspots & Raycasted Anatomical Domains</div>
+      <pre class="mermaid">
+flowchart TB
+    GLB["Blender 3D Model: astronaut_sol_check.glb"] --> THREEJS["Three.js WebGL Host Viewport"]
+    
+    THREEJS --> HEAD["Head Hotspot"] --> MOOD["Behavioral Health & Mood (#/trends?metric=mood)"]
+    THREEJS --> VISOR["Visor Hotspot"] --> SLEEP["Sleep Duration Cycles (#/trends?metric=sleep_duration)"]
+    THREEJS --> CHEST["Chest Hotspot (Live Pulsing Node)"] --> HR["Cardiovascular Telemetry (#/trends?metric=heart_rate)"]
+    THREEJS --> TORSO["Torso Hotspot"] --> TEMP["Thermoregulation (#/trends?metric=body_temp)"]
+    THREEJS --> ABDOMEN["Abdomen Hotspot"] --> GLUCOSE["Metabolic Blood Glucose (#/trends?metric=blood_glucose)"]
+    THREEJS --> LIMBS["Limbs Hotspot"] --> SYMPTOMS["Systemic Reported Symptoms (#/assessment)"]
+
+    THREEJS -. "WebGL Unavailable / Reduced Motion" .-> FALLBACK["Accessible 2D Vector SVG Body Map"]
+    FALLBACK -.-> HEAD & VISOR & CHEST & TORSO & ABDOMEN & LIMBS
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 5: DETERMINISTIC DECISION TREE -->
+    <h2>5. Deterministic Clinical Heuristics & Decision Tree</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 5.1: 7-Rule Deterministic Evaluation Flow (No LLM Inference)</div>
+      <pre class="mermaid">
+flowchart TD
+    INPUT["New Daily Crew Reading"] --> R1{"Rule: entry-quality"}
+    R1 -- "Out of bounds or SBP <= DBP" --> REJECT["Reject Corrupted Data & Alert Recalibration"]
+    R1 -- "Physiologically Valid" --> R7{"Rule: data-unavailable"}
+    
+    R7 -- "< 5 Measured Sols" --> UNCERTAIN["Disclose Incomplete Baseline Uncertainty"]
+    R7 -- ">= 5 Measured Sols" --> BASELINE_COMP["Compare with 14-Sol Rolling Median"]
+    
+    BASELINE_COMP --> R4{"Rule: baseline-change"}
+    R4 -- "|Delta| >= Metric Threshold" --> ANOMALY["Flag Acute Deviation on 3D Twin"]
+    R4 -- "Within Normal Limits" --> R3{"Rule: sustained-trend"}
+    
+    R3 -- ">= 3 Sols Monotonic Drift" --> DRIFT["Flag Insidious Deconditioning"]
+    R3 -- "Stable" --> R2{"Rule: combined-sleep-mood"}
+    
+    R2 -- "Sleep < 6h AND Mood <= 2" --> ESCALATE["Escalate to CMO & Order Duty Rest"]
+    R2 -- "Normal Behavioral Scores" --> R6{"Rule: archive-replay-context"}
+    
+    R6 -- "Aligned with Sol 41 Storm" --> STORM_NEXUS["Correlate Fatigue with Habitat Shelter Event"]
+    R6 -- "Nominal Solar Conditions" --> OK["Emit Nominal Flight Readiness Status"]
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 6: ACTION STATE MACHINE -->
+    <h2>6. Closed-Loop Clinical Action State Machine</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 6.1: Medical Countermeasure Lifecycle & Triage States</div>
+      <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Open: Rule Triggered (e.g. Acute Spike)
+    Open --> Acknowledged: Astronaut / CMO Reviews Finding
+    Acknowledged --> InProgress: Countermeasure Initiated (e.g. Rest / Hydration)
+    InProgress --> AwaitingMeasurement: Follow-up Reading Scheduled
+    AwaitingMeasurement --> AwaitingMedicalReview: New Vital Signs Recorded
+    AwaitingMedicalReview --> Resolved: CMO Verifies Normalization & Signs Off
+    AwaitingMedicalReview --> Escalated: Vitals Continue Deteriorating
+    Escalated --> InProgress: Intensive Medical Protocol
+    Resolved --> [*]
+      </pre>
+    </div>
+
+    <!-- DIAGRAM 7: MULTI-PLATFORM ARCHITECTURE -->
+    <h2>7. Multi-Platform Cross-Deployment Topology</h2>
+    <div class="diagram-container">
+      <div class="diagram-title">Diagram 7.1: Universal Codebase Target Matrix (Web, iOS, Android, Expo Go)</div>
+      <pre class="mermaid">
+flowchart TD
+    SRC["Unified TypeScript & React 19 Core"] --> VITE["Vite 6 Production Bundler"]
+    
+    VITE --> PWA["Web PWA (100% Offline)"]
+    PWA --> DESKTOP["Chrome / Safari / Edge (Desktop & Habitat Terminals)"]
+    PWA --> MOBILE_PWA["Mobile Safari / Chrome (Home Screen Add)"]
+    
+    VITE --> CAPACITOR["Capacitor 6.x Native Bridge"]
+    CAPACITOR --> XCODE["iOS Native App (Xcode App.xcworkspace)"]
+    CAPACITOR --> GRADLE["Android Native App (Gradle APK)"]
+    
+    VITE --> EXPO_BRIDGE["solcheck-expo Wrapper (react-native-webview)"]
+    EXPO_BRIDGE --> METRO["Metro Bundler (Port 8081)"]
+    METRO --> QR["Live ASCII Terminal QR Code"]
+    QR --> IPHONE["iPhone 15 (Expo Go App)"]
+    QR --> ANDROID["Android Phones (Expo Go App)"]
+      </pre>
+    </div>
+
+    <!-- CLINICAL RULES TABLE -->
+    <h2>8. Explainable Decision Rules Reference Table</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Rule ID</th>
+          <th>Rule Name</th>
+          <th>Clinical Trigger Condition</th>
+          <th>Operational Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>entry-quality</code></td>
+          <td>Physiological Bounds</td>
+          <td>Values outside survivable human limits or SBP &le; DBP</td>
+          <td>Rejects corrupted sensor data; orders recalibration</td>
+        </tr>
+        <tr>
+          <td><code>combined-sleep-mood</code></td>
+          <td>Behavioral Cascade</td>
+          <td>Sleep &lt; 6.0h AND Mood &le; 2 across &ge; 3 consecutive sols</td>
+          <td>Escalates to CMO; orders sleep hygiene & duty rest</td>
+        </tr>
+        <tr>
+          <td><code>sustained-trend</code></td>
+          <td>Longitudinal Drift</td>
+          <td>&ge; 3 consecutive readings shifting monotonically</td>
+          <td>Flags insidious deconditioning (e.g. fluid shifts)</td>
+        </tr>
+        <tr>
+          <td><code>baseline-change</code></td>
+          <td>Acute Anomaly</td>
+          <td>Single reading deviates by &ge; metric demo delta</td>
+          <td>Highlights 3D Twin hotspot; emits clinical warning</td>
+        </tr>
+        <tr>
+          <td><code>reported-symptoms</code></td>
+          <td>Symptom Recurrence</td>
+          <td>Active reported symptoms (e.g. cephalalgia, fatigue)</td>
+          <td>Correlates symptoms with active mission hazards</td>
+        </tr>
+        <tr>
+          <td><code>archive-replay-context</code></td>
+          <td>Radiation Event Nexus</td>
+          <td>Correlated with Sol 41 Curiosity RAD storm (&gt;15 &mu;Gy/h)</td>
+          <td>Contextualizes crew fatigue with habitat storm shelter</td>
+        </tr>
+        <tr>
+          <td><code>data-unavailable</code></td>
+          <td>Evidence Disclosure</td>
+          <td>Fewer than 5 distinct measured sols recorded</td>
+          <td>Discloses uncertainty; prevents premature triage</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- QUALITY ASSURANCE -->
+    <h2>9. Quality Assurance & Testing Suite</h2>
+    <div class="card">
+      <p><strong>Vitest Unit & Integration Suites:</strong> 21 passed (21 total), 124 tests passed (124 total) in ~500ms.</p>
+      <p><strong>Chrome DevTools Protocol (CDP) Offline Verification:</strong> 100% route traversal passed with simulated zero-network connectivity.</p>
+    </div>
+
+    <!-- TEAM ROSTER -->
+    <h2>10. Team Roster & Attributions</h2>
+    <div class="card">
+      <p><strong>Crew Engineers & Authors:</strong> Ahmed Shacker, Ahmed Sherif, Andrew Sameh, David Michael, Hassan Mohsen, Ziad AbdElhaleem.</p>
+      <p><strong>Coach:</strong> Mariam Mohamed | <strong>Local Lead:</strong> Dr. Moatasem Mahran.</p>
+      <p><strong>3D Model:</strong> Original astronaut 3D model designed and authored by the team in Blender.</p>
+    </div>
+
+    <footer style="margin-top: 50px; border-top: 1px solid var(--border); padding-top: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+      Sol Check &bull; NASA Space Apps Challenge 2026 &bull; Autonomous Deep-Space Crew Health Evaluation
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#090f1d',
+        primaryColor: '#0f172a',
+        primaryBorderColor: '#38bdf8',
+        primaryTextColor: '#f8fafc',
+        lineColor: '#38bdf8',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#070b14',
+        fontSize: '13px'
+      }
+    });
+
+    window.addEventListener('load', () => {
+      document.body.classList.add('ready');
+      window.PAGE_RENDERED = true;
+    });
+  </script>
+</body>
+</html>

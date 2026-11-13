@@ -14,10 +14,28 @@ export const DEMO_DELTAS: Readonly<Record<MetricId, number>> = {
   blood_glucose: 12,
   sleep_duration: 1,
   mood: 1,
+  heart_rate_standing: 10,
+  bp_systolic_standing: 10,
+  bp_diastolic_standing: 8,
+  fluid_intake: 0.5,
+  exercise_minutes: 30,
 };
 
+/** The seven daily readings that use the generic baseline / trend rules. Optional readings have dedicated rules. */
+export const CORE_METRIC_IDS = METRIC_IDS.filter((metric) => !METRICS[metric].optional);
+
+/** Stand-up test thresholds (consensus definition of orthostatic hypotension; adult heart-rate rise on standing). */
+export const ORTHOSTATIC = { systolicDrop: 20, diastolicDrop: 10, heartRateRise: 30 } as const;
+/** Demo daily minimum fluid intake, litres. */
+export const FLUID_TARGET_L = 2;
+/** Demo daily exercise target, minutes (ISS crews exercise about 2 hours a day). */
+export const EXERCISE_TARGET_MIN = 90;
+/** NASA-STD-3001 habitat CO2 limit (1-hour average), mmHg. */
+export const CO2_LIMIT_MMHG = 3;
+export const MOTION_SICKNESS_SYMPTOMS = ['dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems'] as const;
+
 const baselineCondition = `Use the median of at least ${MIN_BASELINE_READINGS} distinct measured sols in the prior ${BASELINE_LOOKBACK_SOLS} sols.`;
-const deltaLabels = METRIC_IDS.map((metric) => {
+const deltaLabels = CORE_METRIC_IDS.map((metric) => {
   const { label, unitLabel } = METRICS[metric];
   const deltaUnit = metric === 'mood' ? 'point' : unitLabel;
   return `${label.toLowerCase()} ${DEMO_DELTAS[metric]} ${deltaUnit}`;
@@ -58,7 +76,7 @@ const ruleDefinitions = {
   'sustained-trend': {
     ruleId: 'sustained-trend',
     version: '1.0.0',
-    metricIds: [...METRIC_IDS],
+    metricIds: [...CORE_METRIC_IDS],
     conditions: [
       baselineCondition,
       deltaCondition,
@@ -75,7 +93,7 @@ const ruleDefinitions = {
   'baseline-change': {
     ruleId: 'baseline-change',
     version: '1.0.0',
-    metricIds: [...METRIC_IDS],
+    metricIds: [...CORE_METRIC_IDS],
     conditions: [baselineCondition, deltaCondition, 'The current reading differs from its baseline by at least the metric’s demo delta.'],
     contextRequirements: ['A usable reading and an established personal baseline.'],
     priority: 50,
@@ -137,7 +155,7 @@ const ruleDefinitions = {
   'data-unavailable': {
     ruleId: 'data-unavailable',
     version: '1.0.0',
-    metricIds: [...METRIC_IDS],
+    metricIds: [...CORE_METRIC_IDS],
     conditions: ['Report a skipped reading as not measured.', baselineCondition],
     contextRequirements: ['A submitted check-in.'],
     priority: 20,
@@ -146,6 +164,98 @@ const ruleDefinitions = {
     reviewStatus: 'demo_heuristic',
     actionCardIds: [],
     testCases: ['Missing readings and insufficient history produce separate reasons for data unavailable.'],
+  },
+  'orthostatic-check': {
+    ruleId: 'orthostatic-check',
+    version: '1.0.0',
+    metricIds: ['bp_systolic', 'bp_diastolic', 'heart_rate', 'bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'],
+    conditions: [
+      `Compare the seated readings with the readings after 3 minutes standing on the same check-in.`,
+      `Flag a fall of at least ${ORTHOSTATIC.systolicDrop} mmHg systolic or ${ORTHOSTATIC.diastolicDrop} mmHg diastolic, or a pulse rise of at least ${ORTHOSTATIC.heartRateRise} bpm.`,
+    ],
+    contextRequirements: ['A seated blood pressure pair and at least one standing reading on the same check-in.'],
+    priority: 95,
+    reason: 'Orthostatic intolerance is a known risk when moving between gravity levels; a positive stand test is shown to the Crew Medical Officer.',
+    sourceRefs: ['orthostatic-consensus', 'orthostatic-hr-review'],
+    reviewStatus: 'sourced',
+    actionCardIds: ['orthostatic-care'],
+    testCases: ['A 24/6 mmHg drop on standing is flagged.', 'A 28 bpm rise alone is not flagged; 30 bpm is.', 'No standing reading means no finding.'],
+  },
+  'hydration-low': {
+    ruleId: 'hydration-low',
+    version: '1.0.0',
+    metricIds: ['fluid_intake'],
+    conditions: [
+      `Flag fluid intake below ${FLUID_TARGET_L} L on the current check-in.`,
+      `Report a trend when intake is below ${FLUID_TARGET_L} L on at least ${MIN_TREND_READINGS} of the last ${TREND_LOOKBACK_SOLS} sols.`,
+    ],
+    contextRequirements: ['A fluid intake entry on the current check-in.'],
+    priority: 60,
+    reason: 'Thirst is blunted in low gravity; low intake is surfaced so the crew member can drink more.',
+    sourceRefs: ['demo-method'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['hydrate'],
+    testCases: ['1.6 L is flagged; 2.0 L is not.', 'Three low sols in five produce a trend.'],
+  },
+  'countermeasure-adherence': {
+    ruleId: 'countermeasure-adherence',
+    version: '1.0.0',
+    metricIds: ['exercise_minutes'],
+    conditions: [`Exercise is below ${EXERCISE_TARGET_MIN} minutes on at least ${MIN_TREND_READINGS} of the last ${TREND_LOOKBACK_SOLS} logged sols.`],
+    contextRequirements: ['Exercise minutes logged on the current check-in.'],
+    priority: 65,
+    reason: 'Daily exercise is the main countermeasure against muscle and bone loss. Logged minutes are adherence, not a measurement of muscle mass or bone density.',
+    sourceRefs: ['nasa-exercise'],
+    reviewStatus: 'demo_heuristic',
+    actionCardIds: ['exercise-plan'],
+    testCases: ['Three short sessions in five sols produce a finding.', 'A single short day does not.'],
+  },
+  'motion-sickness-pattern': {
+    ruleId: 'motion-sickness-pattern',
+    version: '1.0.0',
+    metricIds: [],
+    conditions: [
+      'At least two of dizziness, spinning/vertigo, nausea, vomiting or balance problems are reported on the current check-in.',
+      'Vomiting is shown to the Crew Medical Officer because it risks dehydration.',
+    ],
+    contextRequirements: ['A current symptom report.'],
+    priority: 80,
+    reason: 'A cluster of vestibular symptoms suggests space motion sickness while the body adapts to a new gravity level.',
+    sourceRefs: ['nasa-monitoring'],
+    reviewStatus: 'needs_clinical_review',
+    actionCardIds: ['motion-sickness-care'],
+    testCases: ['Dizziness and nausea together produce a finding.', 'One symptom alone does not.'],
+  },
+  'sans-screen': {
+    ruleId: 'sans-screen',
+    version: '1.0.0',
+    metricIds: [],
+    conditions: [
+      'Blurred or changed vision is reported: recommend a Crew Medical Officer eye check.',
+      'A puffy face or head fullness is reported: note the fluid shift and keep watching.',
+    ],
+    contextRequirements: ['A current symptom report.'],
+    priority: 85,
+    reason: 'Fluid shift can change the eye (SANS). Symptoms cannot detect SANS; they prompt an eye exam with imaging.',
+    sourceRefs: ['sans-review'],
+    reviewStatus: 'needs_clinical_review',
+    actionCardIds: ['eye-check'],
+    testCases: ['A vision change recommends Crew Medical Officer review.', 'Head fullness alone stays self-care.'],
+  },
+  'co2-headache-context': {
+    ruleId: 'co2-headache-context',
+    version: '1.0.0',
+    metricIds: [],
+    conditions: [
+      `A headache was reported on a sol in the last ${TREND_LOOKBACK_SOLS} when the habitat CO2 daily mean was at or above ${CO2_LIMIT_MMHG} mmHg.`,
+    ],
+    contextRequirements: ['Habitat environment readings for the same sols (simulated in this demo).'],
+    priority: 34,
+    reason: 'NASA links cabin CO2 above about 2.5–3 mmHg with headaches. Timing alone cannot establish a cause; fluid shift causes similar headaches.',
+    sourceRefs: ['nasa-co2-brief'],
+    reviewStatus: 'sourced',
+    actionCardIds: ['co2-check'],
+    testCases: ['A headache on a 3.4 mmHg sol adds a context finding.', 'A headache on a 2.2 mmHg sol does not.'],
   },
 } satisfies Record<string, RuleDefinition>;
 

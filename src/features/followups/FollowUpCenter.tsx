@@ -51,10 +51,9 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
   }
 
   return (
-    <section className="panel panel-padded" style={{ marginTop: '16px', borderTop: '3px solid var(--accent)' }}>
+    <section className="panel panel-padded" style={{ marginTop: '16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
         <div>
-          <p className="eyebrow" style={{ color: 'var(--accent)' }}>Closed-Loop Clinical Accountability</p>
           <h2 style={{ margin: '2px 0 0', fontSize: '1.25rem', fontWeight: 650 }}>Mission Health Action Center</h2>
           <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.84rem' }}>
             Closed-loop tracking: Observation → Assessment → Action → Clinical Sign-Off.
@@ -104,13 +103,8 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
             return (
               <article
                 key={task.id}
-                style={{
-                  border: '1px solid var(--line)',
-                  borderRadius: '6px',
-                  padding: '12px 14px',
-                  background: isResolved ? 'var(--bg-surface)' : 'var(--bg-surface)',
-                  opacity: isResolved ? 0.85 : 1,
-                }}
+                className="followup-task"
+                style={{ opacity: isResolved ? 0.85 : 1 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -118,16 +112,15 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
                       style={{
                         padding: '2px 6px',
                         borderRadius: '3px',
-                        fontSize: '0.68rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
-                        textTransform: 'uppercase',
                         background: pColor.bg,
                         color: pColor.text,
                       }}
                     >
                       {task.priority}
                     </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       Assigned: <strong>{task.assignedRole.replace(/_/g, ' ')}</strong> · Sol {task.sol}
                     </span>
                   </div>
@@ -213,7 +206,7 @@ export function FollowUpCenter({ tasks, onTasksChange, currentUserRole = 'astron
                 )}
 
                 {/* Audit Trail Details */}
-                <details style={{ marginTop: '8px', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                <details style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <summary style={{ cursor: 'pointer' }}>Audit Trail ({task.auditTrail.length} events)</summary>
                   <ul style={{ paddingLeft: '16px', margin: '4px 0 0' }}>
                     {task.auditTrail.map((entry, idx) => (

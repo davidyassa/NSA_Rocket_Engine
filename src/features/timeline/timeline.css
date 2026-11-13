@@ -21,9 +21,6 @@
   align-items: center;
 }
 
-.timeline-toolbar .eyebrow {
-  color: var(--accent-dark);
-}
 
 .timeline-replay-label {
   margin: 4px 0 0;
@@ -116,7 +113,7 @@
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
-  font: 500 0.73rem var(--mono);
+  font: 500 0.8rem var(--mono);
 }
 
 .timeline-lane {
@@ -291,7 +288,7 @@
 .timeline-axis-title,
 .timeline-axis-labels {
   color: var(--muted);
-  font: 500 0.68rem var(--mono);
+  font: 500 0.8rem var(--mono);
 }
 
 .timeline-axis-title {
@@ -320,7 +317,7 @@
   flex-direction: column;
   justify-content: space-between;
   color: var(--muted);
-  font: 400 0.66rem/1 var(--mono);
+  font: 400 0.8rem/1 var(--mono);
 }
 
 .timeline-ticks-left {
@@ -397,7 +394,7 @@
   border-radius: 4px;
   background: var(--tint-trend);
   color: var(--status-trend);
-  font: 500 0.65rem var(--mono);
+  font: 500 0.8rem var(--mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -427,7 +424,7 @@
 
 .timeline-selected-sol,
 .timeline-original-anchor {
-  font: 500 0.67rem var(--mono);
+  font: 500 0.8rem var(--mono);
 }
 
 .timeline-selected-sol {

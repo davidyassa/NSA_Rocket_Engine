@@ -24,6 +24,7 @@ import { FollowUpCenter } from '../followups/FollowUpCenter';
 import { useFollowUpStore } from '../followups/useFollowUpStore';
 import type { FollowUpTask } from '../followups/followUpEngine';
 import { EvidencePassport } from './EvidencePassport';
+import { PLAIN_NEXT_STEP, plainFinding } from '../../content/plainLanguage';
 import './assessment.css';
 
 interface AssessmentProps {
@@ -64,8 +65,7 @@ function MedicalHandoffSection({ record, assessment }: { record: DailyCheckin; a
   }
 
   return (
-    <div className="panel assessment-action" style={{ borderTop: '3px solid var(--accent)' }}>
-      <p className="eyebrow">Autonomous Medical Care</p>
+    <div className="panel assessment-action">
       <h3>Evidence Passport & Flight Surgeon Handoff</h3>
       <p style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem' }}>
         Traceable clinical evidence package prepared autonomously under a simulated 20-minute one-way
@@ -169,7 +169,8 @@ function FindingCard({ finding, readings, assessment, tasks }: {
   return (
     <article className={`panel assessment-finding assessment-finding--${finding.kind}`}>
       <span className="badge assessment-kind">{findingLabels[finding.kind]}</span>
-      <h3>{finding.summary}</h3>
+      <h3>{plainFinding(finding)}</h3>
+      <p className="finding-technical"><span>Technical:</span> {finding.summary}</p>
       <details className="assessment-why">
         <summary aria-label={`Why this finding? ${finding.summary}`}>Why this finding?</summary>
         <div className="assessment-evidence">
@@ -252,8 +253,8 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
   return (
     <>
       <header className="page-intro assessment-intro">
-        <p className="eyebrow">{record ? `Sol ${record.sol} · Check-in results` : 'Crew health log'}</p>
         <h1>Assessment</h1>
+        <p className="page-subtitle">{record ? `Results of your Sol ${record.sol} check-in` : 'Crew health log'}</p>
         <div className="assessment-notice">
           <span className="badge">Not a diagnosis</span>
           {record?.measurements.some(reading => reading.provenance === 'synthetic_demo') && (
@@ -261,6 +262,23 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
           )}
         </div>
       </header>
+
+      {assessment && (
+        <section className="panel plain-summary" aria-labelledby="plain-summary-title">
+          <h2 id="plain-summary-title">{PLAIN_NEXT_STEP[assessment.recommendedTier].title}</h2>
+          <p className="plain-summary-action">{PLAIN_NEXT_STEP[assessment.recommendedTier].action}</p>
+          {assessment.findings.length > 0 ? (
+            <ul className="plain-summary-list">
+              {assessment.findings.map((finding, index) => (
+                <li key={`${finding.ruleId}-${index}`}>{plainFinding(finding)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="plain-summary-action">All the readings that could be compared look like your usual.</p>
+          )}
+          <p className="plain-summary-note">This is a helper, not a diagnosis. If you feel unwell, tell your crew medical officer whatever this page says.</p>
+        </section>
+      )}
 
       {record && (
         <GroundCommunication
@@ -303,8 +321,7 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
           <section className="assessment-actions" aria-labelledby="assessment-actions-title">
             <h2 id="assessment-actions-title">Next steps</h2>
             <div className="panel assessment-action">
-              <p className="eyebrow">Suggested demo route</p>
-              <h3>{tierLabels[assessment.recommendedTier]}</h3>
+              <h3>Suggested route: {tierLabels[assessment.recommendedTier]}</h3>
               <ol className="assessment-ladder" role="list" aria-label="Escalation ladder">
                 {escalationSteps.map(({ tier, text }) => (
                   <li key={tier} aria-current={tier === assessment.recommendedTier ? 'step' : undefined}>
@@ -318,8 +335,8 @@ export function Assessment({ assessment, records, mission }: AssessmentProps) {
             {record && <WhatIfSimulator currentRecord={record} records={records} />}
             {cards.map(card => (
               <article className="panel assessment-action" key={card.id}>
-                <p className="eyebrow">{reviewLabels[card.reviewStatus]}</p>
                 <h3>{card.title}</h3>
+                <span className="badge action-card-status">{reviewLabels[card.reviewStatus]}</span>
                 <ol>
                   {card.steps.map(step => <li key={step}>{step}</li>)}
                 </ol>

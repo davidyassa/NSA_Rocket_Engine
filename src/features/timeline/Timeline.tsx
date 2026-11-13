@@ -179,8 +179,8 @@ export function Timeline({ scenario, records }: { scenario: DemoScenario; record
       <section className="panel mission-timeline" aria-label="Aligned mission timeline">
         <header className="timeline-toolbar">
           <div>
-            <p className="eyebrow">Sols {start}–{last}</p>
             <p className="timeline-replay-label">
+              <span className="timeline-range">Sols {start}–{last} · </span>
               {archiveEventDate} solar particle event replayed on <strong>Sol {eventSol}</strong>
             </p>
           </div>

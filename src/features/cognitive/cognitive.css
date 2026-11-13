@@ -34,7 +34,7 @@
 
 .pvt-target-box.idle {
   background: var(--bg-raised);
-  border-color: var(--line);
+  border-color: transparent;
   color: var(--ink);
 }
 

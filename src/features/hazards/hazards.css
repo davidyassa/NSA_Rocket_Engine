@@ -58,28 +58,21 @@
 .hazard-status-badge.status-monitor { color: var(--accent); }
 .hazard-tagline { margin: 0; color: var(--text-secondary); font-size: 0.95rem; }
 .hazard-sol43-box {
-  padding: 0.75rem 0.9rem;
-  border-radius: var(--radius-chip);
-  background: var(--bg-raised);
-  border-left: 3px solid var(--accent);
-  font-size: 0.92rem;
+  padding: 0;
+  font-size: 0.95rem;
   line-height: 1.5;
 }
 .hazard-sol43-box strong {
   display: block;
   margin-bottom: 0.25rem;
   color: var(--text-muted);
-  font: 500 0.75rem/1.4 var(--mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 500 0.75rem/1.4 var(--font-body);
 }
 .hazard-sol43-box p { margin: 0; }
 .hazard-section-title {
   margin: 0 0 0.4rem;
   color: var(--text-muted);
-  font: 500 0.75rem/1.4 var(--mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font: 500 0.75rem/1.4 var(--font-body);
 }
 .hazard-metrics-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
 .hazard-metric-chip {
@@ -129,3 +122,4 @@
   font: 600 0.75rem var(--mono);
 }
 .hazard-pipeline-arrow { color: var(--text-muted); }
+.hazard-list-tracked li::marker { color: var(--status-steady); } .hazard-list-hardware li::marker { color: var(--text-muted); }

@@ -1,5 +1,5 @@
 import { METRIC_IDS, METRICS, SOL_LENGTH_SECONDS, SYMPTOM_OPTIONS, utcAtSol } from '../contracts';
-import type { AstronautProfile, CheckinEntry, DailyCheckin, DemoScenario, MetricId, MissionContext } from '../contracts';
+import type { AstronautProfile, CheckinEntry, DailyCheckin, DemoScenario, HabitatSample, MetricId, MissionContext } from '../contracts';
 
 export const DEFAULT_SCENARIO_ID = 'sol-43-after-the-storm';
 export const SCENARIO_IDS = [DEFAULT_SCENARIO_ID, 'routine-sol', 'bad-entry'] as const;
@@ -33,7 +33,24 @@ export const HERO_PREFILL: Record<MetricId, number> = {
   blood_glucose: 94,
   sleep_duration: 4.5,
   mood: 2,
+  // Stand-up test: normal response (small drop, modest pulse rise).
+  heart_rate_standing: 76,
+  bp_systolic_standing: 112,
+  bp_diastolic_standing: 76,
+  fluid_intake: 2.3,
+  // Exercise is still short after the shelter days.
+  exercise_minutes: 45,
 };
+
+/** Shelter protocol (sols 41–42) and the sol before: exercise was cut short. */
+const shortExerciseBySol: Partial<Record<number, number>> = { 40: 50, 41: 20, 42: 35 };
+/** Crowded shelter raised cabin CO2 (synthetic ECLSS readings). */
+const shelterCo2BySol: Partial<Record<number, { co2Mmhg: number; cabinTempC: number }>> = {
+  41: { co2Mmhg: 3.4, cabinTempC: 24.1 },
+  42: { co2Mmhg: 3.2, cabinTempC: 23.6 },
+  43: { co2Mmhg: 2.6, cabinTempC: 22.8 },
+};
+const shelterHeadacheSols = new Set([41, 42]);
 
 const lowerSleepBySol: Partial<Record<number, number>> = { 39: 5.1, 40: 4.8, 42: 4.6 };
 
@@ -47,7 +64,25 @@ function historicalValues(sol: number, includesTrend: boolean): Record<MetricId,
     blood_glucose: 94 + (sol % 5) - 2,
     sleep_duration: lowerSleep ?? (sol % 2 === 0 ? 7.5 : 7.75),
     mood: lowerSleep === undefined ? 4 : 2,
+    heart_rate_standing: 68 + (sol % 5) - 2 + 8,
+    bp_systolic_standing: 116 + (sol % 5) - 2 - 4,
+    bp_diastolic_standing: 74 + (sol % 3) - 1 + 2,
+    fluid_intake: Number((2.3 + (sol % 3) / 10).toFixed(1)),
+    exercise_minutes: (includesTrend ? shortExerciseBySol[sol] : undefined) ?? 110 + (sol % 3) * 5,
   };
+}
+
+function environmentFor(scenarioId: ScenarioId): HabitatSample[] {
+  return Array.from({ length: startSol }, (_, index) => {
+    const sol = index + 1;
+    const shelter = scenarioId === DEFAULT_SCENARIO_ID ? shelterCo2BySol[sol] : undefined;
+    return {
+      sol,
+      co2Mmhg: shelter?.co2Mmhg ?? Number((2.0 + (sol % 4) / 10).toFixed(1)),
+      cabinTempC: shelter?.cabinTempC ?? Number((22 + (sol % 3) * 0.3).toFixed(1)),
+      provenance: 'synthetic_demo' as const,
+    };
+  });
 }
 
 function historicalCheckin(sol: number, scenarioId: ScenarioId): DailyCheckin {
@@ -71,7 +106,11 @@ function historicalCheckin(sol: number, scenarioId: ScenarioId): DailyCheckin {
       observedAtUtc: submittedAtUtc,
       provenance: 'synthetic_demo',
     })),
-    symptoms: SYMPTOM_OPTIONS.map(({ id, label }) => ({ id, label, present: false })),
+    symptoms: SYMPTOM_OPTIONS.map(({ id, label }) => ({
+      id,
+      label,
+      present: id === 'headache' && scenarioId === DEFAULT_SCENARIO_ID && shelterHeadacheSols.has(sol),
+    })),
     note: '',
   };
 }
@@ -97,10 +136,11 @@ export const HERO_SCENARIO: DemoScenario = {
       provenance: 'synthetic_demo',
     },
   ],
+  environment: environmentFor(DEFAULT_SCENARIO_ID),
   startSol,
 };
 
-const routinePrefill = { ...HERO_PREFILL, sleep_duration: 7.5, mood: 4 };
+const routinePrefill = { ...HERO_PREFILL, sleep_duration: 7.5, mood: 4, exercise_minutes: 115 };
 
 type DemoOption = { scenario: DemoScenario; prefill: CheckinEntry['values'] };
 
@@ -114,6 +154,7 @@ export const DEMO_OPTIONS: Record<ScenarioId, DemoOption> = {
       profile, missionContext, startSol,
       history: historyFor('routine-sol'),
       events: [],
+      environment: environmentFor('routine-sol'),
     },
     prefill: routinePrefill,
   },
@@ -125,6 +166,7 @@ export const DEMO_OPTIONS: Record<ScenarioId, DemoOption> = {
       profile, missionContext, startSol,
       history: historyFor('bad-entry'),
       events: [],
+      environment: environmentFor('bad-entry'),
     },
     prefill: { ...routinePrefill, bp_systolic: 75, bp_diastolic: 90 },
   },

@@ -39,6 +39,13 @@ const INDICATOR_LABELS: Record<string, string> = {
   headache_symptom: 'Headache',
   nausea_symptom: 'Nausea',
   respiratory_symptoms: 'Breathing symptoms',
+  stand_test: 'Stand-up test',
+  exercise_minutes: 'Exercise minutes',
+  fluid_intake: 'Fluid intake',
+  motion_sickness_symptoms: 'Motion sickness symptoms',
+  vision_changes: 'Vision changes',
+  habitat_co2: 'Habitat CO2',
+  cabin_temperature: 'Cabin temperature',
 };
 
 const PIPELINE = [
@@ -61,10 +68,9 @@ export function NasaHazards() {
   return (
     <div className="hazards-container">
       <header className="page-intro">
-        <p className="eyebrow">NASA Human Research Program (HRP)</p>
         <h1>The five hazards of human spaceflight</h1>
         <p>
-          A Mars mission exposes crew to five connected hazards. Each card shows which Sol Check readings
+          From NASA’s Human Research Program. A Mars mission exposes crew to five connected hazards. Each card shows which Sol Check readings
           relate to it, its Sol 43 status, and the NASA evidence behind it.
         </p>
       </header>
@@ -73,8 +79,8 @@ export function NasaHazards() {
         <aside className="hazard-focus" aria-live="polite" aria-label={`Focused hazard: ${focused.name}`}>
           <div className="hazard-focus-head">
             <div>
-              <p className="eyebrow">Focused hazard · {focused.hrpRiskId}</p>
-              <h2>{focused.name.replace(/^\d+\.\s*/, '')}</h2>
+              <h2>Focused: {focused.name.replace(/^\d+\.\s*/, '')}</h2>
+              <span className="hazard-id-badge" title="Sol Check internal reference">{focused.hrpRiskId}</span>
               <p className="hazard-element">NASA HRP element: {focused.hrpElement}</p>
             </div>
             <button type="button" className="button button-sm button-ghost" onClick={() => setFocusedId(null)}>
@@ -117,6 +123,20 @@ export function NasaHazards() {
                 <h3 className="hazard-section-title">Sol Check indicators</h3>
                 <ul className="hazard-metrics-chips">
                   {hazard.solCheckMetrics.map((m) => <li key={m} className="hazard-metric-chip">{indicatorLabel(m)}</li>)}
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="hazard-section-title">Sol Check tracks</h3>
+                <ul className="hazard-list hazard-list-tracked">
+                  {hazard.measuredBy.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="hazard-section-title">Needs flight hardware</h3>
+                <ul className="hazard-list hazard-list-hardware">
+                  {hazard.needsHardware.map((item) => <li key={item}>{item}</li>)}
                 </ul>
               </section>
 

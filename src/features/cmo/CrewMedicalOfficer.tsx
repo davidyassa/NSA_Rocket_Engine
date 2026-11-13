@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserCheck, Stethoscope, CheckCircle2, Check } from 'lucide-react';
+import { ArrowRight, UserCheck, CheckCircle2, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DailyCheckin, RiskAssessment, DemoScenario } from '../../contracts';
 import { METRICS } from '../../contracts';
@@ -38,9 +38,6 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
     <div className="cmo-container" style={{ display: 'grid', gap: '16px' }}>
       <header className="page-intro">
         <div>
-          <p className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
-            <Stethoscope size={15} /> Crew Medical Officer (CMO) Flight Medicine Console
-          </p>
           <h1>CMO Clinical Review</h1>
           <p className="muted">
             Independent clinical oversight for {scenario.profile.displayName} ({scenario.profile.role}) on Sol {scenario.startSol}.
@@ -68,7 +65,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650 }}>
             {latest ? `Sol ${latest.sol} Recorded` : 'Pending Entry'}
           </p>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             {latest ? `${latest.measurements.length} vitals · ${latest.symptoms.filter(s => s.present).length} symptoms` : 'No data'}
           </span>
         </div>
@@ -78,7 +75,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650, color: assessment?.recommendedTier === 'crew_medical_officer' ? 'var(--status-trend)' : 'var(--status-steady)' }}>
             {assessment ? assessment.recommendedTier.replace(/_/g, ' ').toUpperCase() : 'NO ASSESSMENT'}
           </p>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             {assessment?.findings.length ?? 0} active findings flagged
           </span>
         </div>
@@ -88,7 +85,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650, color: urgentTasksCount > 0 ? 'var(--nasa-red)' : 'var(--status-steady)' }}>
             {pendingTasksCount} Pending ({urgentTasksCount} Urgent)
           </p>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Closed-loop accountability queue</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Closed-loop accountability queue</span>
         </div>
 
         <div className="panel" style={{ padding: '12px 14px' }}>
@@ -96,7 +93,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           <p style={{ margin: '4px 0 0', fontSize: '1.1rem', fontWeight: 650 }}>
             {scenario.missionContext.oneWayDelayMinutes} min One-Way
           </p>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>40 min round-trip reply</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>40 min round-trip reply</span>
         </div>
       </div>
 
@@ -148,10 +145,10 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
 
           <div style={{ display: 'grid', gap: '8px' }}>
             {(assessment?.findings ?? []).map((finding, idx) => (
-              <div key={idx} style={{ padding: '10px 12px', border: '1px solid var(--line)', borderRadius: '6px', background: 'var(--bg-raised)' }}>
+              <div key={idx} className="cmo-finding-row">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="badge" style={{ fontSize: '0.7rem' }}>{finding.kind.toUpperCase()}</span>
-                  <code style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Rule: {finding.ruleId}</code>
+                  <span className="badge" style={{ fontSize: '0.8rem' }}>{finding.kind.toUpperCase()}</span>
+                  <code style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Rule: {finding.ruleId}</code>
                 </div>
                 <p style={{ margin: '6px 0 3px', fontWeight: 600, fontSize: '0.92rem' }}>{finding.summary}</p>
                 {finding.baselineUsed.length > 0 && (
@@ -164,7 +161,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
           </div>
 
           {/* CMO Formal Sign-Off Box */}
-          <div style={{ background: 'var(--bg-raised)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)', marginTop: '6px' }}>
+          <div className="cmo-signoff">
             <h3 style={{ margin: '0 0 6px', fontSize: '0.98rem' }}>CMO Clinical Review & Prescriptions</h3>
             <textarea
               value={cmoNotes}
@@ -192,7 +189,7 @@ export function CrewMedicalOfficer({ scenario, latest, assessment, records }: Cr
               )}
 
               <Link to="/assessment" className="button button-sm button-ghost">
-                View Full Patient Assessment →
+                View full patient assessment <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
           </div>
