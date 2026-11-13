@@ -7,7 +7,7 @@ import { guideFor } from './pageGuides';
 import type { AssistantContext, AssistantReply } from './respond';
 import { SolBubble } from './SolBubble';
 import { SolListener, heySolWanted, isVoiceModeOpen, onHeySolChange, onVoiceModeChange, setHeySolWanted } from './solListener';
-import { speak } from './voiceOutput';
+import { prepareVoice, speak } from './voiceOutput';
 import './solDock.css';
 
 /** Back to waiting for "Hey Sol" after this much quiet in a conversation. */
@@ -152,6 +152,9 @@ export function SolDock({ ctx, onAction }: {
       l.mode = mode;
       setProgress(0);
       setState('starting');
+      // Warm the on-device voice while the mic/model load, so the first reply
+      // after "Hey Sol" speaks immediately instead of paying a cold start.
+      prepareVoice();
       void l.start((p) => setProgress(p));
       return;
     }

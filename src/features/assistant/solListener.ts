@@ -69,6 +69,7 @@ export class SolListener {
   private hasFrames = false;
   private handlers: ListenerHandlers;
   private stopped = true;
+  private resumeTimer: ReturnType<typeof setInterval> | undefined;
 
   constructor(handlers: ListenerHandlers) { this.handlers = handlers; }
 
@@ -121,6 +122,9 @@ export class SolListener {
         this.hasFrames = false;
         segmenter.reset();
         this.handlers.onAudioReady(false);
+        // The browser suspended us (tab blur, phone lock, autoplay policy). Keep
+        // trying to come back so "Hey Sol" stays hands-free without a tap.
+        void session.resume().catch(() => undefined);
       };
       this.stream.getAudioTracks()[0]?.addEventListener('ended', () => {
         if (this.audio !== session) return;
@@ -172,6 +176,17 @@ export class SolListener {
       processor.connect(muted);
       muted.connect(session.destination);
       if (!this.hasFrames) this.handlers.onAudioReady(false);
+      // A freshly loaded AudioContext starts suspended under the browser's
+      // autoplay policy, so the one resume() above can silently no-op after a
+      // hard refresh. A live, permitted microphone lets most browsers resume
+      // without a tap — poll until it actually starts (and recover if it is
+      // suspended again), so the mic opens by itself. iOS Safari still needs
+      // one real gesture; the dock's "resume" prompt covers that case.
+      clearInterval(this.resumeTimer);
+      this.resumeTimer = setInterval(() => {
+        if (this.audio !== session) { clearInterval(this.resumeTimer); return; }
+        if (session.state !== 'running') { this.enableAudio(); void session.resume().catch(() => undefined); }
+      }, 500);
     } catch (error) {
       if (audio && this.audio !== audio) return;
       this.stop();
@@ -186,6 +201,8 @@ export class SolListener {
 
   stop() {
     this.stopped = true;
+    clearInterval(this.resumeTimer);
+    this.resumeTimer = undefined;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     void this.audio?.close().catch(() => undefined);
