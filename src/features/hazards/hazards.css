@@ -1,0 +1,156 @@
+.hazards-container {
+  max-width: 1040px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.hazards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: 1.25rem;
+}
+
+.hazard-card {
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hazard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.hazard-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hazard-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hazard-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.hazard-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.hazard-id-badge {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #ede8dc;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.hazard-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hazard-status-badge.nominal {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.hazard-status-badge.elevated {
+  background: #feefe3;
+  color: #c5221f;
+}
+
+.hazard-status-badge.active_monitoring {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.hazard-tagline {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.hazard-sol43-box {
+  padding: 0.75rem;
+  border-radius: calc(var(--radius) - 3px);
+  background: #fbf9f5;
+  border-left: 3px solid var(--accent);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.hazard-sol43-box strong {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.hazard-metrics-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.hazard-metric-chip {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  background: #f0ece1;
+  color: var(--ink);
+}
+
+.hazard-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0.4rem 0 0.2rem;
+}
+
+.hazard-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #4a453e;
+}
+
+.hazard-list li + li {
+  margin-top: 0.3rem;
+}
+
+.hazard-ref-list {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.76rem;
+  color: var(--muted);
+}

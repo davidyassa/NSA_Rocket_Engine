@@ -1,0 +1,522 @@
+.camera-pulse-container {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.camera-pulse-open-btn {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.camera-pulse-card {
+  margin-top: 0.6rem;
+  padding: 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: #faf8f2;
+}
+
+.camera-pulse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.camera-pulse-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.camera-pulse-badge-opt {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #ede8dc;
+  color: var(--muted);
+}
+
+.camera-pulse-consent-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #4a453e;
+}
+
+.camera-pulse-consent-points {
+  margin: 0 0 0.85rem;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.camera-pulse-consent-points li + li {
+  margin-top: 0.3rem;
+}
+
+.camera-pulse-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.camera-pulse-actions .button {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.camera-video-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 4 / 3;
+  border-radius: calc(var(--radius) - 3px);
+  overflow: hidden;
+  background: #1e1e1c;
+  margin: 0.6rem auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+/* Face positioning reticle overlay */
+.camera-face-reticle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.camera-reticle-oval {
+  position: relative;
+  width: 135px;
+  height: 180px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.camera-face-reticle.searching .camera-reticle-oval {
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+  animation: reticlePulse 2s infinite ease-in-out;
+}
+
+.camera-face-reticle.calibrating .camera-reticle-oval {
+  border: 2px solid #e09f3e;
+  box-shadow: 0 0 10px rgba(224, 159, 62, 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.2);
+}
+
+.camera-face-reticle.good .camera-reticle-oval {
+  border: 2px solid #2d6a4f;
+  box-shadow: 0 0 12px rgba(45, 106, 79, 0.5), 0 0 0 9999px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes reticlePulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.03); opacity: 1; }
+}
+
+/* Corner HUD brackets around the reticle */
+.camera-reticle-bracket {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: rgba(255, 255, 255, 0.7);
+  border-style: solid;
+  border-width: 0;
+  transition: border-color 0.3s ease;
+}
+
+.camera-face-reticle.calibrating .camera-reticle-bracket {
+  border-color: #e09f3e;
+}
+
+.camera-face-reticle.good .camera-reticle-bracket {
+  border-color: #2d6a4f;
+}
+
+.camera-reticle-bracket.top-left {
+  top: -8px;
+  left: -8px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.camera-reticle-bracket.top-right {
+  top: -8px;
+  right: -8px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.camera-reticle-bracket.bottom-left {
+  bottom: -8px;
+  left: -8px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.camera-reticle-bracket.bottom-right {
+  bottom: -8px;
+  right: -8px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.camera-video-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  background: rgba(35, 36, 32, 0.82);
+  color: #f7f2e8;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.camera-pulse-measuring-info {
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.camera-pulse-status-msg {
+  display: block;
+  font-weight: 550;
+  margin-bottom: 0.2rem;
+}
+
+.camera-pulse-sqi-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.camera-pulse-sqi-track {
+  flex: 1;
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.camera-pulse-sqi-fill {
+  height: 100%;
+  background: #3b7d54;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.camera-pulse-sqi-fill.weak {
+  background: #b54a32;
+}
+
+.camera-pulse-sqi-fill.optimal {
+  background: #1e7040;
+}
+
+.camera-pulse-sqi-pct {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.camera-sqi-badge {
+  font-size: 0.68rem;
+  font-weight: 650;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.camera-sqi-badge.weak {
+  color: #a8422f;
+  background: #fde8e5;
+}
+
+.camera-sqi-badge.good {
+  color: #2d6a4f;
+  background: #e6f4ea;
+}
+
+.camera-sqi-badge.optimal {
+  color: #1b4332;
+  background: #ccead7;
+}
+
+/* Real-time Movement & Environmental Coaching Banner */
+.camera-movement-guide {
+  margin: 0.55rem 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: all 0.3s ease;
+}
+
+.camera-movement-guide.guide-searching {
+  background: #f4efe6;
+  border: 1px solid #dfd7c5;
+}
+
+.camera-movement-guide.guide-calibrating {
+  background: #fef7ee;
+  border: 1px solid #fbd38d;
+}
+
+.camera-movement-guide.guide-good {
+  background: #f0f7f2;
+  border: 1px solid #b7dfca;
+}
+
+.camera-movement-guide-badge {
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.guide-searching .camera-movement-guide-badge {
+  background: #5c564c;
+  color: #fff;
+}
+
+.guide-calibrating .camera-movement-guide-badge {
+  background: #d97706;
+  color: #fff;
+}
+
+.guide-good .camera-movement-guide-badge {
+  background: #2d6a4f;
+  color: #fff;
+}
+
+.camera-movement-guide-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.38;
+  color: #2b2926;
+}
+
+/* Collapsible Quality & Movement Tips Guide */
+.camera-quality-guide {
+  margin-top: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 3px);
+  background: #ffffff;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.camera-quality-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.camera-quality-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.camera-quality-guide summary:hover {
+  color: var(--accent);
+}
+
+.camera-quality-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.camera-tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.camera-tip-card strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 650;
+  margin-bottom: 0.1rem;
+}
+
+.camera-tip-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.camera-tip-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* Weak signal troubleshooting box */
+.camera-troubleshoot-box {
+  margin: 0.5rem 0 0.8rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background: #fdf5f2;
+  border: 1px solid #f6cfc5;
+}
+
+.camera-troubleshoot-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #9c3621;
+}
+
+.camera-troubleshoot-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #554440;
+}
+
+.camera-troubleshoot-list li + li {
+  margin-top: 0.25rem;
+}
+
+.camera-pulse-weak-alert {
+  color: #a8422f;
+  font-weight: 550;
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+}
+
+.camera-pulse-result {
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 3px);
+}
+
+.camera-pulse-result-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.camera-pulse-result-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+.camera-pulse-result-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.camera-pulse-disclaimer {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: #f7ebe3;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+.camera-pulse-privacy-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.camera-pulse-result-meta {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #4a453e;
+}
+
+.camera-pulse-method {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.camera-pulse-window-progress {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 0.78rem;
+  color: #4a453e;
+  line-height: 1.4;
+}
+
+.camera-pulse-scanlog {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.camera-pulse-scanlog .button {
+  align-self: flex-start;
+}
+
+.camera-pulse-scanlog p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.camera-pulse-error-msg {
+  color: #a8422f;
+  font-size: 0.82rem;
+  margin: 0.4rem 0 0.75rem;
+  line-height: 1.4;
+}

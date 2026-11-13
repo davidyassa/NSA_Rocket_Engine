@@ -1,0 +1,96 @@
+.trend-selector {
+  min-width: 0;
+  margin-bottom: 16px;
+  border: 0;
+  padding: 0;
+}
+.trend-selector legend { margin-bottom: 8px; font-size: 0.85rem; font-weight: 650; }
+.trend-metrics { display: flex; flex-wrap: wrap; gap: 6px; }
+.trend-metric { position: relative; cursor: pointer; }
+.trend-metric input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.trend-metric span {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 620;
+}
+.trend-metric:hover span { border-color: #c8ab9c; color: var(--ink); }
+.trend-metric input:checked + span { border-color: #d7a18f; background: var(--accent-soft); color: var(--accent-dark); }
+.trend-metric input:focus-visible + span { outline: 3px solid #bb6249; outline-offset: 3px; }
+
+.trend-panel { min-width: 0; padding: clamp(14px, 2.4vw, 26px); }
+.trend-panel-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 10px; }
+.trend-panel-heading h2 { font-size: clamp(1.45rem, 2.3vw, 2rem); font-weight: 660; letter-spacing: -0.042em; }
+.trend-range { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; }
+.trend-range select {
+  min-height: 42px;
+  border: 1px solid #d4c8b9;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: var(--ink);
+  background: var(--panel);
+  font: inherit;
+}
+.trend-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 13px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #faf7ef;
+}
+.trend-summary div { min-width: 0; padding: 12px; }
+.trend-summary div + div { border-left: 1px solid var(--line); }
+.trend-summary dt { color: var(--muted); font-size: 0.82rem; }
+.trend-summary dd { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 9px; margin: 4px 0 0; }
+.trend-summary dd strong { font-size: clamp(1rem, 1.9vw, 1.38rem); font-weight: 660; letter-spacing: -0.02em; }
+.trend-summary dd .muted { font-size: 0.75rem; }
+
+.trend-legend { display: flex; flex-wrap: wrap; gap: 6px 15px; padding: 1px 0 5px; color: var(--muted); font-size: 0.78rem; }
+.trend-legend > span { display: inline-flex; gap: 6px; align-items: center; }
+.trend-key { flex: 0 0 auto; display: inline-block; }
+.trend-key-reading { width: 8px; height: 8px; border: 1.6px solid var(--accent); border-radius: 50%; }
+.trend-key-entered { width: 7px; height: 7px; transform: rotate(45deg); background: var(--accent); }
+.trend-key-baseline { width: 18px; height: 0; border-top: 2px dashed #4d6b5b; }
+.trend-chart { width: 100%; height: clamp(220px, 37vw, 318px); min-width: 0; overflow: clip; }
+.trend-chart .recharts-cartesian-axis-tick-value { fill: var(--muted); font: 0.67rem var(--mono); }
+.trend-chart .recharts-wrapper:focus-visible { outline-offset: -3px; }
+.trend-chart-caption { margin-top: 1px; color: var(--muted); text-align: center; font: 0.65rem var(--mono); }
+.trend-tooltip {
+  display: grid;
+  gap: 3px;
+  max-width: 200px;
+  padding: 8px 10px;
+  border: 1px solid #d8c7b9;
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 4px 12px #342a2214;
+  font-size: 0.79rem;
+  white-space: normal;
+}
+.trend-tooltip strong { font-weight: 660; }
+.trend-method { margin: 11px 0 17px; font-size: 0.85rem; }
+.trend-empty { padding: 14px 0; color: var(--muted); font-size: 0.9rem; }
+.trend-records { padding: 12px 14px; }
+.trend-records summary { width: fit-content; cursor: pointer; color: var(--ink); font-size: 0.91rem; font-weight: 650; }
+.trend-records summary .muted { margin-left: 5px; font-size: 0.76rem; font-weight: 500; }
+.trend-table-wrap { max-width: 100%; overflow-x: auto; margin: 10px 0 2px; }
+.trend-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.83rem; }
+.trend-table th, .trend-table td { border-bottom: 1px solid var(--line); padding: 7px 6px; vertical-align: top; }
+.trend-table thead th { color: var(--muted); font-weight: 650; }
+.trend-table tbody th { font: 0.75rem var(--mono); }
+.trend-table tr:last-child > * { border-bottom: 0; }
+
+@media (max-width: 490px) {
+  .trend-metric span { padding-inline: 9px; font-size: 0.8rem; }
+  .trend-summary div { padding: 9px; }
+  .trend-summary dt { font-size: 0.73rem; }
+  .trend-table { font-size: 0.77rem; }
+}

@@ -1,0 +1,336 @@
+.assessment-intro .eyebrow {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+}
+
+.assessment-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.assessment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
+  align-items: start;
+  gap: 1.2rem;
+}
+
+.assessment-findings,
+.assessment-actions {
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+}
+
+.assessment-findings > h2,
+.assessment-actions > h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.assessment-symptoms,
+.assessment-version {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.assessment-finding,
+.assessment-action,
+.assessment-empty,
+.assessment-warnings {
+  padding: clamp(1rem, 2.7vw, 1.5rem);
+}
+
+.assessment-finding h3,
+.assessment-action h3 {
+  margin: 0.6rem 0 0;
+  font-size: 1.12rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.assessment-finding--trend .assessment-kind {
+  background: #f2e4d9;
+  color: #7b3c2d;
+}
+
+.assessment-finding--data_quality .assessment-kind {
+  background: #f6edd4;
+  color: #714e23;
+}
+
+.assessment-why {
+  margin-top: 0.9rem;
+  color: #403a32;
+  font-size: 0.9rem;
+}
+
+.assessment-why summary {
+  width: fit-content;
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.assessment-evidence {
+  margin-top: 0.8rem;
+  border-top: 1px solid #e3ddd1;
+  padding-top: 0.8rem;
+}
+
+.assessment-rule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.3rem;
+  margin: 0;
+}
+
+.assessment-rule dt {
+  color: #625e56;
+  font-size: 0.78rem;
+}
+
+.assessment-rule dd {
+  margin: 0.18rem 0 0;
+}
+
+.assessment-rule code {
+  overflow-wrap: anywhere;
+}
+
+.assessment-evidence p {
+  line-height: 1.55;
+}
+
+.assessment-evidence h4 {
+  margin: 0.9rem 0 0.45rem;
+  font-size: 0.94rem;
+  font-weight: 650;
+}
+
+.assessment-baselines,
+.assessment-conditions,
+.assessment-action ol {
+  margin: 0.55rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+
+.assessment-baseline-readings {
+  margin: 0.25rem 0 0.55rem;
+}
+
+.assessment-conditions,
+.assessment-baselines,
+.assessment-warnings {
+  list-style: disc;
+}
+
+.assessment-action ol {
+  list-style: decimal;
+}
+
+.assessment-action .eyebrow {
+  margin: 0;
+}
+
+.assessment-action li + li {
+  margin-top: 0.35rem;
+}
+
+.assessment-action .assessment-ladder {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.assessment-ladder li {
+  display: grid;
+  gap: 0.13rem;
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 2px solid var(--line);
+  font-size: 0.87rem;
+}
+
+.assessment-ladder li + li { margin-top: 0; }
+.assessment-ladder li[aria-current='step'] { border-left-color: var(--accent); background: var(--accent-soft); }
+.assessment-ladder li span { color: var(--muted); }
+
+.assessment-warnings {
+  margin: 0;
+  padding-left: 2rem;
+}
+
+.assessment-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.assessment-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.assessment-table th,
+.assessment-table td {
+  border-bottom: 1px solid #e5dfd4;
+  padding: 0.42rem 0.5rem;
+}
+
+.assessment-table th:first-child,
+.assessment-table td:first-child {
+  padding-left: 0;
+}
+
+.assessment-table th[scope='row'] {
+  font-weight: 500;
+}
+
+.assessment-sources {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assessment-sources li {
+  border-left: 2px solid #e3ddd1;
+  padding-left: 0.65rem;
+  overflow-wrap: anywhere;
+}
+
+.assessment-sources a {
+  color: var(--accent-dark);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.assessment-sources span,
+.assessment-source-scope {
+  display: block;
+  margin: 0.3rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.assessment-source-scope div + div {
+  margin-top: 0.3rem;
+}
+
+.assessment-source-scope dt,
+.assessment-source-scope dd {
+  display: inline;
+  margin: 0;
+}
+
+.assessment-source-scope dt {
+  margin-right: 0.38rem;
+  font-weight: 650;
+}
+
+.ground-communication {
+  margin-bottom: 1.2rem;
+  padding: 1rem clamp(1rem, 2.7vw, 1.5rem);
+}
+
+.ground-banner,
+.ground-heading,
+.ground-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ground-banner { flex-wrap: wrap; justify-content: space-between; }
+.ground-copy-row { flex-wrap: wrap; margin-top: 0.65rem; }
+.ground-copy-row span { font-size: 0.83rem; }
+
+.ground-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.65rem;
+  height: 2.65rem;
+  border-radius: 0.55rem;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.ground-heading h2,
+.ground-summary h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.ground-heading p { margin: 0.18rem 0 0; font-size: 0.86rem; }
+
+.ground-summary {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.ground-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 1.1rem;
+  margin-top: 0.65rem;
+}
+
+.ground-label { display: block; margin-bottom: 0.35rem; font-size: 0.84rem; font-weight: 600; }
+.ground-summary textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--ink);
+  background: var(--paper);
+  font: 400 0.78rem/1.55 var(--mono);
+  resize: vertical;
+}
+
+.ground-include-note { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.55rem; font-size: 0.86rem; }
+.ground-include-note input { accent-color: var(--accent); }
+
+.ground-timing {
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  padding: 0.8rem;
+  background: var(--paper);
+  font-size: 0.87rem;
+}
+
+.ground-timing dl { display: grid; gap: 0.5rem; margin: 0; }
+.ground-timing dl > div { display: flex; justify-content: space-between; gap: 0.55rem; }
+.ground-timing dd { margin: 0; font: 500 0.84rem/1.35 var(--mono); white-space: nowrap; }
+.ground-timing dd[role='timer'] { color: var(--accent-dark); }
+.ground-timing p { margin: 0.65rem 0; line-height: 1.45; }
+.ground-timing .assessment-why { margin-top: 0.55rem; }
+
+@media (max-width: 1080px) {
+  .assessment-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .ground-summary-grid { grid-template-columns: 1fr; }
+}
+
