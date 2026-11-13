@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronRight, ClipboardList, Database, Ellipsis, LayoutGrid, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Activity, ChartNoAxesCombined, ClipboardList, Database, Ellipsis, LayoutGrid, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { CheckinEntry } from '../contracts';
 import rocketEngineMark from '../ui/assets/nasa/rocket-engine.webp';
@@ -9,9 +9,9 @@ import { Assessment } from '../features/assessment/Assessment';
 import { Checkin } from '../features/checkin/Checkin';
 import { CognitiveLab } from '../features/cognitive/CognitiveLab';
 import { Dashboard } from '../features/dashboard/Dashboard';
-import { NasaHazards } from '../features/hazards/NasaHazards';
+// import { NasaHazards } from '../features/hazards/NasaHazards';
 import { Timeline } from '../features/timeline/Timeline';
-import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
+// import { CrewMedicalOfficer } from '../features/cmo/CrewMedicalOfficer';
 import { DEMO_OPTIONS, type ScenarioId } from '../scenarios';
 import { radlabEventSol } from '../sim';
 import { DemoData } from './DemoData';
@@ -48,7 +48,6 @@ export function App() {
   const [revision, setRevision] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
-  const glossaryDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
 
   const { scenario, prefill } = DEMO_OPTIONS[mission.scenarioId];
@@ -132,13 +131,6 @@ export function App() {
           <button type="button" className="reset-link" onClick={openReset}>
             <RotateCcw size={16} aria-hidden="true" /> <span>Reset demo</span>
           </button>
-          <div className="crew-profile">
-            <span className="crew-avatar" aria-hidden="true">{initials}</span>
-            <div>
-              <strong>{profile.displayName}</strong>
-              <span>Synthetic crew</span>
-            </div>
-          </div>
         </div>
       </aside>
 
