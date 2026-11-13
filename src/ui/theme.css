@@ -232,7 +232,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   min-height: var(--topbar-height);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: end;
   gap: 12px;
   padding: 0 clamp(16px, 3vw, 40px);
   border-bottom: 1px solid var(--border-subtle);
@@ -667,7 +667,7 @@ a { text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
   }
   .breadcrumbs { min-width: 0; gap: 7px; }
   .breadcrumbs strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar-meta { flex: none; }
+  .topbar-meta { flex: justify; }
   .breadcrumb-root, .breadcrumbs > svg { display: none; }
   .main-content[data-route]:not([data-route='/']) .page-intro {
     background-image: linear-gradient(90deg, #1a1614f8 12%, #1a1614e8 58%, #1a161484), var(--route-photo);

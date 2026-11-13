@@ -17,18 +17,17 @@ import { radlabEventSol } from '../sim';
 import { DemoData } from './DemoData';
 import { RouteErrorBoundary, lazyWithReload } from './lazyRoute';
 import { confirmTap } from './native';
-import { GLOSSARY } from '../content/plainLanguage';
 import { entryFromCheckin, useMissionStore } from './store';
 
 const Trends = lazyWithReload(() => import('../features/trends/Trends').then(({ Trends }) => ({ default: Trends })));
 
 const navigation = [
   { to: '/', label: 'Dashboard', Icon: LayoutGrid },
-  { to: '/check-in', label: 'Sol check-in', Icon: ClipboardList },
-  { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
-  { to: '/hazards', label: 'NASA 5 hazards', Icon: ShieldAlert },
+  { to: '/check-in', label: 'Check-in', Icon: ClipboardList },
+  // { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
+  // { to: '/hazards', label: 'NASA 5 hazards', Icon: ShieldAlert },
   { to: '/assessment', label: 'Assessment', Icon: Activity },
-  { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
+  // { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
   { to: '/trends', label: 'Trends', Icon: ChartNoAxesCombined },
   { to: '/timeline', label: 'Timeline', Icon: RouteIcon },
   { to: '/demo', label: 'Demo and data', Icon: Database },
@@ -115,11 +114,10 @@ export function App() {
       <aside className="sidebar">
         <Link to="/" className="wordmark" aria-label="Sol Check dashboard">
           <span className="wordmark-icon"><img src={rocketEngineMark} alt="" /></span>
-          <span className="wordmark-name">Sol Check<small>Rocket Engine</small></span>
+          <span className="wordmark-name">Sol Check</span>
         </Link>
 
         <div className="sidebar-body">
-          <p className="sidebar-label">Crew health</p>
           <nav aria-label="Main navigation" className="side-nav">
             {navigation.map(({ to, label, Icon }) => (
               <NavLink end={to === '/'} key={to} to={to}>
@@ -145,19 +143,6 @@ export function App() {
       </aside>
 
       <div className="work-area">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            <Link to="/" className="mobile-wordmark" aria-label="Sol Check dashboard"><img src={rocketEngineMark} alt="" /></Link>
-            <span className="breadcrumb-root">Mission</span><ChevronRight size={13} aria-hidden="true" /><strong>{section}</strong>
-          </div>
-          <div className="topbar-meta">
-            <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
-              <BookOpen size={16} aria-hidden="true" /> <span>Words explained</span>
-            </button>
-            <span className="topbar-sol">SOL {startSol}</span>
-            <span className="badge badge-synthetic"><span className="badge-dot" /> Synthetic demo</span>
-          </div>
-        </header>
         <main className="main-content" data-route={pathname} id="main-content" ref={main} tabIndex={-1}>
           {warning && <p className="storage-warning" role="alert">{warning}</p>}
           <Routes>
@@ -173,9 +158,7 @@ export function App() {
               />
             } />
             <Route path="/cognitive" element={<CognitiveLab currentSol={startSol} />} />
-            <Route path="/hazards" element={<NasaHazards />} />
             <Route path="/assessment" element={<Assessment key={`${mission.scenarioId}:${revision}`} assessment={assessment} records={records} mission={scenario.missionContext} />} />
-            <Route path="/cmo" element={<CrewMedicalOfficer scenario={scenario} latest={latest} assessment={assessment} records={records} />} />
             <Route path="/trends" element={
               <RouteErrorBoundary name="Trends">
                 <Suspense fallback={<p role="status">Loading trends…</p>}>
@@ -187,10 +170,6 @@ export function App() {
             <Route path="/demo" element={<DemoData scenario={scenario} records={records} scenarioId={mission.scenarioId} onLoad={switchScenario} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <footer className="workspace-footer">
-            <ShieldCheck size={15} aria-hidden="true" />
-            Research-informed prototype · Not a diagnosis
-          </footer>
         </main>
       </div>
 
@@ -221,25 +200,6 @@ export function App() {
           <RotateCcw size={18} aria-hidden="true" /> <span>Reset demo</span>
         </button>
       </div>
-
-      <dialog className="reset-dialog glossary-dialog" ref={glossaryDialog} aria-labelledby="glossary-title">
-        <button type="button" className="dialog-close" aria-label="Close" onClick={() => glossaryDialog.current?.close()}>
-          <X size={20} />
-        </button>
-        <h2 id="glossary-title">Words explained</h2>
-        <p>Health words used in Sol Check, in everyday language.</p>
-        <dl className="glossary-list">
-          {GLOSSARY.map(({ term, meaning }) => (
-            <div key={term}>
-              <dt>{term}</dt>
-              <dd>{meaning}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="dialog-actions">
-          <button type="button" className="button button-secondary" autoFocus onClick={() => glossaryDialog.current?.close()}>Close</button>
-        </div>
-      </dialog>
 
       <dialog className="reset-dialog" ref={resetDialog} aria-labelledby="reset-title">
         <button type="button" className="dialog-close" aria-label="Close" onClick={() => resetDialog.current?.close()}>

@@ -81,35 +81,16 @@ export function Dashboard({ scenario, records, latest, assessment }: {
     <div className="dashboard">
       <section className="mission-hero" aria-labelledby="mission-heading">
         <div className="mission-hero-content">
-          <p className="mission-habitat"><MapPin size={15} aria-hidden="true" /> {missionContext.habitat}</p>
-          <h1 id="mission-heading">Mission<br />dashboard<span aria-hidden="true">.</span></h1>
+          <h1 id="mission-heading">Dashboard<span aria-hidden="true">.</span></h1>
           <p className="mission-scenario">{scenario.title}</p>
           <Link to={logged ? '/assessment' : '/check-in'} className="button button-primary">
             {logged ? 'View today’s assessment' : 'Start check-in'} <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         </div>
-        <p className="mission-photo-credit">Lunar habitat concept</p>
       </section>
 
       <div className="mission-stats panel">
         <div><CalendarClock size={19} aria-hidden="true" /><span>Last check-in</span><strong>{latest ? `Sol ${latest.sol}` : 'None recorded'}</strong></div>
-        <div><CalendarClock size={19} aria-hidden="true" /><span>Next check-in due</span><strong>Sol {logged ? startSol + 1 : startSol}</strong></div>
-        <div className="mission-stat-streak">
-          <Flame size={19} aria-hidden="true" />
-          <div className="mission-stat-label-wrap">
-            <span>Check-in streak</span>
-            <span className="streak-origin">
-              {streak.syntheticCount > 0 && streak.userEnteredCount > 0
-                ? `${streak.syntheticCount} synthetic · ${streak.userEnteredCount} entered`
-                : streak.syntheticCount > 0
-                  ? 'Seeded synthetic'
-                  : streak.userEnteredCount > 0
-                    ? 'User entered'
-                    : 'No streak'}
-            </span>
-          </div>
-          <strong>{streak.count} {streak.count === 1 ? 'sol' : 'sols'}</strong>
-        </div>
         <div><Radio size={19} aria-hidden="true" /><span>Simulated one-way delay</span><strong>{missionContext.oneWayDelayMinutes} min</strong></div>
       </div>
 

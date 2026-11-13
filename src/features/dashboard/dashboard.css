@@ -39,17 +39,6 @@
 .mission-hero h1 span { color: var(--accent); }
 .mission-scenario { margin: 20px 0 22px; color: #eadbd0; font-size: 1.05rem; }
 .mission-hero .button { padding-inline: 18px; }
-.mission-photo-credit {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
-  margin: 0;
-  padding: 4px 9px;
-  border-radius: var(--radius-pill);
-  color: #f1dfd2;
-  background: #17110fd9;
-  font-size: 0.73rem;
-}
 .mission-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; }
 .mission-stats > div {
   display: grid;
