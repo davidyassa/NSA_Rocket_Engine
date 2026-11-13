@@ -1,88 +1,26 @@
-# Hazard 2: Isolation and Confinement
+# Hazard 2 · Isolation and confinement
 
-- **Sol Check hazard code** `SC-BHP-01`
-- **NASA Human Research Program element** Human Factors and Behavioral Performance (HFBP)
-- **Associated factors** Circadian disruption, sleep restriction, and sensory monotony
+Open **Isolation and confinement** at `#/hazards/isolation`. NASA studies how prolonged confinement, limited social contact, sleep disruption and workload may affect crew health and performance, including through isolation analogs. Sol Check illustrates how a crew might track changes and plan follow-up. [NASA HRP, *Hazard: Isolation and Confinement*](https://www.nasa.gov/hrp/hazard-isolation-and-confinement/) · [NASA, *About NEK and SIRIUS*](https://www.nasa.gov/about-nek-sirius/)
 
-## 1. Hazard Overview
+## Walk through Sol 43
 
-Isolation and confinement are important behavioral health challenges during long-duration space missions. Isolation refers to reduced social interaction with people outside the crew, including family, friends, and the wider community on Earth. Confinement refers to living and working for extended periods in a limited environment with a small group of people.
+1. In **Sol check-in**, fill and save the demo readings. Maya Chen records **4.5 hours of sleep** against a **7.5-hour** baseline and **mood 2/5** against a baseline of **4/5**. Sleep and mood meet the lower-trend rule on Sols 39, 40, 42 and 43. The simulated shelter period is Sols 41–42, so some of the documented change precedes shelter operations.
+2. Open the combined finding under **Assessment → Findings**, then **Why this finding?**. The app uses the median of the preceding 14 sols, with five distinct measured sols required. A sustained lower trend needs a usable current reading and at least three qualifying sols among the last five. The demo thresholds are a drop of at least one hour for sleep and one point for mood. When both trends qualify, the app recommends onboard medical review. [Rule definitions](../src/engine/rules.ts)
+3. In **Cognitive Lab**, run a vigilance check. The **Mission Health Action Center** also creates a sleep and vigilance task when the combined rule fires or fatigue is reported. Review saved results from the hazard screen, Assessment, the CMO console, or Trends. [Vigilance modes and baseline code](../src/features/cognitive/vigilance.ts)
+4. Use the hazard page to save a local plan for sleep and wake times, lighting, Earth contact and a meaningful activity. The planner records the choices and completion marks for the simulation. After saving a check-in, **Open next simulated sol** lets you record a new set of readings and optionally copy the previous plan.
 
-These conditions can limit social contact and environmental stimulation. Repeated scenery, sounds, and activities can contribute to boredom and reduced engagement. Workload, irregular schedules, and light exposure can also disrupt sleep and its timing. NASA studies these effects in spaceflight and in ground analogs such as NEK and SIRIUS. [NASA hazard overview][hazard] · [NEK and SIRIUS][sirius]
+## Vigilance scoring
 
-## 2. Mission Status — Sol 43
-
-In Sol Check’s synthetic Mars scenario, mission specialist Maya Chen’s Sol 43 demo check-in follows shelter operations on Sols 41–42. The table uses the baselines calculated by **Assessment** after saving the demo readings.
-
-| Indicator | Sol 43 demo reading | Comparison |
+| Mode | Length | Lapse threshold |
 | --- | --- | --- |
-| Sleep duration | 4.5 hours | 7.5-hour personal baseline. A decrease of 3.0 hours (40%). |
-| Self-reported mood | 2/5 (Low) | Personal baseline of 4/5 (Positive). A decrease of 2 points. |
-| Reaction time and lapses | No result on record | The Hazard 2 card recommends a brief vigilance check in **Cognitive Lab**. |
+| Quick | 3 trials | 500 ms |
+| Standard | 6 trials | 500 ms |
+| Timed | 3 minutes | 355 ms |
 
-Sleep and mood both met the sustained lower-trend rule on **four of the last five sols** (39, 40, 42, and 43). The combined finding recommends onboard **Crew Medical Officer (CMO)** review. The radiation replay gives the shelter event a timeline reference. The recorded changes began before shelter operations, and the demo data establish neither their cause nor a diagnosis.
+Missed responses count as lapses and are excluded from the mean response time. The comparison uses the median of usable same-mode sessions on at least three distinct sols within the preceding 14 sols. The timed mode takes inspiration from the ISS brief psychomotor vigilance task. Sol Check's modes are demonstrations, and results depend on the device and interaction method. [Tu et al. (2021), NASA/TP-20210022966](https://ntrs.nasa.gov/citations/20210022966) · [Jones et al. (2022), *Sleep*, 45(3), zsac006](https://ntrs.nasa.gov/citations/13986557791770)
 
-## 3. Potential Spaceflight Health and Performance Impacts
+## NASA evidence for the planner
 
-- **Neurobehavioral fatigue and sustained attention.** Repeated short sleep and demanding schedules can reduce alertness, slow responses, and increase attention lapses during tasks that require continuous monitoring. [NASA sleep evidence report][sleep] · [ISS reaction-time study][iss-study]
-- **Circadian misalignment.** Irregular schedules and shifts in light exposure can make it harder to fall asleep at the scheduled time and stay alert during work periods. [NASA sleep evidence report][sleep]
-- **Mood, motivation, and team cohesion.** Limited outside contact and prolonged confinement may contribute to loneliness, boredom, or lower morale. The effects vary by individual and can affect communication and coordination within the crew. [NASA behavioral health evidence report][behavior] · [NEK and SIRIUS][sirius]
-
-## 4. Sol Check Monitoring Indicators
-
-### A. Sleep Duration
-
-**Check-in → Sleep** asks how many hours the crew member actually slept during the last sleep period. The crew member can skip the field when a reading is unavailable. **Dashboard → Recent readings** and **Trends → Sleep duration** show recorded sleep over time. Assessment uses the median of the previous 14 mission sols and requires usable readings on at least five distinct sols. Sol 43 has 14 prior readings, from Sols 29–42.
-
-### B. Mood Score
-
-**Check-in → Mood** records how the crew member feels at the time of the check-in. The app labels the scale **1 Very low, 2 Low, 3 Midpoint, 4 Positive, and 5 Very positive**. Assessment uses the same baseline method as for sleep. The rating is a self-report for tracking changes over time. Clinical interpretation belongs to the medical team.
-
-### C. Reaction Time and Lapses
-
-**Cognitive Lab** offers three-trial, six-trial, and three-minute timed modes. The crew member presses a key or taps when the signal appears. The app saves completed results by scenario, sol, and mode. It counts responses of **500 ms or longer** as lapses in the shorter modes and **355 ms or longer** in timed mode. Missed responses count as lapses and are excluded from the mean reaction time. A personal baseline uses the median of usable same-mode results from at least three distinct prior sols in the 14-sol window.
-
-NASA’s ISS Reaction SelfTest used a three-minute Brief Psychomotor Vigilance Test (PVT-B) to measure sustained attention. The timed Sol Check mode draws on the published ISS study. Medical and operational decisions remain with mission authorities. [NASA Reaction SelfTest project][reaction] · [ISS reaction-time study][iss-study]
-
-### D. Supporting Observations
-
-**Check-in → How you feel** includes a fatigue checkbox and the option to report feeling hopeless or unable to cope. Reporting the latter independently recommends immediate CMO review, without waiting for a baseline or trend. Optional camera-estimated heart rate variability (HRV) can add recovery context when a usable estimate is available. Sleep duration, mood, and vigilance remain the primary focus for this hazard.
-
-## 5. Countermeasures
-
-- **Vigilance checks and sleep follow-up.** The Mission Health Action Center creates a **Fatigue & Sleep Hygiene Protocol** task when the combined trend is detected or the crew member reports fatigue. For flight use, the medical team would select the test protocol, testing schedule, and interpretation criteria. [NASA Reaction SelfTest project][reaction]
-- **Structured sleep hygiene.** Protect scheduled sleep opportunities, keep sleep and wake times consistent when operations allow, reduce disturbances, and provide time to wind down. Review persistent deviations with the CMO when considering schedule changes. [NASA astronaut sleep practices][sleep-practices]
-- **Dynamic habitat lighting.** Consider appropriately timed blue-enriched white light to support alertness and lower-intensity, blue-depleted light before sleep. Timing, intensity, spectrum, and exposure duration belong in the lighting plan. Implementation requires habitat lighting and a mission schedule. [NASA ISS dynamic lighting project][lighting]
-- **Scheduled Earth contact.** The local planner records a contact time and message format. The Sol 43 scenario models 20 minutes one way, so recorded voice, recorded video, or written messages suit the simulated delay. The Earth communication screen supports a local medical handoff draft and delay rehearsal. [NASA behavioral health evidence report][behavior] · [NASA distance-from-Earth hazard][distance]
-- **Meaningful activities and sensory variety.** Offer options such as plant care, exercise, reading, creative work, and group recreation according to crew preferences and habitat resources. NASA has studied plant care as a possible source of engagement in confinement. [NASA space gardening research][gardening]
-
-## 6. Sol Check Monitoring and Response Workflow
-
-1. **Collect observations.** On the website, open **Sol check-in**. On the phone layout, tap **Check-in** in the bottom bar. Enter sleep hours and a mood score, add relevant symptoms, and select **Save and assess**. Use **Fill demo readings** to reproduce the Sol 43 values. Select **Fatigue** in **How you feel** to demonstrate the fatigue follow-up task.
-2. **Compare with personal baselines.** In **Assessment → Findings → Why this finding?**, open the combined sleep and mood finding to see the baseline, contributing readings, rule, and evidence. The baselines use prior valid measurements and exclude the current sol.
-3. **Identify a sustained change.** The lower-trend demo rule requires a usable current reading and at least three readings below the baseline by the relevant delta within the five-sol window, including the current sol. The demo deltas are **1 hour** for sleep and **1 point** for mood. When both metrics meet the lower-trend rule, Assessment recommends CMO review.
-4. **Run a vigilance check if indicated.** Open **Cognitive Lab** from Hazard 2. Review the saved reaction time and lapse count in Assessment or the CMO console. The local ground draft and handoff include the matching sol’s vigilance results.
-5. **Review and track the response.** The **Mission Health Action Center** shows review and vigilance tasks. The Hazard 2 planner records sleep and wake times, lighting completion, Earth contact, and activities. Lighting and contact are plans for simulated operations.
-6. **Review later measurements.** Select **Open next simulated sol** on Hazard 2 after saving the current check-in. Record the new sleep and mood values, and use **Trends** for their history and saved vigilance results. You can copy the previous plan’s times and activities into the new sol.
-
-## 7. Scientific Evidence Sources
-
-1. NASA Human Research Program. [Behavioral health evidence report][behavior]. Covers behavioral and cognitive risks, monitoring, and support for exploration crews.
-2. NASA Human Research Program. [Sleep loss, circadian desynchronization, and work overload evidence report][sleep]. Covers sleep and circadian factors that affect crew performance.
-3. NASA. [ISS Psychomotor Vigilance Self Test project][reaction]. See also [Jones et al., 2022, the ISS study and scoring method][iss-study].
-4. NASA. [ISS Dynamic Lighting Schedule][lighting]. Describes the use of different white-light settings for visibility, alertness, and sleep preparation.
-5. NASA. [Can Space Gardening Help Astronauts Cope With Isolation?][gardening] May 13, 2021.
-6. NASA. [Houston We Have a Podcast, episode 58, Hazard 2: Isolation][podcast]. August 17, 2018.
-7. NASA. [About NEK and SIRIUS][sirius]. Describes ground analog research on isolation, confinement, and team dynamics.
-
-[hazard]: https://www.nasa.gov/hrp/hazard-isolation-and-confinement/
-[behavior]: https://humanresearchroadmap.nasa.gov/evidence/reports/HRP-ER-BMED-HFBP-20250210.pdf
-[sleep]: https://humanresearchroadmap.nasa.gov/evidence/reports/Sleep.pdf
-[reaction]: https://techport.nasa.gov/projects/23201
-[iss-study]: https://pmc.ncbi.nlm.nih.gov/articles/PMC8919197/
-[lighting]: https://techport.nasa.gov/projects/23237
-[sleep-practices]: https://www.nasa.gov/missions/station/seven-ways-astronauts-improve-sleep-may-help-you-snooze-better-on-earth/
-[distance]: https://www.nasa.gov/hrp/hazard-distance-from-earth/
-[gardening]: https://www.nasa.gov/humans-in-space/can-space-gardening-help-astronauts-cope-with-isolation/
-[podcast]: https://www.nasa.gov/podcasts/houston-we-have-a-podcast/hazard-2-isolation/
-[sirius]: https://www.nasa.gov/about-nek-sirius/
+- The behavioral health and sleep evidence reports provide background for monitoring behavior, sleep and circadian schedules. [NASA HRP, behavioral health evidence report](https://humanresearchroadmap.nasa.gov/evidence/reports/HRP-ER-BMED-HFBP-20250210.pdf) · [NASA HRP, sleep and circadian evidence report](https://humanresearchroadmap.nasa.gov/evidence/reports/Sleep.pdf)
+- NASA's astronaut sleep and gardening resources provide examples for the lighting and activity options. [NASA, *Seven Ways Astronauts Improve Sleep*](https://www.nasa.gov/missions/station/seven-ways-astronauts-improve-sleep-may-help-you-snooze-better-on-earth/) · [NASA, *Can Space Gardening Help Astronauts Cope With Isolation?*](https://www.nasa.gov/humans-in-space/can-space-gardening-help-astronauts-cope-with-isolation/)
+- The simulated communication delay is consistent with the distance scenario. The planner records contact times and message formats locally. [Distance from Earth workflow](hazard-3-distance-from-earth.md)

@@ -26,11 +26,21 @@ describe('"Hey Sol" wake word', () => {
   it.each(['Hey Sol', 'Hey soul.', 'Hey, Seoul.', 'HeySaul!', 'Taysol.', 'Okay Sol open the timeline', 'um hey sol'])('wakes on "%s"', (text) => {
     expect(matchWake(text).woke).toBe(true);
   });
+  // Real ways Whisper-tiny garbles a quick "Hey Sol" that the strict pattern missed.
+  it.each([
+    'Yo Sol', 'Yo, Sol.', 'Heya Sol', 'Hiya sol', 'Ey Sol', 'Ay, Sol.',
+    'Hey sole', 'Hey Sal', 'hi saul', 'um, hey soul', 'well hey sol',
+    'Heysole', 'yosol', 'A Sol, how am I doing?',
+  ])('also wakes on garbled "%s"', (text) => {
+    expect(matchWake(text).woke).toBe(true);
+  });
   it('keeps the question said after the wake word', () => {
     expect(matchWake('Hey Saul, what is this page?').rest).toBe('what is this page?');
     expect(matchWake('Hey, Seoul —\nwhat is this page?').rest).toBe('what is this page?');
+    expect(matchWake('Yo Sol, open the timeline').rest).toBe('open the timeline');
+    expect(matchWake('A Sol, how am I doing?').rest).toBe('how am I doing?');
   });
-  it.each(['Sol', 'I said hey Sol', 'Hey, so what is this page?', 'Hey Solar', 'Hey, solve this', 'Hey, sunshine', 'Solar storm on Sol 41', 'I said hello', 'They saw the sun'])('ignores "%s"', (text) => {
+  it.each(['Sol', 'I said hey Sol', 'Hey, so what is this page?', 'Hey Solar', 'Hey, solve this', 'Hey, sunshine', 'Solar storm on Sol 41', 'I said hello', 'They saw the sun', 'Hey, also check this', 'The console is slow'])('ignores "%s"', (text) => {
     expect(matchWake(text).woke).toBe(false);
   });
 });

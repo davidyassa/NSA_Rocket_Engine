@@ -1,84 +1,67 @@
-# Camera heart-rate validation
+# Sol Check validation
 
-Sol Check's camera pulse reading is an estimate. This folder holds the evidence for how close it is, and the kit to collect more.
+The repository includes automated software tests and controlled camera and microphone bench results. These checks exercise specific inputs and workflows. Accuracy and repeatability on people and on physical devices still need to be measured.
 
-## 1. Bench test (done): known pulse, three camera speeds
+## Camera pulse check
 
-We made test videos from a public-domain NASA astronaut portrait, with the skin colour pulsing at an exact known rate, and played each one as the camera in Chrome. That runs the full pipeline (face detection, the on-device rPPG model, our fine-resolution heart-rate step), not a shortcut.
+The recorded Chrome bench played synthetic videos as its camera input. The videos varied facial colour at a known pulse rate to exercise face detection, on-device remote photoplethysmography (rPPG) and Sol Check's finer-resolution rate estimate. The three checked-in results matched their programmed rates at displayed precision. The original stimulus videos and generator are absent from the repository. [Bench results](bench-synthetic.csv)
 
-| True pulse | Camera speed | Camera model alone | Sol Check | Time to result |
-|---|---|---|---|---|
-| 82 bpm | 24 fps (laptop) | 83–85 | **82** | 15.5 s |
-| 67 bpm | 15 fps (dim laptop) | 68 | **67** | 15.5 s |
-| 104 bpm | 30 fps (phone) | 105–106 | **104** | 15.5 s |
+| Programmed pulse | Video frame rate | Sol Check |
+| ---: | ---: | ---: |
+| 82 bpm | 24 fps | 82 bpm |
+| 67 bpm | 15 fps | 67 bpm |
+| 104 bpm | 30 fps | 104 bpm |
 
-Data: [`bench-synthetic.csv`](bench-synthetic.csv). Run `node scripts/validate-camera.mjs docs/validation/bench-synthetic.csv`.
+Recalculate the agreement statistics from the recorded pairs with the [camera validation script](../../scripts/validate-camera.mjs).
 
-What the bench test proves: timing, frame-rate handling and the 4-bpm rounding fix work. What it does not prove: accuracy on real skin with real movement, lighting and breathing. That needs step 2.
+```sh
+node scripts/validate-camera.mjs docs/validation/bench-synthetic.csv
+```
 
-## 2. People test (to do before judging): 5–10 people vs a fingertip pulse oximeter
+The script reports mean absolute error, bias, Bland–Altman limits of agreement and the proportion of paired readings within ±3 and ±5 bpm. The CSV covers pulse only. It supplies no validation results for the camera breathing and heart rate variability estimates.
 
-You need: the Sol Check app on the laptop or phone you will demo with, one fingertip pulse oximeter, 5–10 volunteers (ideally a mix of skin tones), about 3 minutes per person.
+### Device comparison protocol
 
-1. Seat the person facing a lamp or window. Rest 2 minutes.
-2. Clip the oximeter on a finger of the hand resting on the table.
-3. Start the camera check. When Sol Check shows the result, write down the camera number **and** the oximeter number shown at that moment.
-4. Repeat once more per person if time allows (each repeat is a new row).
-5. Enter rows in a copy of [`camera-vs-oximeter-template.csv`](camera-vs-oximeter-template.csv), then run:
+For an exploratory comparison, record a fingertip pulse oximeter reading during the same measurement window as the Sol Check camera estimate. Start seated after two minutes of rest, facing steady light. Repeat the capture and note the device and lighting. Use participant IDs and preserve the total number of attempts, including attempts with no estimate. Keep that count outside the script's paired-error metrics.
+
+Copy the [paired-reading CSV template](camera-vs-oximeter-template.csv), remove its example rows, and include only rows with numeric values in both columns. Blank CSV values are read as zero by the script. Use at least two complete pairs. Alternatively, download the in-app pulse scan log after accepting an estimate and fill in each matching `referenceBpm` before running the script on the JSON file. [Scan log implementation](../../src/features/checkin/CameraPulseCheck.tsx)
 
 ```sh
 node scripts/validate-camera.mjs docs/validation/camera-vs-oximeter.csv
 ```
 
-The report gives mean absolute error, bias, Bland–Altman 95% limits of agreement and the share within ±3 and ±5 bpm: everything for one slide. The in-app scan log ("Download scan log (JSON)") also works as input once each scan's `referenceBpm` is filled in.
+## Microphone capture
 
-How to read it: fingertip oximeters are themselves accurate to roughly ±2–3 bpm, so a mean error of 2–3 bpm is about as close as any comparison can show. A commonly cited bar for heart-rate meters is ANSI/AAMI EC13: within ±10% or ±5 bpm, whichever is greater.
+The current check-in exposes a read-aloud voice check on the Mood page. It estimates pitch variation, articulation rate and time spent in pauses from a fixed 144-syllable passage. It checks for background noise, clipping and an incomplete reading. The assessment compares each marker with at least five prior readings in the preceding 14 sols and uses the results for personal trend review. [Voice analysis](../../src/features/checkin/audio/voiceAnalysis.ts) · [Assessment rule](../../src/engine/rules.ts)
 
-Report every reading, including failed scans ("couldn't get a clear reading" counts as a result: say how many).
+The code retains two experimental microphone analyzers. One looks for repeating heart sounds in a 20-second recording, suppressing friction spikes and comparing short windows. The other uses a repeating sound pattern and a breath-cycle count from a 40-second recording, with agreement within 2 breaths per minute required. The current check-in offers camera capture and manual entry for these rates. [Heart-sound analysis](../../src/features/checkin/audio/heartSound.ts) · [Breath-sound analysis](../../src/features/checkin/audio/breathSound.ts)
 
-## Microphone checks
+### Generated-signal results
 
-- **Heart sounds.** The app filters a 20-second chest recording to 25–400 Hz, suppresses rubbing spikes and looks for a repeating heartbeat in the Shannon-energy envelope. It requires at least three clear 8-second windows with estimates within 8 bpm of one another.
-- **Breath sounds.** The app filters a 40-second recording to 100–2500 Hz. It estimates the breathing cycle from the repeating sound pattern and separately counts breath cycles, pairing inhales and exhales where appropriate. Both estimates must agree within 2 breaths/min.
-- **Voice.** The app measures pitch movement with YIN, pace from the passage’s 144 syllables and measured speaking time, and the percentage of reading time spent in pauses of at least 250 ms. It checks background noise, clipping, and whether the amount of speech is consistent with a complete reading. The assessment uses the crew member’s median from the previous 14 sols and needs at least five prior readings per marker.
+The [unit tests](../../src/features/checkin/audio/micAnalysis.test.ts) exercise synthetic heart and breath rates, voice metrics, noise rejection and incomplete readings. An earlier [Chrome bench](../../scripts/validate-mic-bench.mjs) sent generated WAVs through the microphone capture and result screens for all three modes. The checked-in CSV preserves that run. A rerun of the current build reproduced the voice row and timed out on the four heart and breath cases because their microphone controls are absent. [Archived Chrome results](mic-bench.csv)
 
-### Direct synthetic tests
+| Test | Expected | Recorded |
+| --- | ---: | ---: |
+| Heart sounds | 58 and 84 bpm | 58 and 84 bpm |
+| Breath sounds | 12 and 18 breaths/min | 12 and 18 breaths/min |
+| Voice pitch variation | 2.13 semitones | 2.13 semitones |
+| Voice articulation rate | 4.63 syllables/s | 4.60 syllables/s |
+| Voice pause time | 17.52% | 16.9% |
 
-All six standard heart fixtures (48, 60, 72, 90, 110 and 140 bpm) and all six standard breath fixtures (8, 12, 15, 18, 22 and 28 breaths/min) matched at the displayed whole-number precision. The standard synthetic voice measured 2.13 semitones of pitch movement, 4.60 syllables/s, and 16.9% time in pauses. The generated reference values were 2.132 semitones, 4.633 syllables/s, and 17.516%, respectively. The tests also cover noise, short captures, and incomplete readings.
+Run the unit tests from the repository root.
 
 ```sh
 npx vitest run src/features/checkin/audio/micAnalysis.test.ts
 ```
 
-### Chrome bench
+### Device comparison protocol
 
-The bench feeds five generated WAVs to Chrome’s fake microphone and drives the production check-in through the visible controls. It reads the numbers from the result cards, exercising recording, signal analysis, quality gates and display. All five fixtures passed in Chrome 157. [Bench CSV](mic-bench.csv)
+Repeat the voice passage three times with the same device, distance and room conditions. Report each participant's within-person spread and the fraction of attempts with a result. Keep numeric measurements under participant IDs and omit raw audio.
 
-| Fixture | Reference | Sol Check | Absolute error |
-| --- | ---: | ---: | ---: |
-| Heart sounds | 58 bpm | 58 bpm | 0 bpm |
-| Heart sounds with added noise | 84 bpm | 84 bpm | 0 bpm |
-| Breath sounds | 12 breaths/min | 12 breaths/min | 0 breaths/min |
-| Breath sounds with equally loud inhales and exhales | 18 breaths/min | 18 breaths/min | 0 breaths/min |
-| Voice, pitch movement | 2.13 semitones | 2.13 semitones | 0.00 semitones |
-| Voice, speaking pace | 4.63 syllables/s | 4.60 syllables/s | 0.03 syllables/s |
-| Voice, time in pauses | 17.52% | 16.9% | 0.62 percentage points |
+## App interaction checks
 
-A separate Chrome run with a 60-syllable partial reading displayed a retry message and withheld all three voice measurements.
-
-```sh
-npm run build
-node --experimental-strip-types scripts/validate-mic-bench.mjs
-```
-
-### People test (pending)
-
-Use the phone or laptop intended for the demo. Record the device, microphone placement, room conditions, each reference and estimate, and any attempt that produces no reading. Use participant IDs and keep the numeric measurements only.
-
-1. **Heart sounds.** With the participant seated and rested, record the fingertip pulse oximeter rate during the same 20-second chest recording. Repeat after repositioning the phone.
-2. **Breath sounds.** Have an observer count breaths over the same 40-second recording and multiply the count by 1.5 to get breaths/min. Repeat once with the participant breathing naturally.
-3. **Voice.** Ask each participant to read the passage three times at a natural pace, using the same device, room and distance. Compare the three measurements within each person to see how repeatable they are.
-
-Report paired absolute errors and the fraction of attempts that return a number for heart and breath. Report within-person spread and the fraction that return a result for voice.
-
-Synthetic fixtures and the Chrome bench establish performance on generated signals. Real microphones, phone placement, motion and room noise can change the results. The heart check estimates rate only and provides no murmur or disease detection. Voice metrics track changes in reading aloud and have no validated role in depression screening.
+- Open the main routes at a 320 px viewport. Check the Assessment header for overflow and verify that charts scroll inside their containers when needed.
+- Switch metrics on Dashboard and open the matching Trends view. Save a synthetic Sol 43 check-in and check that both Assessment and Dashboard reflect it.
+- Open Mission media, switch gallery categories, and navigate the image viewer by keyboard. Escape should close the viewer and restore focus.
+- Use Push to Talk or the Ask Sol text field with “Record pulse 82 bpm, blood pressure 118 over 76, and sleep six and a half hours.” Confirm the values in **Review & save** and verify that the check-in is created only after explicitly saving it. [Command handling](../../src/features/assistant/checkinCommands.ts) · [Check-in form](../../src/features/checkin/Checkin.tsx)
+- Open the production web build, wait for offline readiness, then disconnect and reload. Check the saved record, evidence links within the app and the RadLab chart. See the [mobile guide](../mobile-roadmap.md#device-checks) for physical-device checks.

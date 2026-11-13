@@ -1,130 +1,44 @@
-# Native iOS and Android apps (Capacitor 8)
+# Run Sol Check on a phone
 
-Status: **native projects generated in `ios/` and `android/`.** App ID `com.solcheck.astronaut`.
+## Browser demo
 
-## Everyday commands
+From the repository root, install dependencies with `npm ci` and run `npm run serve:phones`. This builds the production web app, starts LAN previews on ports 4173 (HTTP) and 4174 (HTTPS), and prints a QR code. Open it from a phone on the same Wi-Fi. The HTTPS preview uses a local self-signed certificate. For camera and microphone access, use a trusted HTTPS origin on the phone. Desktop preview at localhost can use media permissions directly. [Preview configuration](../vite.config.ts) · [Browser media requirements](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia)
 
-```sh
-npm run cap:sync   # native web build + esm.mjs fix-up + copy into ios/ and android/
-npm run ios        # sync, then open Xcode (pick a simulator or device, press Run)
-npm run android    # sync, then open Android Studio (pick an emulator or device, press Run)
-npm run icons      # regenerate app icons and splash screens from scripts/generate-app-icons.mjs
-```
+On phones, Dashboard, Assessment, Check-in and Timeline are in the bottom bar. **More** opens the other destinations. The web app can work offline once **Demo and data** reports it is ready. For offline voice, let speech recognition and the local Sol voice load while the server is reachable so their models are cached.
 
-Command-line builds (no IDE):
+## Native iOS and Android builds
+
+The Capacitor 8 projects use app ID `com.solcheck.astronaut`. The iOS project supports iOS 15 or later and needs macOS with Xcode 26 or later to build. The Android project uses Java 21, compiles and targets API 36, and has a minimum SDK of API 24. Set up the platform tools and run commands from the repository root. [Capacitor environment setup](https://capacitorjs.com/docs/getting-started/environment-setup) · [Android SDK settings](../android/variables.gradle)
+
+| Goal | Command |
+| --- | --- |
+| Build the web assets and sync both native projects | `npm run cap:sync` |
+| Sync and open Xcode | `npm run ios` |
+| Sync and open Android Studio | `npm run android` |
+| Build a debug APK | `npm run android:apk` |
+| Copy an existing debug APK to `dist/` and show its download QR | `npm run android:qr` |
+| Build and install on a connected iPhone in Developer Mode | `APPLE_TEAM_ID=YOUR_TEAM_ID npm run ios:device` |
+| Regenerate icons and splash screens | `npm run icons` |
+
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. To use its QR code, start `npm run preview` after building the APK and keep the phone on the same Wi-Fi. Android may ask permission to install the APK from the browser. For iPhone device installation, use a signing team configured in Xcode and unlock and trust the device. [Android QR helper](../scripts/android-qr.mjs) · [iPhone install script](../scripts/ios-install.mjs)
+
+To build for the iOS Simulator from the command line after syncing:
 
 ```sh
 xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
-ANDROID_HOME=/opt/homebrew/share/android-commandlinetools android/gradlew -p android assembleDebug
 ```
 
-## What the native build changes
+The native build places the web app, data and models inside the WebView bundle and disables the service worker. The postbuild step renames the camera dependencies' extensionless `+esm` modules to `esm.mjs` and patches their references for WebView loading. [Capacitor configuration](../capacitor.config.ts) · [Postbuild script](../scripts/native-postbuild.mjs)
 
-- `SOLCHECK_TARGET=native` disables the service worker: every asset ships inside the app.
-- `scripts/native-postbuild.mjs` copies `vendor/{litert,mediapipe}/+esm` to `esm.mjs` and
-  rewrites the camera SDK references. Without this, iOS routes the extensionless module to
-  `index.html` (text/html) and Android serves it untyped, so the camera pulse check would fail.
-  The script exits with an error if the SDK's references change.
-- `src/app/native.ts`: dark status bar with light icons, splash hidden after start-up, and a
-  light haptic tap on checklist toggles and check-in saves. No haptic on the PVT-B stimulus.
-- The Demo page shows "Bundled in app · works offline" instead of the service-worker status.
-- Safe areas use Capacitor Android's injected `--safe-area-inset-*` values, falling back to `env()`.
-- Camera permission: `NSCameraUsageDescription` (iOS) and `CAMERA` with the camera feature
-  optional (Android). Video only, never audio.
-- App icon and splash: the Sol Check mark in the console palette (no NASA insignia).
+The camera scans use a video-only stream. The read-aloud voice check, push-to-talk and hands-free voice mode request separate audio access. Camera and microphone usage strings are defined in the iOS app, and the Android manifest declares camera and audio permissions. Native checklist and save confirmations can trigger haptics. The vigilance task uses a visual stimulus. [iOS usage strings](../ios/App/App/Info.plist) · [Android permissions](../android/app/src/main/AndroidManifest.xml) · [Native integration](../src/app/native.ts)
 
-## Mobile-ready web layer
+## Device checks
 
-- Phone layout under 768 px: bottom bar Dashboard · Assessment · **Check-in (centre)** ·
-  Timeline · More (CMO console, trends, cognitive lab, hazards, demo data, reset).
-- Touch devices (`pointer: coarse`): every button, tab, nav item and `summary` is at least
-  44 × 44 px. 3D markers keep a 28 px visual with an invisible 44 px+ hit area.
-- Safe areas: `viewport-fit=cover`, plus `env(safe-area-inset-*)` padding on the top bar,
-  content gutters and bottom bar (notch, Dynamic Island, gesture bar).
-- Charts on `#/trends` keep a 480 px minimum width and scroll sideways on phones.
-- Everything is self-hosted (WASM, models, fonts, RadLab CSV, astronaut GLB). No CDN.
+An earlier build was smoke-tested offline in the iPhone 17 Pro simulator and an Android API 36 emulator. The Android run also checked camera module imports, WASM MIME type and the astronaut model with six markers. This repository includes synthetic camera and microphone bench results. It has no recorded physical-device comparison for the sensor estimates. [Validation](validation/README.md)
 
-## Decisions taken
+For a native build, check first launch in airplane mode, reload after saving a check-in, and open both 3D viewers. On physical devices, check camera and microphone grant and deny flows, stop a capture mid-session and change routes, then confirm manual entry remains available. Check the bottom bar, safe areas and 3D markers with VoiceOver or TalkBack.
 
-| Item | Recommendation | Why |
-| --- | --- | --- |
-| App ID | `com.solcheck.astronaut` (or a domain the team owns) | `gov.nasa.*` implies NASA publishes the app; a reverse domain should be one you control. |
-| Camera plugin | **Do not add `@capacitor/camera`** | It captures still photos. The rPPG check uses a live `getUserMedia` stream inside the WebView, which needs only the OS permission strings below. |
-| Haptics | Checklist toggles and save confirmations only. **Never on the PVT-B stimulus** | A buzz at stimulus onset would cue the reaction-time test and change what it measures. |
-| Splash | Static `#070B14` native splash; any cyan pulse runs in the web layer after load, honouring reduced motion | Native splash screens are static images. |
-| Icons | Generate from the existing `public/sol-check.svg` with `@capacitor/assets` | No NASA insignia, logotype or patches in store assets. |
+## Expo Go preview
 
-## `capacitor.config.ts`
-
-```ts
-import type { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
-  appId: 'com.solcheck.astronaut',
-  appName: 'Sol Check',
-  webDir: 'dist',
-  backgroundColor: '#070B14',
-  ios: { contentInset: 'never', backgroundColor: '#070B14' },
-  android: { backgroundColor: '#070B14' },
-  plugins: {
-    SplashScreen: { backgroundColor: '#070B14', launchAutoHide: true, showSpinner: false },
-    StatusBar: { style: 'DARK', backgroundColor: '#070B14', overlaysWebView: true },
-  },
-  // No `server.url`: the app must load from the bundled dist/, never from a network host.
-};
-
-export default config;
-```
-
-`StatusBar.style: 'DARK'` means a dark background with light status-bar icons.
-
-## Platform permissions
-
-**iOS `ios/App/App/Info.plist`**
-
-```xml
-<key>NSCameraUsageDescription</key>
-<string>Sol Check uses the camera only on this device to estimate your pulse. No video or face data is saved or sent.</string>
-```
-
-No microphone key: the camera request is video-only.
-
-**Android `android/app/src/main/AndroidManifest.xml`**
-
-```xml
-<uses-permission android:name="android.permission.CAMERA" />
-<uses-feature android:name="android.hardware.camera" android:required="false" />
-```
-
-Capacitor's WebChromeClient turns the WebView's camera request into the runtime permission prompt.
-
-## Verification so far (13 Nov 2026)
-
-| Check | iOS (iPhone 17 Pro simulator) | Android (API 36 emulator) |
-| --- | --- | --- |
-| Native build | `xcodebuild` **BUILD SUCCEEDED** | `gradlew assembleDebug` **BUILD SUCCESSFUL** (15.7 MB debug APK) |
-| App launches offline from bundle, console theme, safe areas | ✔ | ✔ (navy system bars, light icons) |
-| Camera modules (`esm.mjs`) served as `text/javascript` and importable | not yet inspected | ✔ LiteRT and MediaPipe import, FilesetResolver initialises |
-| Original `+esm` path (control) | | ✘ served as `text/html`, import fails (confirms the fix is needed) |
-| `.wasm` served as `application/wasm` | not yet inspected | ✔ |
-| 3D astronaut renders (team GLB, 6 markers, no 2D fallback) | not yet inspected | ✔ |
-
-## Still to test on real devices
-
-1. **Camera pulse check end to end.** Simulators and emulators have no real face camera. On a
-   phone: consent → measuring → estimate → "Use … bpm"; deny permission; background the app
-   mid-scan; confirm tracks stop on route change.
-2. **iOS WebView inspection.** Use Safari ▸ Develop ▸ Simulator to confirm `esm.mjs` imports
-   and the 3D view on iOS, as was done on Android.
-3. **WebGL and memory on low-end Android.** Check the 2.7 MB crew GLB on a budget phone
-   and confirm the health links stay available if the model cannot load.
-4. **Signing and store upload.** Debug builds only so far; release needs a team Apple
-   Developer account and an Android upload keystore.
-
-## Device test checklist
-
-- Airplane mode from first launch: dashboard, check-in, assessment, timeline, trends, 3D view.
-- Camera pulse check: consent → measuring → weak signal → retry → stop; manual entry untouched.
-- Safe areas on a notched iPhone and on Android with gesture navigation.
-- VoiceOver / TalkBack through the six body-region markers and the bottom bar.
+[The Expo project](../solcheck-expo/AGENTS.md) is a development WebView wrapper that loads a reachable web server. It currently uses endpoints embedded in `App.js`. The QR helper writes its URL to `appUrl.js`, which that screen does not consume. The Capacitor projects bundle the app for native offline use.

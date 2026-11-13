@@ -1,5 +1,5 @@
 # CapApp-SPM
 
-This package is used to host SPM dependencies for your Capacitor project
+This local Swift package connects the iOS app to Capacitor and its plugins. Its [package manifest](Package.swift) is managed by the Capacitor CLI and resolves local plugin dependencies from the repository's `node_modules`.
 
-Do not modify the contents of it or there may be unintended consequences.
+After installing npm dependencies or changing the web bundle, run `npm run cap:sync` from the repository root. [Mobile build guide](../../../docs/mobile-roadmap.md)

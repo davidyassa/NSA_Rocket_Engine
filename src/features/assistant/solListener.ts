@@ -28,9 +28,46 @@ export function onHeySolChange(fn: () => void) {
 // Whisper can treat Sol as a name or place, or join a fast greeting into one word.
 const WAKE = /^\W*(?:(?:um+|uh+|okay|ok|so)\W+)?(?:(?:hey|hay|hi|a|okay|ok|hello)[\s,.:!?–—-]+(?:sol|soul|saul|seoul|sole|sal|solle|sorl)|hey(?:sol|soul|saul|seoul)|taysol)\b[\s,.:!?–—-]*([\s\S]*)$/i;
 
+// A phonetic second pass for everything the strict pattern misses. Whisper-tiny
+// hears a quick "Hey Sol" in many ways ("yo sol", "heya sole", "ey saul"), so we
+// accept a greeting followed by a word that *sounds* like "Sol" — while still
+// rejecting look-alikes like "Hey Solar" or "Hey, solve this".
+const GREET = new Set(['hey', 'hay', 'heya', 'hiya', 'hi', 'hello', 'hullo', 'hallo', 'ay', 'ey', 'yo', 'a', 'ok', 'okay']);
+const FILLER = new Set(['um', 'umm', 'uh', 'uhm', 'uhh', 'erm', 'er', 'well', 'so', 'okay', 'ok', 'hmm', 'mm']);
+const GLUED = ['hey', 'hay', 'ha', 'ay', 'a', 'ok', 'okay', 'yo', 'tay', 'he'];
+
+const edges = /^[\W_]+|[\W_]+$/g;
+const bare = (word: string) => word.replace(edges, '').toLowerCase();
+/** Consonant skeleton: sol/soul/saul/seoul → "sl"; solar → "slr"; so → "s". */
+const skeleton = (word: string) => word.replace(/[aeiou]/g, '').replace(/[^a-z]/g, '');
+/** True for a token that sounds like "Sol": s + vowels + l, nothing after. */
+const soundsLikeSol = (word: string) =>
+  (/^s[aeiou]+l[aeiou]?$/.test(word) && skeleton(word) === 'sl') || word === 'seoul' || word === 'zol' || word === 'sul';
+
+const restFrom = (words: string[], from: number) => words.slice(from).join(' ').replace(/^[\s\W_]+/, '').trim();
+
+function fuzzyWake(text: string): { woke: boolean; rest: string } {
+  const raw = text.trim().split(/\s+/).filter(Boolean);
+  const words = raw.map(bare);
+  // The greeting must open the phrase: allow only one throwaway filler before it.
+  for (let g = 0; g <= 1 && g < words.length; g += 1) {
+    if (g === 1 && !FILLER.has(words[0])) break;
+    const head = words[g];
+    if (!head) continue;
+    if (GREET.has(head) && soundsLikeSol(words[g + 1] ?? '')) return { woke: true, rest: restFrom(raw, g + 2) };
+    for (const pre of GLUED) {
+      if (head.length > pre.length && head.startsWith(pre) && soundsLikeSol(head.slice(pre.length))) {
+        return { woke: true, rest: restFrom(raw, g + 1) };
+      }
+    }
+  }
+  return { woke: false, rest: '' };
+}
+
 export function matchWake(text: string): { woke: boolean; rest: string } {
   const m = text.trim().match(WAKE);
-  return m ? { woke: true, rest: m[1].trim() } : { woke: false, rest: '' };
+  if (m) return { woke: true, rest: m[1].trim() };
+  return fuzzyWake(text);
 }
 
 /** Lets full-screen voice mode borrow the microphone from the listener. */
