@@ -87,7 +87,7 @@ describe('"Hey Sol" wake word', () => {
   it.each(['Hey Sally', 'Hey, silly', 'A salt shaker'])('does not wake on the look-alike "%s"', (text) => {
     expect(matchWake(text).woke).toBe(false);
   });
-  it.each(['Sol', 'I said hey Sol', 'Hey, so what is this page?', 'Hey Solar', 'Hey, solve this', 'Hey, sunshine', 'Solar storm on Sol 41', 'I said hello', 'They saw the sun', 'Hey, also check this', 'The console is slow'])('ignores "%s"', (text) => {
+  it.each(['I said hey Sol', 'Hey, so what is this page?', 'Hey Solar', 'Hey, solve this', 'Hey, sunshine', 'Solar storm on Sol 41', 'I said hello', 'They saw the sun', 'Hey, also check this', 'The console is slow'])('ignores "%s"', (text) => {
     expect(matchWake(text).woke).toBe(false);
   });
 });

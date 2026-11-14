@@ -13,7 +13,8 @@ import {
   type MetricId,
 } from '../../contracts';
 import { MEASUREMENT_GUIDES, SOURCES } from '../../content';
-import { CameraPulseCheck, type CameraVitalsEstimate } from './CameraPulseCheck';
+import { CameraPulseCheck } from './CameraPulseCheck';
+import { RespiratoryMonitor, type AcceptedBreathing } from '../respiration/RespiratoryMonitor';
 import { MicCheck, type MicReading } from './audio/MicCheck';
 import type { CameraPulseEstimate } from './pulseQuality';
 import { FIELD_HINTS, PLAIN_FIELD_LABEL } from '../../content/plainLanguage';
@@ -37,10 +38,9 @@ interface CheckinProps {
   onSubmit: (entry: CheckinEntry) => void;
 }
 
-/** 8 sequential pages: Heart Rate (Pulse), Breathing & HRV, Blood Pressure, Temperature & Sugar, Sleep, Mood, Symptoms & Activity, Review & Save */
 const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: string }[] = [
-  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Page 1 of 8: Type your resting pulse or read it with the camera.' },
-  { id: 'breath', title: 'Breathing & HRV', metrics: ['respiratory_rate', 'hrv_rmssd'], intro: 'Page 2 of 8: Camera-derived breathing rate and heart rate variability (HRV), or enter breath count manually.' },
+  { id: 'heart', title: 'Heart rate', metrics: ['heart_rate'], intro: 'Page 1 of 8: Your resting heart rate, in beats per minute. Rest quietly for 5 minutes first. Then use the camera scan below (about 16 seconds: face well lit, hold still), or count by hand: two fingers on the thumb side of your inner wrist, count the beats for a full 60 seconds.' },
+  { id: 'breath', title: 'Breath rate', metrics: ['respiratory_rate'], intro: 'Page 2 of 8: How many breaths you take in one minute, at rest. Sit still and breathe normally; do not slow down or speed up. Use the camera breathing scan below (about 45 seconds, sitting an arm’s length away so your face and chest are both in view), or count by hand: count each time your chest rises for a full 60 seconds. Normal at rest is 12 to 20.' },
   { id: 'pressure', title: 'Blood pressure', metrics: ['bp_systolic', 'bp_diastolic', 'bp_systolic_standing', 'bp_diastolic_standing', 'heart_rate_standing'], intro: 'Page 3 of 8: Use the arm cuff to record seated blood pressure (mmHg). Includes optional stand-up test.' },
   { id: 'temp_sugar', title: 'Temperature & Sugar', metrics: ['body_temp', 'blood_glucose'], intro: 'Page 4 of 8: Core body temperature (°C) with thermometer and blood glucose (mg/dL) with finger-prick meter.' },
   { id: 'sleep', title: 'Sleep', metrics: ['sleep_duration'], intro: 'Page 5 of 8: How many hours did you actually sleep last night?' },
@@ -49,6 +49,7 @@ const STEPS: { id: string; title: string; metrics: readonly MetricId[]; intro: s
   { id: 'review', title: 'Review & save', metrics: [], intro: 'Page 8 of 8: Review all answers from Pages 1–7. Tap Edit to change anything, then save your check-in.' },
 ];
 const REVIEW_STEP = STEPS.length - 1;
+const BREATH_STEP = STEPS.findIndex(step => step.id === 'breath');
 const FEEL_STEP = STEPS.findIndex(step => step.id === 'feel');
 const EXTRA_SYMPTOMS = SYMPTOM_OPTIONS.slice(CORE_SYMPTOM_OPTIONS.length);
 
@@ -117,7 +118,9 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
   const [capture, setCapture] = useState<CheckinEntry['capture']>(() => initialEntry?.capture ?? {});
   const formRef = useRef<HTMLFormElement>(null);
   const [searchParams] = useSearchParams();
-  const stepParam = searchParams.get('step') ?? searchParams.get('page');
+  const requestedStep = searchParams.get('step') ?? searchParams.get('page');
+  // Old links: "pulse" and the removed HRV page open Heart rate; "breathing" opens Breath rate.
+  const stepParam = requestedStep === 'pulse' || requestedStep === 'hrv' ? 'heart' : requestedStep === 'breathing' ? 'breath' : requestedStep;
   const [step, setStep] = useState(() => {
     if (initialEntry) return REVIEW_STEP;
     if (stepParam) {
@@ -207,7 +210,16 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
     }
   }, [moodAssessment.finalIntegerScore, mcqAnswers, isManualMoodOverride, draft.mood]);
 
+  /** Answered mood questions collapse to one line; these are reopened to change the answer. */
+  const [reopenedMood, setReopenedMood] = useState<ReadonlySet<string>>(() => new Set());
+  const reopenMood = (questionId: string, open: boolean) => setReopenedMood(previous => {
+    const next = new Set(previous);
+    if (open) next.add(questionId); else next.delete(questionId);
+    return next;
+  });
+
   function handleSelectMcq(questionId: keyof MoodMcqAnswers, score: number) {
+    reopenMood(questionId, false);
     setVoiceMoodSuggested(false);
     setIsManualMoodOverride(false);
     const updated = { ...mcqAnswers, [questionId]: score };
@@ -309,55 +321,38 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
     goTo(REVIEW_STEP);
   }
 
-  function acceptCameraEstimate(estimate: CameraPulseEstimate) {
-    const measurementCapture: MeasurementCapture = {
-      capturedAtUtc: estimate.capturedAtUtc,
-      source: 'camera_estimate',
-      status: 'accepted',
-      signalQuality: estimate.sqi,
-      algorithm: estimate.algorithm,
-      device: 'browser webcam · on-device WebAssembly',
-      synthetic: false,
-    };
-    setDraft(previous => ({ ...previous, heart_rate: String(estimate.bpm) }));
-    setPrefilled(previous => previous.filter(id => id !== 'heart_rate'));
-    setCapture(previous => ({ ...previous, heart_rate: measurementCapture }));
-    setErrors(previous => {
-      const next = { ...previous };
-      delete next.heart_rate;
-      return next;
-    });
-    // Reading accepted: move on to the next page automatically.
-    window.setTimeout(() => goTo(1), 700);
-  }
-
-  function acceptCameraVitals(estimate: CameraVitalsEstimate) {
-    const readings: [MetricId, number | null, number | null][] = [
-      ['respiratory_rate', estimate.brpm, estimate.breathingQuality],
-      ['hrv_rmssd', estimate.rmssd, null],
-    ];
-    const accepted = readings.filter((entry): entry is [MetricId, number, number | null] => entry[1] !== null);
-    setDraft(previous => ({ ...previous, ...Object.fromEntries(accepted.map(([metric, value]) => [metric, String(value)])) }));
-    setPrefilled(previous => previous.filter(id => !accepted.some(([metric]) => metric === id)));
+  /** Record camera readings as accepted estimates (each replaces any typed value). */
+  function acceptCameraReadings(readings: [MetricId, number, number | null, string, string][]) {
+    setDraft(previous => ({ ...previous, ...Object.fromEntries(readings.map(([metric, value]) => [metric, String(value)])) }));
+    setPrefilled(previous => previous.filter(id => !readings.some(([metric]) => metric === id)));
     setCapture(previous => ({
       ...previous,
-      ...Object.fromEntries(accepted.map(([metric, , quality]) => [metric, {
-        capturedAtUtc: estimate.capturedAtUtc,
+      ...Object.fromEntries(readings.map(([metric, , quality, algorithm, capturedAtUtc]) => [metric, {
+        capturedAtUtc,
         source: 'camera_estimate',
         status: 'accepted',
         signalQuality: quality,
-        algorithm: estimate.algorithm,
+        algorithm,
         device: 'browser webcam · on-device WebAssembly',
         synthetic: false,
       } satisfies MeasurementCapture])),
     }));
     setErrors(previous => {
       const next = { ...previous };
-      for (const [metric] of accepted) delete next[metric];
+      for (const [metric] of readings) delete next[metric];
       return next;
     });
-    const breathStep = STEPS.findIndex(page => page.id === 'breath');
-    window.setTimeout(() => goTo(breathStep + 1), 700);
+  }
+
+  /** Heart rate page: the camera pulse scan. Moves on to Breath rate afterwards. */
+  function acceptCameraEstimate(estimate: CameraPulseEstimate) {
+    acceptCameraReadings([['heart_rate', estimate.bpm, estimate.sqi, estimate.algorithm, estimate.capturedAtUtc]]);
+    window.setTimeout(() => goTo(BREATH_STEP), 700);
+  }
+
+  /** Breath rate page: the hybrid breathing monitor (chest motion, cross-checked with the face pulse). */
+  function acceptMonitorBreathing(accepted: AcceptedBreathing) {
+    acceptCameraReadings([['respiratory_rate', accepted.brpm, accepted.quality, accepted.algorithm, accepted.capturedAtUtc]]);
   }
 
   function acceptMicReading(reading: MicReading) {
@@ -674,7 +669,7 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
                   {readingField('heart_rate')}
                 </div>
                 {index === step && (
-                  <CameraPulseCheck onAcceptEstimate={acceptCameraEstimate} />
+                  <CameraPulseCheck mode="pulse" onAcceptEstimate={acceptCameraEstimate} />
                 )}
                 {capture.heart_rate?.source === 'camera_estimate' && (
                   <p className="checkin-capture-note">
@@ -685,23 +680,22 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
               </fieldset>
             )}
 
-            {/* Page 2: Breathing & HRV */}
+            {/* Page 2: Breath rate */}
             {item.id === 'breath' && (
               <fieldset className="checkin-metric">
-                <legend className="sr-only">Breathing and HRV</legend>
-                <div className="pressure-grid">
+                <legend className="sr-only">Breath rate</legend>
+                <div className="reading-field">
                   {readingField('respiratory_rate')}
-                  {readingField('hrv_rmssd')}
                 </div>
                 {index === step && (
-                  <CameraPulseCheck mode="breathing" onAcceptVitals={acceptCameraVitals} />
+                  <RespiratoryMonitor onAccept={acceptMonitorBreathing} />
                 )}
-                {(capture.respiratory_rate?.source === 'camera_estimate' || capture.hrv_rmssd?.source === 'camera_estimate') && (
+                {capture.respiratory_rate?.source === 'camera_estimate' && (
                   <p className="checkin-capture-note">
-                    ✓ Vitals captured from camera. Typing a new number replaces it with manual entry.
+                    ✓ Breath rate captured from camera. Typing a new number replaces it with manual entry.
                   </p>
                 )}
-                <MeasurementGuide metric="respiratory_rate" label="Breathing rate" />
+                <MeasurementGuide metric="respiratory_rate" label="Breath rate" />
               </fieldset>
             )}
 
@@ -772,6 +766,24 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
 
                   {MOOD_QUESTIONS.map(q => {
                     const selectedScore = mcqAnswers[q.id];
+                    // Answered: just the title, with the chosen number on the right. Tap to change it.
+                    if (selectedScore !== undefined && !reopenedMood.has(q.id)) {
+                      const chosen = q.options.find(option => option.score === selectedScore);
+                      return (
+                        <button
+                          key={q.id}
+                          type="button"
+                          className="mood-question-card mood-question-collapsed"
+                          aria-expanded={false}
+                          aria-label={`Question ${q.number}, ${q.title}: answered ${selectedScore}, ${chosen?.label ?? ''}. Change answer`}
+                          onClick={() => reopenMood(q.id, true)}
+                        >
+                          <span className="mood-q-badge">Q{q.number}</span>
+                          <span className="mood-question-collapsed-title">{q.title}</span>
+                          <span className="mood-question-collapsed-choice">{selectedScore}</span>
+                        </button>
+                      );
+                    }
                     return (
                       <fieldset key={q.id} className="mood-question-card">
                         <legend className="sr-only">Question {q.number}: {q.title}</legend>

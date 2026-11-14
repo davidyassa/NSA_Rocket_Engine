@@ -19,6 +19,9 @@ import { PAGE_GUIDES, TOUR_ROUTES, describePage, guideFor, prewarmRoute, routeFr
 import { checkinCommand, type CheckinPatch } from './checkinCommands';
 import { missionAnswer } from './missionAnswers';
 import { ALL_FIGURES, describeFigures, figureFor } from './pageFigures';
+import { ASKS_VISUAL } from './pageVisuals';
+import { featureFor, pageExplanation } from './features';
+import { stripAddress } from './wake';
 import { EMERGENCY_NEXT, EMERGENCY_REPEAT, EMERGENCY_STOP, STEPS_PER_TURN, emergencyById, emergencySources, emergencyTurn, type EmergencyProtocol } from './emergency';
 
 export interface DialogueState {
@@ -27,11 +30,13 @@ export interface DialogueState {
   turns: number;
   /** position in the guided tour of the tabs, or null when not touring */
   tour?: number | null;
-  /** the emergency being handled: protocol id and the first step of the last batch spoken */
-  emergency?: { id: string; start: number } | null;
+  /** a chart being explained part by part: the parts and the next one to say */
+  explain?: { parts: string[]; next: number } | null;
+  /** the emergency being handled: protocol id, the first step of the last batch spoken, and where it is */
+  emergency?: { id: string; start: number; room?: string } | null;
 }
 
-export const newDialogue = (): DialogueState => ({ topic: null, turns: 0, tour: null, emergency: null });
+export const newDialogue = (): DialogueState => ({ topic: null, turns: 0, tour: null, emergency: null, explain: null });
 
 /** Something the screen should do after the reply (go to another tab or subpage). */
 export interface DialogueAction {
@@ -47,6 +52,25 @@ export interface DialogueAction {
   radiationRoom?: string;
   routine?: { id: string; checked: boolean };
   timeline?: 'play' | 'pause' | 'next' | 'back' | 'restart';
+  /** Emergency Mode: show the alert over every tab; 'safe' turns it green; 'close' closes Sol's islands. */
+  emergency?: EmergencyAlert | 'safe' | 'close';
+  /** Click the on-screen control whose name best matches this label. */
+  click?: string;
+}
+
+/** What the Emergency Mode window shows while the medical officer is being called. */
+export interface EmergencyAlert {
+  id: string;
+  label: string;
+  /** compartment the crewmates should go to, when the person said where they are */
+  room?: string;
+  steps: string[];
+  stepStart: number;
+}
+
+/** Finds on-screen controls for "click …". The app passes one that reads the page. */
+export interface ScreenControls {
+  find(label: string): { name: string } | null;
 }
 
 /** Compartments on the radiation monitor's 3D model, with the words that name them. */
@@ -58,7 +82,17 @@ const RADIATION_ROOMS: { id: string; name: string; pattern: RegExp }[] = [
   { id: 'galley', name: 'Galley & Wardroom', pattern: /\bgalley\b|\bwardroom\b|\bkitchen\b|\bmess\b/i },
   { id: 'equipment-bay', name: 'Service & Equipment Bay', pattern: /\bequipment bay\b|\bservice bay\b|\bequipment\b|\bservice module\b/i },
 ];
+const CLICK = /^(?:please )?(click|tap|press|hit|push|toggle|select|choose|pick|open|expand|collapse|check|uncheck)(?: on)?\s+(?:the\s+|a\s+|an\s+)?(.+?)[.!?]*$/i;
 const ROOM_VERB = /^(?:please )?(?:show(?: me)?|open|select|go to|take me to|click(?: on)?|tap(?: on)?|press(?: on)?|choose|pick|focus(?: on)?|zoom (?:in )?on|inspect|display)\s+(?:the\s+)?/i;
+/** "I'm in the galley", "she collapsed at the airlock" → that compartment's name. */
+export function roomIn(text: string): string | undefined {
+  for (const room of RADIATION_ROOMS) {
+    const place = new RegExp(String.raw`\b(?:in|at|inside|near|by|on|from)\s+(?:the\s+)?(?:${room.pattern.source})`, 'i');
+    if (place.test(text)) return room.name;
+  }
+  return undefined;
+}
+
 function matchRoom(text: string): { id: string; name: string } | null {
   if (!ROOM_VERB.test(text)) return null;
   const rest = text.replace(ROOM_VERB, '');
@@ -66,7 +100,7 @@ function matchRoom(text: string): { id: string; name: string } | null {
   return null;
 }
 
-const WHERE = /\b(where am i|what('?s| is) this (page|tab|screen|place)|what (page|tab|screen) is this|help me( here| on this (page|tab))?|what (can|do|should) i do (here|on this (page|tab))|how (do i|to) use (this|it)( page| tab| screen)?|explain this( page| tab| screen)?|guide me( here)?)\b/i;
+const WHERE = /\b(where am i|what('?s| is) this (page|tab|screen|place)|what (page|tab|screen) is this|help me (?:here|on this (?:page|tab)|with this (?:page|tab))|what (can|do|should) i do (here|on this (page|tab))|how (do i|to) use (this|it)( page| tab| screen)?|explain this( page| tab| screen)?|guide me( here)?)\b/i;
 const TOUR = /\b(give me a tour|take me on a tour|tour (of )?(the app|sol check)|show me around|(walk|guide) me through (the app|sol check))\b/i;
 const TOUR_NEXT = /^(next(?: page| tab| one)?|continue|go on|keep going|okay next|yes)[.!?]*$/i;
 const TOUR_BACK = /^(back|go back|previous|last one)[.!?]*$/i;
@@ -204,38 +238,80 @@ function careReply(care: SymptomCare): AssistantReply {
   };
 }
 
-function emergencyStep(protocol: EmergencyProtocol, from: number, turns: number, state: DialogueState): { reply: AssistantReply; state: DialogueState } {
+function emergencyStep(protocol: EmergencyProtocol, from: number, turns: number, state: DialogueState, room = state.emergency?.room): { reply: AssistantReply; state: DialogueState; action?: DialogueAction } {
   const turn = emergencyTurn(protocol, from);
+  const newRoom = room && room !== state.emergency?.room;
+  const text = newRoom && from === 0 ? turn.text.replace(`${protocol.label}. `, `${protocol.label}. All crewmates to ${room}. `) : turn.text;
   return {
-    reply: { kind: 'urgent', text: turn.text, steps: turn.steps, stepStart: turn.start, emergency: protocol.id, sources: emergencySources(protocol) },
-    state: { ...state, topic: null, tour: null, turns, emergency: { id: protocol.id, start: from } },
+    reply: { kind: 'urgent', text, steps: turn.steps, stepStart: turn.start, emergency: protocol.id, sources: emergencySources(protocol) },
+    state: { ...state, topic: null, tour: null, turns, emergency: { id: protocol.id, start: from, room } },
+    // Every crew medical emergency calls the medical officer: Emergency Mode on every tab.
+    action: protocol.scope === 'crew'
+      ? { emergency: { id: protocol.id, label: protocol.label, room, steps: turn.steps, stepStart: turn.start } }
+      : undefined,
+  };
+}
+
+function explainStep(parts: readonly string[], at: number, state: DialogueState, turns: number, page: string): { reply: AssistantReply; state: DialogueState } {
+  // At most two parts: the second comes after a single "next".
+  const two = parts.slice(0, 2);
+  const more = at === 0 && two.length > 1;
+  const guide = guideFor(page);
+  return {
+    reply: { kind: 'help', text: `${two[at]}${more ? ' Say “next” for more.' : ''}`, speech: `${two[at]}${more ? ' Say next for more.' : ''}`, sources: [{ label: guide.name.replace(/^the /, ''), route: guide.route }] },
+    state: { ...state, turns, explain: more ? { parts: two, next: 1 } : null },
   };
 }
 
 /** One turn of conversation: returns the reply and the updated memory. */
-export function converse(utterance: string, state: DialogueState, ctx: AssistantContext, index: KnowledgeIndex, page = '/', search = ''): { reply: AssistantReply; state: DialogueState; action?: DialogueAction } {
-  const sentences = cleanSpeech(utterance);
-  const whole = sentences.join(' ');
+export function converse(utterance: string, state: DialogueState, ctx: AssistantContext, index: KnowledgeIndex, page = '/', search = '', screen?: ScreenControls): { reply: AssistantReply; state: DialogueState; action?: DialogueAction } {
   const turns = state.turns + 1;
+  // "Hey Sol" (and "Sol, …", "…, Sol") only gets my attention; it is not part of the request.
+  const asked = stripAddress(utterance);
+  if (!asked.replace(/[^a-z0-9]/gi, '')) {
+    return { reply: { kind: 'help', text: 'I’m listening.', sources: [] }, state: { ...state, turns } };
+  }
+  const sentences = cleanSpeech(asked);
+  const whole = sentences.join(' ');
+
+  // 0. "We're safe", "the emergency is over": stand down first, so words like
+  // "emergency" or "alarm" in it are not read as a new emergency.
+  const plain = whole.replace(/[’‘`]/g, "'").trim();
+  const standing = state.emergency ? emergencyById(state.emergency.id) : undefined;
+  if ((standing || ctx.emergencyMode === 'alert') && EMERGENCY_STOP.test(plain)) {
+    return {
+      reply: { kind: 'help', text: standing?.scope === 'habitat'
+        ? 'Glad you’re safe. Keep following the procedure and report to Mission Control.'
+        : 'Glad you’re safe. Tell your crew medical officer everything that happened.', sources: standing ? emergencySources(standing) : [] },
+      state: { ...state, emergency: null, turns },
+      action: { emergency: 'safe' },
+    };
+  }
+
+  if (EMERGENCY_STOP.test(plain) && /\b(?:safe|over|ended|all clear|out of danger|stand down|false alarm)\b|\b(?:ok(?:ay)?|fine|alright|all right|better) now\b/i.test(plain) && !/\?$/.test(plain)) {
+    return { reply: { kind: 'help', text: 'Glad you’re safe. I’m here if anything changes.', sources: [] }, state: { ...state, turns } };
+  }
 
   // 1. Safety first, on everything that was said.
   const safety = respond(whole, ctx, index, true);
   if (safety.kind === 'crisis') return { reply: safety, state: { topic: null, turns, emergency: null } };
   if (safety.kind === 'urgent') {
     const protocol = safety.emergency ? emergencyById(safety.emergency) : undefined;
-    return protocol ? emergencyStep(protocol, 0, turns, state) : { reply: safety, state: { topic: null, turns, emergency: null } };
+    return protocol ? emergencyStep(protocol, 0, turns, state, roomIn(whole) ?? state.emergency?.room) : { reply: safety, state: { topic: null, turns, emergency: null } };
+  }
+  // In safe mode, "all good" closes Sol's islands.
+  if (ctx.emergencyMode === 'safe' && /^(?:(?:ok(?:ay)?|yes|yeah)[\s,.!]*)?(?:all good|close(?: it)?|done|got it|thanks|thank you|dismiss)[\s.!]*$/i.test(plain)) {
+    return { reply: { kind: 'help', text: 'All good.', sources: [] }, state: { ...state, emergency: null, turns }, action: { emergency: 'close' } };
   }
   // While an emergency is being handled: "next", "repeat", "she's breathing again".
   const active = state.emergency ? emergencyById(state.emergency.id) : undefined;
   if (active && state.emergency) {
     const said = whole.replace(/[’‘`]/g, "'").trim();
-    if (EMERGENCY_STOP.test(said)) {
-      return {
-        reply: { kind: 'help', text: active.scope === 'habitat'
-          ? 'Okay. Stay with your crew, keep following the procedure and report to Mission Control. Say “Hey Sol” if you need me again.'
-          : 'Okay. Stay with them, and tell your crew medical officer everything that happened. Say “Hey Sol” if you need me again.', sources: emergencySources(active) },
-        state: { ...state, emergency: null, turns },
-      };
+    // "I'm in the galley": send the crew there.
+    const room = roomIn(said);
+    if (room && room !== state.emergency.room) {
+      const update = emergencyStep(active, state.emergency.start, turns, state, room);
+      return { ...update, reply: { kind: 'urgent', text: `All crewmates to ${room}.`, emergency: active.id, sources: emergencySources(active) } };
     }
     if (EMERGENCY_REPEAT.test(said)) return emergencyStep(active, state.emergency.start, turns, state);
     if (EMERGENCY_NEXT.test(said)) {
@@ -249,6 +325,13 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
   }
   if (safety.kind === 'declined') return { reply: safety, state: { ...state, turns } };
   if (safety.kind === 'farewell') return { reply: safety, state: newDialogue() };
+  // A chart being explained: each "next" adds one detail.
+  if (state.explain) {
+    if (TOUR_STOP.test(whole)) return { reply: { kind: 'help', text: 'Okay.', sources: [] }, state: { ...state, explain: null, turns } };
+    if (TOUR_NEXT.test(whole.trim()) || /^(?:more|go on|tell me more|and\??|what else\??)[.!?]*$/i.test(whole.trim())) {
+      return explainStep(state.explain.parts, state.explain.next, state, turns, page);
+    }
+  }
   // On-screen commands work with polite wrappers: "can you scroll down a bit, please".
   const command = whole
     .replace(/^(?:(?:hey )?(?:sol|soul|saul)[,!.\s]+)?(?:(?:can|could|would|will) you |please |sol,? )+/i, '')
@@ -291,7 +374,9 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
       action: item && !item.recorded ? { routine: { id: item.id, checked }, navigate: '/' } : undefined,
     };
   }
-  const subpage = subpageFromSpeech(whole, page);
+  // "Explain the triage tab" asks for an explanation, not to open it.
+  const wantsExplanation = /^(?:please |can you |could you )?(?:explain|describe|walk me through|tell me about|what(?:'?s| is| are| does)|how (?:do i|does|to) (?:use|read))\b/i.test(whole);
+  const subpage = wantsExplanation ? null : subpageFromSpeech(whole, page);
   if (subpage) {
     const onParent = subpage.parentName ? ` on ${subpage.parentName}` : '';
     return {
@@ -364,6 +449,27 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
       action: { navigate: destination.route },
       state: { ...state, turns },
     };
+  }
+  // "Click start", "tap the standard option", "press save": any control on the screen.
+  const click = command.match(CLICK);
+  if (click && screen) {
+    const target = click[2].replace(/\s+(?:button|tab|link|option|box|checkbox|toggle|switch|card|item|icon)s?$/i, '').trim();
+    const strong = /^(?:click|tap|press|hit|push|toggle)$/i.test(click[1]);
+    const found = target.split(/\s+/).length <= 6 ? screen.find(target) : null;
+    if (found) return { reply: { kind: 'help', text: `Clicking ${found.name}.`, sources: [] }, state: { ...state, turns }, action: { click: target } };
+    if (strong) return { reply: { kind: 'help', text: `I can’t find “${target}” on this screen.`, sources: [] }, state: { ...state, turns } };
+  }
+  // Explanations: a feature or sub-tab by name, or the whole tab, in at most two parts.
+  // "What does the 30-day dose mean?" is a number question and is answered below.
+  const asksMeaning = /\b(?:mean|means|meaning|stand for|significan\w*|normal|good|bad|safe|high|low|limit)\b/i.test(whole) && figureFor(whole, page);
+  if (!asksMeaning && !ALL_FIGURES.test(whole)) {
+    const feature = featureFor(whole, page, search);
+    if (feature) return explainStep(feature.parts, 0, { ...state, tour: null }, turns, page);
+    if (ASKS_VISUAL.test(whole) || /\b(?:explain|describe|walk me through) (?:this|the|all of this) (?:page|tab|screen)\b|\bwhat(?:'?s| is) on (?:this|the) (?:page|tab|screen)\b/i.test(whole)) {
+      const whole2 = pageExplanation(page);
+      if (whole2) return explainStep(whole2, 0, { ...state, tour: null }, turns, page);
+      if (ASKS_VISUAL.test(whole)) return { reply: { kind: 'help', text: `There are no charts on ${guideFor(page).name}. Ask me what its numbers mean instead.`, sources: [] }, state: { ...state, turns } };
+    }
   }
   if (WHERE.test(whole)) {
     const guide = guideFor(page);

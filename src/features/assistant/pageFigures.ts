@@ -59,7 +59,8 @@ export const PAGE_FIGURES: Record<string, PageFigure[]> = {
   ],
   '/trends': [
     { name: 'Line', pattern: /\b(?:line|points?|dots?)\b/i, means: 'Your reading on each sol.' },
-    { name: 'Shaded band', pattern: /\b(?:shaded|band|range|grey|gray)\b/i, means: 'Your usual range. Points outside it are the ones Sol Check flags.' },
+    { name: 'Dashed line', pattern: /\b(?:dashed|dotted|baseline line|band|range)\b/i, means: 'Your personal baseline: the middle of your last 14 sols. Points far from it are flagged.' },
+    { name: 'Markers', pattern: /\b(?:diamonds?|circles?|markers?)\b/i, means: 'Circles are recorded readings; diamonds are readings you entered by hand.' },
     BASELINE,
   ],
   '/timeline': [

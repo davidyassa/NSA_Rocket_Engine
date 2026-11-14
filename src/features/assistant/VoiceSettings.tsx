@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { heySolWanted, onHeySolChange, setHeySolWanted } from './solListener';
 import { speak } from './voiceOutput';
 import { onVoiceServerChange, voiceServerAvailable, voiceServerUp } from './voiceServer';
+import { isNativeApp } from '../../app/native';
 
 export function VoiceSettings() {
   const heySol = useSyncExternalStore(onHeySolChange, heySolWanted);
@@ -37,12 +38,14 @@ export function VoiceSettings() {
         <Ear size={16} aria-hidden="true" />
         <span><strong>“Hey Sol”</strong>: keep the microphone on so you can call Sol from any tab.</span>
       </label>
-      <p className="voice-setting-note">Wake listening is on by default while Sol Check is visible, once you allow microphone access. Microphone audio stays on this device and is never saved.</p>
+      <p className="voice-setting-note">Wake listening is on by default while Sol Check is visible, once you allow microphone access. Microphone audio is never saved by Sol Check.</p>
 
-      <p className="voice-setting-note">Sol speaks with the Piper “lessac” voice and says a short version of each answer; the full answer stays on screen. The web app caches the voice after first use.</p>
-      <p className="voice-setting-note" role="status">{serverUp
-        ? 'Voice server connected: faster-whisper listens and Piper speaks on this laptop.'
-        : 'Using the on-device voice. Run “npm run voice:server” on the laptop for faster, more accurate listening.'}</p>
+      <p className="voice-setting-note">Sol speaks a short version of each answer. The full answer stays on screen.</p>
+      <p className="voice-setting-note" role="status">{isNativeApp
+        ? 'Voice runs on this device with bundled models. Microphone audio stays on this device.'
+        : serverUp
+          ? 'Connected to the voice server. It processes speech on the computer running it.'
+          : 'Using the on-device models. The web app caches them after first use.'}</p>
       <div className="voice-setting-test">
         <button type="button" className="button button-secondary" onClick={() => void test()}>{testing ? 'Stop test' : 'Test voice'}</button>
         {testNote && <span className="voice-setting-note" role="status">{testNote}</span>}
@@ -52,16 +55,13 @@ export function VoiceSettings() {
       <div className="voice-edge-card">
         <div className="voice-edge-header">
           <Cpu size={18} aria-hidden="true" />
-          <strong>Runs on this device, or on a laptop next to it</strong>
+          <strong>{isNativeApp ? 'On-device voice' : 'Voice processing'}</strong>
         </div>
-        <p className="voice-setting-note">
-          Sol runs inside your browser using Web Workers and WebAssembly, or uses the optional voice server on a laptop on the same network. No cloud services and no API keys. Designed for Mars missions where Earth is minutes away.
-        </p>
         <div className="voice-edge-grid">
           <div className="voice-edge-item">
             <Zap size={14} aria-hidden="true" />
             <div>
-              <strong>Listening:</strong> faster-whisper small.en on the voice server; Moonshine or Whisper tiny on the device.
+              <strong>Listening:</strong> {serverUp ? 'faster-whisper on the voice server.' : 'Moonshine Tiny or Whisper Tiny on this device.'}
             </div>
           </div>
           <div className="voice-edge-item">

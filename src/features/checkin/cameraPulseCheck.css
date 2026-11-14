@@ -617,5 +617,21 @@
 .camera-result-unit { color: var(--status-steady); font-size: 0.9rem; font-weight: 600; }
 .camera-result-how { margin: 4px 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.45; }
 .camera-pulse-success .camera-pulse-result-reading { margin: 0; }
+.camera-combined-readings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  text-align: center;
+}
+.camera-combined-readings > div {
+  display: grid;
+  align-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.25rem;
+}
+.camera-combined-readings strong {
+  color: var(--text-primary);
+  font: 600 clamp(1.8rem, 8vw, 3.4rem)/1 var(--mono);
+}
 @keyframes camera-result-in { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .camera-result-oval { animation: none; } }

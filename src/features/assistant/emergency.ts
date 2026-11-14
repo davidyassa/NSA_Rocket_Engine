@@ -302,6 +302,15 @@ export const EMERGENCIES: EmergencyProtocol[] = [
     ],
   },
   {
+    id: 'critical', label: 'Critical emergency', scope: 'crew',
+    pattern: /\b(?:(?:i'?m|i am|he'?s|he is|she'?s|she is|they'?re|they are|someone'?s|someone is|we'?re|we are|(?:i|he|she) (?:think|feel|feels|thinks)(?: like)? (?:i'?m|he'?s|she'?s|i am)) (?:dying|dieing|going to die|gonna die|about to die|might die|not going to make it|not gonna make it)|(?:i|he|she|they|we) (?:might|could|will|may) die|i don'?t want to die|in (?:terrible|severe|extreme|unbearable|so much) pain|can'?t (?:take|stand) the pain|(?:help|please)[,!. ]+(?:i'?m|i am) dying)\b|^\W*(?:help[,!. ]*)?dying\W*$/i,
+    steps: [
+      'Tell me what is happening: chest pain, bleeding, can’t breathe, or pain where?',
+      'Stay where you are. Don’t move unless it is unsafe.',
+      'Not breathing? CPR: 30 pushes, 2 breaths.',
+    ],
+  },
+  {
     id: 'alarm', label: 'Alarm', scope: 'habitat',
     pattern: /\b(?:alarm|siren|master (?:alarm|caution)|warning (?:light|tone) is (?:on|going))\b/i,
     steps: [
@@ -313,7 +322,7 @@ export const EMERGENCIES: EmergencyProtocol[] = [
   {
     id: 'help', label: 'Emergency', scope: 'triage',
     // A bare call for help, not "help me with the check-in".
-    pattern: /\b(?:emergency|mayday|sos|help(?:[,!. ]+help)+|(?:someone|somebody|he|she|they)(?:'?s| is| are) (?:hurt|injured)|i(?:'?m| am) (?:hurt|injured)|i got hurt|(?:i'?m|i am|we'?re|we are|(?:s?he|they)(?:'?s| is| are)) in danger|something(?:'?s| is) (?:really |very )?wrong with (?:me|him|her|them|us))\b|^\W*(?:help(?: me)?(?: now| please)?|i need help(?: now| right now)?|get help(?: now)?)\W*$/i,
+    pattern: /\b(?:emergency|mayday|sos|help(?:[,!. ]+help)+|(?:someone|somebody|he|she|they)(?:'?s| is| are) (?:hurt|injured)|i(?:'?m| am) (?:hurt|injured)|i got hurt|(?:i'?m|i am|we'?re|we are|(?:s?he|they)(?:'?s| is| are)) in (?:danger|trouble)|(?:i'?m|i am) not (?:ok|okay|alright|all right)(?! with)|something(?:'?s| is) (?:really |very |seriously )?wrong(?: with (?:me|him|her|them|us))?)\b|^\W*(?:help(?: me)?(?: now| please)?|i need help(?: now| right now)?|get help(?: now)?)\W*$/i,
     steps: [
       'Tell me what is happening: fire, bleeding, not breathing, chest pain or pressure leak?',
       'Someone not breathing? CPR: 30 pushes, 2 breaths, now.',
@@ -336,6 +345,8 @@ export function matchEmergency(text: string): EmergencyProtocol | null {
   const said = text.replace(/[’‘`]/g, "'").trim();
   if (!said) return null;
   if (ASKING_ABOUT.test(said) && !HAPPENING.test(said)) return null;
+  // "The emergency is over", "false alarm": standing down, not a new emergency.
+  if (EMERGENCY_STOP.test(said)) return null;
   return EMERGENCIES.find((protocol) => protocol.pattern.test(said)) ?? null;
 }
 
@@ -385,4 +396,4 @@ export function emergencyTurn(protocol: EmergencyProtocol, from = 0): EmergencyT
 // Follow-ups while an emergency is being handled.
 export const EMERGENCY_NEXT = /^(?:(?:ok(?:ay)?|right|yes|yeah|got it|done)[\s,.!]*)*(?:next(?: step| steps| one)?|what(?:'?s| is)? next|then what|what now|now what|and then\??|continue|go on|keep going|done|did (?:it|that)|i did (?:it|that)|what else|more|ok(?:ay)?|got it)?[\s.!?]*$/i;
 export const EMERGENCY_REPEAT = /^(?:(?:sorry|what)[\s,.!?]*)?(?:repeat(?: that| it| the steps)?|say (?:it|that) again|again|come again|pardon|i didn'?t (?:hear|get|catch) (?:that|it|you)|what do i do|what should i do|what (?:do|should) we do|start again|from the (?:start|top|beginning)|what\??|sorry\??)[\s.!?]*$/i;
-export const EMERGENCY_STOP = /^(?:stop|cancel|all clear|it'?s over|false alarm|never ?mind|we'?re (?:ok|okay|safe|fine)|(?:she|he|they|i|we)(?:'?s|'?m|'?re| is| am| are) (?:ok|okay|fine|safe|better|breathing(?: again)?|awake))[\s.!?]*$/i;
+export const EMERGENCY_STOP = /^(?:(?:ok(?:ay)?|sol|soul|hey sol|right|good news|thank god|phew|and|so|well|yes|yeah|alright|all right|now)[\s,.!]+)*(?:stop|cancel|all clear|stand down|false alarm|never ?mind|(?:it'?s|it is) (?:over|ok|okay|fine|alright|all right|under control)(?: now)?|(?:the )?(?:emergency|danger|crisis) (?:is |has )?(?:over|ended|finished|done|resolved|passed)|(?:the )?emergency'?s over|(?:cancel|end|stop) (?:the )?emergency(?: mode)?|no (?:more )?emergency|(?:the )?situation(?:'?s| is) under control|everything(?:'?s| is) (?:ok|okay|fine|alright|all right|good|under control)(?: now)?|all (?:is )?(?:good|well|fine)(?: now)?|we(?:'?re| are) (?:ok|okay|safe|fine|good|alright|all right|out of danger)(?: now)?|(?:she|he|they|i|we)(?:'?s|'?m|'?re| is| am| are) (?:ok|okay|fine|safe|better|stable|alright|all right|good|out of danger|breathing(?: again)?|awake)(?: now)?(?: again)?)(?:[\s,.!]+(?:now|thanks|thank you|sol|soul|again))*[\s.!]*$/i;

@@ -30,6 +30,9 @@ import { activeSol, useMissionStore } from './store';
 import { tasksForScenario, useFollowUpStore } from '../features/followups/useFollowUpStore';
 import { AskSol } from '../features/assistant/AskSol';
 import { SolDock } from '../features/assistant/SolDock';
+import { EmergencyMode } from '../features/assistant/EmergencyMode';
+import { clickControl } from '../features/assistant/computerUse';
+import type { EmergencyAlert } from '../features/assistant/dialogue';
 import type { DialogueAction } from '../features/assistant/dialogue';
 import type { MissionEvidence } from '../features/assistant/missionAnswers';
 import type { AssistantContext } from '../features/assistant/respond';
@@ -109,6 +112,7 @@ export function App() {
   const [checkinDraft, setCheckinDraft] = useState<MissionEvidence['checkinDraft']>();
   const [officerReview, setOfficerReview] = useState<MissionEvidence['officerReview']>();
   const [controlled, setControlled] = useState(false);
+  const [emergencyAlert, setEmergencyAlert] = useState<(EmergencyAlert & { safe?: boolean }) | null>(null);
   const [controlLabel, setControlLabel] = useState('');
   const controlTimer = useRef<number>(0);
   const [voiceDraft, setVoiceDraft] = useState<{ scope: string; patches: NonNullable<DialogueAction['checkin']>[] }>();
@@ -147,6 +151,7 @@ export function App() {
   const roomReading = radiationCondition.scenario.frames[radiationCondition.frameIndex]?.find(reading => reading.roomId === radiationRoom);
   const routine = routineChecklistItems(sol, latest, mission.checklist?.[scenarioId]?.[sol] ?? []);
   const assistantContext: AssistantContext = {
+    emergencyMode: emergencyAlert ? (emergencyAlert.safe ? 'safe' : 'alert') : undefined,
     crewName: profile.displayName,
     sol,
     oneWayDelayMinutes: scenario.missionContext.oneWayDelayMinutes,
@@ -166,10 +171,30 @@ export function App() {
     },
   };
 
+  /** "All good": close every floating island (Emergency Mode, Sol's control island and panel). */
+  function closeIslands() {
+    window.clearTimeout(controlTimer.current);
+    setEmergencyAlert(null);
+    setControlled(false);
+    window.dispatchEvent(new Event('sol:close-islands'));
+  }
+
   function applySolAction(action: DialogueAction) {
     window.clearTimeout(controlTimer.current);
     const behavior: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
     let label = 'Sol is here';
+    if (action.emergency) {
+      // The medical officer is needed: Emergency Mode over every tab (Sol speaks the steps).
+      // Stand-down turns it green (safe mode); "all good" closes Sol's islands.
+      if (action.emergency === 'close') closeIslands();
+      else if (action.emergency === 'safe') setEmergencyAlert((alert) => alert && { ...alert, safe: true });
+      else setEmergencyAlert(action.emergency);
+      if (!action.navigate && !action.click) return;
+    }
+    if (action.click) {
+      const clicked = clickControl(action.click, behavior);
+      label = clicked ? `Clicking ${clicked}` : `Couldn’t find “${action.click}”`;
+    }
     if (action.checkin) {
       label = 'Filling in your check-in';
       const patch = action.checkin;
@@ -408,6 +433,7 @@ export function App() {
       </div>
 
       <SolDock ctx={assistantContext} onAction={applySolAction} />
+      {emergencyAlert && <EmergencyMode alert={emergencyAlert} onSafe={() => setEmergencyAlert((alert) => alert && { ...alert, safe: true })} onAllGood={closeIslands} />}
       {controlled && (
         <div className="sol-island" role="status">
           <span className="sol-island-dot" aria-hidden="true"><span className="sol-island-dot-glow" /></span>

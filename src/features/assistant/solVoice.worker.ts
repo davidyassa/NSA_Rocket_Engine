@@ -7,6 +7,7 @@
  */
 import { AutoTokenizer, StyleTextToSpeech2Model, Tensor, env } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web';
+import './voiceStreamCompatibility';
 import { phonemize } from 'phonemizer';
 import { PIPER_NOISE, SOL_SPEED, piperIds, piperPhonemes, speakableText } from './piperPhonemes';
 

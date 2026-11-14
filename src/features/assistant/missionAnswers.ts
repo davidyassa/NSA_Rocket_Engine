@@ -71,7 +71,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
     const details = [
       `Confirm the ${duration ? `${duration} ` : ''}${isEva ? 'EVA' : 'mission'} plan and abort criteria with mission operations and the crew medical officer.`,
       'Mission survival is undetermined. A validated mission risk model and vehicle reliability data are needed for a probability.',
-      today ? `Sol ${sol} has ${usable.length} usable check-in readings, ${usable.filter(reading => reading.provenance === 'synthetic_demo').length} from the demo.` : `There is no saved check-in for Sol ${sol}.`,
+      today ? `Sol ${sol} has ${usable.length} usable check-in readings.` : `There is no saved check-in for Sol ${sol}.`,
     ];
     const planTime = question.match(/\b(\d+(?:\.\d+)?)\s*[- ]?\s*(minutes?|hours?)\s+(?:eva|spacewalk|surface traverse)\b/i);
     const oxygenTime = question.match(/\b(?:oxygen|life support)\s+(?:will last|lasts?|for|has)\s+(\d+(?:\.\d+)?)\s*(minutes?|hours?)\b/i);
@@ -107,7 +107,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
     if (data?.radiation) {
       details.push(`The radiation monitor currently shows ${data.radiation.status} in its replay.`);
       if (isEva && ['RED', 'ORANGE'].includes(data.radiation.status)) {
-        details.push('The replay shows a storm scenario. To revise that simulated EVA, move it outside the storm window and verify actual radiation telemetry and exposure limits with mission operations.');
+        details.push('The replay shows a storm scenario. To revise that EVA, move it outside the storm window and verify actual radiation telemetry and exposure limits with mission operations.');
       }
       sources.push(source('Radiation monitor replay', '/hazards/radiation'));
     }
@@ -156,7 +156,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
       const reading = usableMeasurement(record, metric);
       if (!reading) return [];
       const { label, unitLabel } = METRICS[metric];
-      return `${label}: ${reading.value} ${unitLabel}${reading.provenance === 'synthetic_demo' ? ' (demo)' : ''}`;
+      return `${label}: ${reading.value} ${unitLabel}`;
     }) : [];
     return { kind: 'personal', text: readings.length ? `Saved readings for Sol ${record?.sol}. ${readings.join('. ')}.` : 'There are no usable saved readings for that check-in.', sources: [source('Saved check-in records', '/trends')] };
   }
@@ -176,7 +176,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
   }
   if (/\b(?:supplies|inventory|stock|expir(?:y|ed|ing))\b/i.test(question) || (summary && page === '/cmo' && currentTab === 'kit')) {
     const kit = kitSummary(sol);
-    return { kind: 'personal', text: `Demo supplies on Sol ${sol}: ${kit.low} low, ${kit.expired} expired and ${kit.expiresSoon} expiring soon. ${kit.items.map(({ item, status }) => `${item.name}: ${item.quantity} ${item.unit}. ${KIT_STATUS_TEXT[status]}.`).join(' ')}`, sources: [source('Supplies on board', '/cmo')] };
+    return { kind: 'personal', text: `Supplies on Sol ${sol}: ${kit.low} low, ${kit.expired} expired and ${kit.expiresSoon} expiring soon. ${kit.items.map(({ item, status }) => `${item.name}: ${item.quantity} ${item.unit}. ${KIT_STATUS_TEXT[status]}.`).join(' ')}`, sources: [source('Supplies on board', '/cmo')] };
   }
   if (/\b(?:isolation plan|countermeasure plan|my isolation)\b/i.test(question) || (summary && page === '/hazards/isolation')) {
     const plan = data?.isolation;
@@ -188,7 +188,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
       : 'Open the radiation monitor to inspect the spacecraft replay and its compartment readings.', sources: [source('Radiation monitor replay', '/hazards/radiation')] };
   }
   if (/\b(?:habitat air|cabin (?:temperature|air|co2)|co2 reading)\b/i.test(question) && !/^why\b/i.test(question)) {
-    if (habitat) return { kind: 'personal', text: `Sol ${requestedSol} habitat log: ${habitat.co2Mmhg} millimetres of mercury of CO₂ and cabin temperature ${habitat.cabinTempC} degrees Celsius. These are simulated habitat readings.`, sources: [co2Source] };
+    if (habitat) return { kind: 'personal', text: `Sol ${requestedSol} habitat log: ${habitat.co2Mmhg} millimetres of mercury of CO₂ and cabin temperature ${habitat.cabinTempC} degrees Celsius.`, sources: [co2Source] };
     return { kind: 'personal', text: `There is no habitat reading for Sol ${requestedSol}.`, sources: [co2Source] };
   }
   if (data && (/\b(?:mission events?|what happened)\b/i.test(question) || (summary && page === '/timeline'))) {
@@ -197,7 +197,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
     return { kind: 'personal', text: [
       events.length ? `Sol ${requestedSol}: ${events.map(event => event.label).join(', ')}.` : `No scenario events are listed for Sol ${requestedSol}.`,
       archive ? 'The Timeline also replays the archived Curiosity radiation event for this sol.' : '',
-      habitat ? `The simulated cabin log records ${habitat.co2Mmhg} millimetres of mercury of CO₂ and ${habitat.cabinTempC} degrees Celsius.` : '',
+      habitat ? `The cabin log records ${habitat.co2Mmhg} millimetres of mercury of CO₂ and ${habitat.cabinTempC} degrees Celsius.` : '',
     ].filter(Boolean).join(' '), sources: [source('Mission timeline', '/timeline'), ...(habitat ? [co2Source] : []), ...(archive ? [source(RADLAB_SOURCE.title, '/timeline', RADLAB_SOURCE.url ?? undefined)] : [])] };
   }
   if ((summary && page === '/demo') || /\b(?:current|active|loaded) (?:demo|scenario)\b/i.test(question)) {
@@ -223,7 +223,7 @@ export function missionAnswer(question: string, ctx: AssistantContext, page: str
       });
       const first = readings.at(0);
       const last = readings.at(-1);
-      return { kind: 'personal', text: last && first ? `${METRICS[selected].label}: ${readings.length} usable readings. The series starts at ${first.reading.value} on Sol ${first.sol} and ends at ${last.reading.value} ${METRICS[selected].unitLabel} on Sol ${last.sol}.${readings.some(({ reading }) => reading.provenance === 'synthetic_demo') ? ' The series includes demo data.' : ''}` : `There are no usable readings for ${METRICS[selected].label.toLowerCase()}.`, sources: [source('Selected trend', `/trends?metric=${selected}`)] };
+      return { kind: 'personal', text: last && first ? `${METRICS[selected].label}: ${readings.length} usable readings. The series starts at ${first.reading.value} on Sol ${first.sol} and ends at ${last.reading.value} ${METRICS[selected].unitLabel} on Sol ${last.sol}.` : `There are no usable readings for ${METRICS[selected].label.toLowerCase()}.`, sources: [source('Selected trend', `/trends?metric=${selected}`)] };
     }
   }
   if ((summary && page === '/hazards/distance') || /\b(?:communication|one.way|round.trip) delay\b/i.test(question)) {

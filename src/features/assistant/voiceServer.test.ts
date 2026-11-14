@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-async function load(fetchImpl: Fetch) {
+async function load(fetchImpl: Fetch, native = false) {
   vi.resetModules();
+  vi.doMock('../../app/native', () => ({ isNativeApp: native }));
   vi.stubGlobal('document', { baseURI: 'https://sol.test/' });
   vi.stubGlobal('window', globalThis);
-  vi.stubGlobal('localStorage', { getItem: () => null });
+  vi.stubGlobal('localStorage', { getItem: () => native ? 'https://voice.sol.test/' : null });
   const calls: string[] = [];
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => { calls.push(`${init?.method ?? 'GET'} ${url}`); return fetchImpl(url, init); });
   return { mod: await import('./voiceServer'), calls };
@@ -23,6 +24,15 @@ describe('Sol voice server client', () => {
     expect(await mod.voiceServerAvailable()).toBe(true);
     expect(await mod.serverTranscribe(new Float32Array(1600))).toBe('Hey Sol, fire!');
     expect(calls).toEqual(['GET https://sol.test/sol-voice/health', 'POST https://sol.test/sol-voice/stt']);
+  });
+
+  it('keeps packaged apps offline even with a saved server address', async () => {
+    const { mod, calls } = await load(async () => new Response(JSON.stringify({ ok: true })), true);
+
+    expect(await mod.voiceServerAvailable()).toBe(false);
+    await expect(mod.serverTranscribe(new Float32Array(10))).rejects.toThrow('bundled voice models');
+    await expect(mod.serverSpeak('Step 1.', 1.12, new AbortController().signal)).rejects.toThrow('bundled voice models');
+    expect(calls).toEqual([]);
   });
 
   it('reports the server down when it is not running, without retrying on every phrase', async () => {
