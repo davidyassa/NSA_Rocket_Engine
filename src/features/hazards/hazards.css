@@ -1,0 +1,274 @@
+.hazards-container {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.hazards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.hazard-card {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+  padding: 1.1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.hazard-card-photo {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  border-radius: calc(var(--radius) - 7px);
+  background: var(--bg-base);
+}
+.hazard-card-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+}
+.hazard-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: calc(var(--radius) - 5px);
+  color: var(--accent);
+  background: var(--tint-accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.hazard-name { margin: 0; font-size: 1.1rem; font-weight: 600; line-height: 1.3; }
+.hazard-overview { margin: 0; color: var(--text-secondary); font-size: 0.95rem; }
+.hazard-status-badge {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.hazard-status-badge svg { flex: none; }
+.hazard-status-badge.status-monitor { color: var(--accent); }
+.hazard-detail-link { justify-self: start; }
+.hazard-details { border-top: 1px solid var(--border-subtle); }
+.hazard-details summary { padding: 0.65rem 0 0; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+.hazard-details summary::marker { color: var(--accent); }
+.hazard-details-body { display: grid; gap: 0.85rem; padding-top: 0.85rem; }
+.hazard-details-body h3 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+.hazard-details-body p { margin: 0; color: var(--text-secondary); font-size: 0.92rem; }
+.hazard-details-body a { color: var(--accent); }
+.hazard-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  list-style: disc;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.hazard-list li::marker { color: var(--accent); }
+.hazard-list li + li { margin-top: 0.3rem; }
+
+.isolation-page { max-width: 66rem; margin-inline: auto; display: grid; gap: 1rem; min-width: 0; }
+.isolation-page .page-intro { margin-bottom: 0; }
+.isolation-page .page-intro h1 { overflow-wrap: anywhere; }
+.isolation-section { min-width: 0; padding: clamp(0.9rem, 2.5vw, 1.6rem); }
+.isolation-section h2 { margin: 0 0 0.6rem; }
+.isolation-section > p { margin: 0 0 0.85rem; }
+.isolation-section details { margin-top: 0.9rem; }
+.isolation-section summary { cursor: pointer; padding-block: 0.35rem; font-weight: 600; }
+.isolation-section details .hazard-list { margin-top: 0.5rem; }
+.isolation-section details a { color: var(--accent); }
+.isolation-previous-plan { margin-bottom: 0.85rem; }
+.isolation-review { padding: 0.65rem 0.85rem; border-inline-start: 3px solid var(--status-trend); background: var(--tint-trend); }
+.isolation-readings, .isolation-plan-grid { display: grid; gap: 0.75rem; }
+.isolation-readings { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+.isolation-readings article, .isolation-plan-grid fieldset { min-width: 0; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.85rem; }
+.isolation-readings h3 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.4rem; font-size: 1rem; }
+.isolation-readings h3 svg { color: var(--accent); flex: none; }
+.isolation-readings strong { display: block; font: 600 1.15rem var(--mono); }
+.isolation-readings p { margin: 0.4rem 0; color: var(--text-secondary); font-size: 0.9rem; }
+.isolation-readings .text-link { margin-top: 0.45rem; }
+.isolation-readings .text-link + .text-link { display: flex; width: fit-content; }
+.hazard-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.85rem; }
+.hazard-actions .button { max-width: 100%; min-height: 44px; white-space: normal; }
+.isolation-plan-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.isolation-plan-grid fieldset { margin: 0; }
+.isolation-plan-grid legend { padding: 0 0.3rem; font-weight: 650; }
+.isolation-plan-grid p { margin: 0.55rem 0; color: var(--text-secondary); }
+.isolation-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 0.65rem; }
+.isolation-fields label { display: grid; gap: 0.25rem; min-width: 0; font-size: 0.9rem; }
+.isolation-fields input, .isolation-fields select { display: block; width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; padding: 0.4rem 0.55rem; color-scheme: dark; }
+.isolation-fields input[type='time'] { appearance: none; text-align: start; }
+.isolation-complete { display: flex; align-items: center; gap: 0.55rem; min-height: 44px; }
+.isolation-complete input { width: 1.1rem; height: 1.1rem; flex: none; accent-color: var(--accent); }
+.isolation-complete:has(input:disabled) { color: var(--text-muted); }
+
+.distance-timing, .distance-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
+.distance-timing dt { color: var(--text-secondary); }
+.distance-timing dd {
+  margin: 0.25rem 0 0;
+  font: 600 1.25rem var(--mono);
+}
+
+/* Distance from Earth & Frozen Design Contract v1 Styles */
+.distance-contract-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.contract-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.distance-ladder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.distance-tier-card {
+  padding: 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.distance-tier-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.distance-tier-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 0.82rem var(--mono);
+}
+
+.distance-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  margin-top: 0.8rem;
+}
+
+.distance-contract-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  text-align: start;
+}
+
+.distance-contract-table th,
+.distance-contract-table td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.distance-contract-table th {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.distance-contract-table tr:last-child td {
+  border-bottom: none;
+}
+
+.distance-contract-table code {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  padding: 0.15rem 0.35rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.distance-params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.distance-param-box {
+  padding: 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.distance-param-box h3 {
+  margin: 0;
+  font-size: 0.98rem;
+  color: var(--accent);
+}
+
+.wording-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.wording-tag {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.wording-tag--allowed {
+  background: var(--tint-accent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.wording-tag--banned {
+  background: var(--tint-change);
+  color: var(--status-trend);
+  border: 1px solid color-mix(in srgb, var(--status-trend) 30%, transparent);
+  text-decoration: line-through;
+}

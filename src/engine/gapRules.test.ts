@@ -1,0 +1,214 @@
+import { describe, expect, it } from 'vitest';
+import { METRIC_IDS, METRICS, type DailyCheckin, type HabitatSample, type MetricId } from '../contracts';
+import { DEMO_OPTIONS, DEFAULT_SCENARIO_ID } from '../scenarios';
+import { evaluateCheckin } from './index';
+
+function checkin(sol: number, values: Partial<Record<MetricId, number>>, symptoms: string[] = []): DailyCheckin {
+  const submittedAtUtc = new Date(Date.UTC(2039, 0, sol, 10)).toISOString();
+  const id = `crew-1:${sol}`;
+  return {
+    id, sol, astronautId: 'crew-1', submittedAtUtc, note: '',
+    measurements: METRIC_IDS.flatMap((metric) => values[metric] === undefined ? [] : [{
+      id: `${id}:${metric}`, astronautId: 'crew-1', metric, value: values[metric]!, unit: METRICS[metric].unit,
+      observedAtUtc: submittedAtUtc, provenance: 'synthetic_demo' as const,
+    }]),
+    symptoms: ['headache', 'dizziness', 'vertigo', 'nausea', 'vomiting', 'balance_problems', 'vision_changes', 'head_fullness', 'poor_appetite', 'flank_pain', 'feeling_hopeless']
+      .map((s) => ({ id: s, label: s.replace('_', ' '), present: symptoms.includes(s) })),
+  };
+}
+const seated = { heart_rate: 70, bp_systolic: 118, bp_diastolic: 76 };
+const ids = (c: DailyCheckin, history: DailyCheckin[] = [], environment?: HabitatSample[]) =>
+  evaluateCheckin(c, history, environment ? { events: [], archiveEvent: { sol: 1, date: '2017-09-11' }, environment } : undefined);
+
+describe('stand-up (orthostatic) test', () => {
+  it('flags a 20/10 mmHg fall or a 30 bpm rise on standing and routes to the Crew Medical Officer', () => {
+    const drop = ids(checkin(43, { ...seated, bp_systolic_standing: 96, bp_diastolic_standing: 70, heart_rate_standing: 82 }));
+    expect(drop.findings.some((f) => f.ruleId === 'orthostatic-check')).toBe(true);
+    expect(drop.recommendedTier).toBe('crew_medical_officer');
+    expect(drop.domainStatuses.cardiovascular).not.toBe('no_change_detected');
+
+    const pulse = ids(checkin(43, { ...seated, bp_systolic_standing: 116, bp_diastolic_standing: 78, heart_rate_standing: 100 }));
+    expect(pulse.findings.find((f) => f.ruleId === 'orthostatic-check')?.summary).toMatch(/pulse rose by 30 bpm/);
+  });
+
+  it('stays quiet for a normal stand test, a 28 bpm rise, or no standing reading', () => {
+    expect(ids(checkin(43, { ...seated, bp_systolic_standing: 112, bp_diastolic_standing: 78, heart_rate_standing: 98 }))
+      .findings.some((f) => f.ruleId === 'orthostatic-check')).toBe(false);
+    const none = ids(checkin(43, seated));
+    expect(none.findings.some((f) => f.ruleId === 'orthostatic-check' || f.summary.includes('Standing'))).toBe(false);
+  });
+
+  it('rejects a reversed standing pair as an entry problem', () => {
+    const bad = ids(checkin(43, { ...seated, bp_systolic_standing: 70, bp_diastolic_standing: 80 }));
+    expect(bad.dataQualityWarnings.join(' ')).toMatch(/Standing systolic/);
+    expect(bad.domainStatuses.cardiovascular).toBe('check_entry');
+  });
+});
+
+describe('hydration and exercise countermeasures', () => {
+  it('notes a single low-fluid day and trends three in five', () => {
+    expect(ids(checkin(43, { fluid_intake: 1.6 })).findings.find((f) => f.ruleId === 'hydration-low')?.kind).toBe('observation');
+    expect(ids(checkin(43, { fluid_intake: 2 })).findings.some((f) => f.ruleId === 'hydration-low')).toBe(false);
+    const history = [checkin(41, { fluid_intake: 1.5 }), checkin(42, { fluid_intake: 1.7 })];
+    expect(ids(checkin(43, { fluid_intake: 1.6 }), history).findings.find((f) => f.ruleId === 'hydration-low')?.kind).toBe('trend');
+  });
+
+  it('flags exercise below target on 3 of 5 sols but not one short day, and never sets a body-area status', () => {
+    const history = [checkin(41, { exercise_minutes: 20 }), checkin(42, { exercise_minutes: 35 })];
+    const low = ids(checkin(43, { exercise_minutes: 45 }), history);
+    expect(low.findings.find((f) => f.ruleId === 'countermeasure-adherence')?.summary).toMatch(/not muscle or bone directly/);
+    expect(low.domainStatuses.metabolic).toBe(ids(checkin(43, {}), history).domainStatuses.metabolic); // exercise never changes it
+    expect(ids(checkin(43, { exercise_minutes: 45 })).findings.some((f) => f.ruleId === 'countermeasure-adherence')).toBe(false);
+  });
+});
+
+describe('motion sickness, SANS and CO2', () => {
+  it('needs two vestibular symptoms; vomiting goes to the Crew Medical Officer', () => {
+    expect(ids(checkin(43, {}, ['nausea'])).findings.some((f) => f.ruleId === 'motion-sickness-pattern')).toBe(false);
+    const sick = ids(checkin(43, {}, ['dizziness', 'nausea']));
+    expect(sick.findings.some((f) => f.ruleId === 'motion-sickness-pattern')).toBe(true);
+    expect(sick.recommendedTier).toBe('self_care');
+    expect(ids(checkin(43, {}, ['nausea', 'vomiting'])).recommendedTier).toBe('crew_medical_officer');
+  });
+
+  it('refers vision changes for an eye check; head fullness alone stays self-care', () => {
+    const vision = ids(checkin(43, {}, ['vision_changes']));
+    expect(vision.findings.some((f) => f.ruleId === 'sans-screen')).toBe(true);
+    expect(vision.recommendedTier).toBe('crew_medical_officer');
+    expect(ids(checkin(43, {}, ['head_fullness'])).recommendedTier).toBe('self_care');
+  });
+
+  it('links headaches to habitat CO2 only at or above the 3 mmHg limit', () => {
+    const env = (co2: number): HabitatSample[] => [{ sol: 43, co2Mmhg: co2, cabinTempC: 22, provenance: 'synthetic_demo' }];
+    const high = ids(checkin(43, {}, ['headache']), [], env(3.4));
+    expect(high.findings.find((f) => f.ruleId === 'co2-headache-context')?.kind).toBe('contextual_association');
+    expect(ids(checkin(43, {}, ['headache']), [], env(2.2)).findings.some((f) => f.ruleId === 'co2-headache-context')).toBe(false);
+  });
+});
+
+describe('Sol 43 hero scenario tells the after-the-storm story', () => {
+  it('shows short exercise and CO2-linked shelter headaches alongside sleep and mood', () => {
+    const { scenario, prefill } = DEMO_OPTIONS[DEFAULT_SCENARIO_ID];
+    const today = checkin(43, prefill);
+    const history = scenario.history.map((h) => ({ ...h, astronautId: 'crew-1', measurements: h.measurements.map((m) => ({ ...m, astronautId: 'crew-1' })) }));
+    const result = evaluateCheckin(today, history, { events: scenario.events, archiveEvent: { sol: 41, date: '2017-09-11' }, environment: scenario.environment });
+    const rules = result.findings.map((f) => f.ruleId);
+    expect(rules).toEqual(expect.arrayContaining(['combined-sleep-mood', 'countermeasure-adherence', 'co2-headache-context', 'hrv-below-usual', 'energy-intake-low', 'bone-kidney-compound', 'voice-change-from-usual']));
+    expect(rules).not.toContain('orthostatic-check'); // the scripted stand test is normal
+    expect(result.domainStatuses.behavioral).not.toBe('no_change_detected');
+    expect(result.engineVersion).toBe('1.7.0');
+  });
+});
+
+describe('voice check (read-aloud passage)', () => {
+  const usual = { voice_pitch_variability: 2.6, voice_articulation_rate: 4.8, voice_pause_ratio: 18 };
+  const history = [36, 37, 38, 39, 40].map((sol, i) => checkin(sol, {
+    voice_pitch_variability: usual.voice_pitch_variability + (i % 2) * 0.1,
+    voice_articulation_rate: usual.voice_articulation_rate + (i % 2) * 0.05,
+    voice_pause_ratio: usual.voice_pause_ratio + (i % 2),
+  }));
+  const voice = (values: Partial<Record<MetricId, number>>, prior = history) =>
+    ids(checkin(43, { ...usual, ...values }), prior).findings.find((f) => f.ruleId === 'voice-change-from-usual');
+
+  it('flags two markers moving the tired way against the personal usual', () => {
+    const found = voice({ voice_pitch_variability: 1.6, voice_pause_ratio: 27 });
+    expect(found?.summary).toMatch(/2 of 3 markers/);
+    expect(found?.baselineUsed.map((b) => b.metric)).toEqual(['voice_pitch_variability', 'voice_pause_ratio']);
+    expect(found?.kind).toBe('observation');
+  });
+
+  it('stays quiet for one marker alone, a change the other way, or a small change', () => {
+    expect(voice({ voice_pitch_variability: 1.6 })).toBeUndefined();
+    expect(voice({ voice_pitch_variability: 3.6, voice_pause_ratio: 10 })).toBeUndefined();
+    expect(voice({ voice_pitch_variability: 2.3, voice_pause_ratio: 21 })).toBeUndefined();
+  });
+
+  it('respects a person whose voice varies a lot from sol to sol', () => {
+    const variable = [36, 37, 38, 39, 40].map((sol, i) => checkin(sol, {
+      voice_pitch_variability: [1.6, 3.6, 2.6, 1.8, 3.4][i], voice_articulation_rate: 4.8, voice_pause_ratio: [10, 26, 18, 12, 24][i],
+    }));
+    expect(voice({ voice_pitch_variability: 1.8, voice_pause_ratio: 25 }, variable)).toBeUndefined();
+  });
+
+  it('needs 5 prior voice checks and never escalates on voice alone', () => {
+    expect(voice({ voice_pitch_variability: 1.6, voice_pause_ratio: 27 }, history.slice(0, 4))).toBeUndefined();
+    const result = ids(checkin(43, { ...usual, voice_pitch_variability: 1.6, voice_pause_ratio: 27 }), history);
+    expect(result.recommendedTier).toBe('self_care');
+  });
+});
+
+describe('camera breathing rate and HRV', () => {
+  it('flags breathing outside 12–20 per minute at rest, both directions', () => {
+    expect(ids(checkin(43, { respiratory_rate: 24 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/above/);
+    expect(ids(checkin(43, { respiratory_rate: 9 })).findings.find((f) => f.ruleId === 'breathing-rate-range')?.summary).toMatch(/below/);
+    expect(ids(checkin(43, { respiratory_rate: 16 })).findings.some((f) => f.ruleId === 'breathing-rate-range')).toBe(false);
+  });
+
+  it('compares microphone breathing with the personal median once it has five prior readings', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { respiratory_rate: 16 }));
+    const recorded = (rate: number): DailyCheckin => {
+      const current = checkin(43, { respiratory_rate: rate });
+      return { ...current, measurements: current.measurements.map((m) => ({ ...m, source: 'microphone_estimate' })) };
+    };
+    const finding = (rate: number, prior: DailyCheckin[]) =>
+      ids(recorded(rate), prior).findings.find((f) => f.ruleId === 'breathing-rate-range');
+    expect(finding(20, history)?.baselineUsed[0]?.median).toBe(16);
+    expect(finding(12, history)?.summary).toMatch(/below the personal usual/);
+    expect(finding(19, history)).toBeUndefined();
+    expect(finding(24, history.slice(0, 4))).toBeUndefined();
+  });
+
+  it('compares HRV only with the person’s own usual, and needs 5 prior readings', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { hrv_rmssd: 50 }));
+    const low = ids(checkin(43, { hrv_rmssd: 30 }), history).findings.find((f) => f.ruleId === 'hrv-below-usual');
+    expect(low?.summary).toMatch(/usual of 50 ms/);
+    expect(low?.baselineUsed[0]?.metric).toBe('hrv_rmssd');
+    expect(ids(checkin(43, { hrv_rmssd: 45 }), history).findings.some((f) => f.ruleId === 'hrv-below-usual')).toBe(false);
+    expect(ids(checkin(43, { hrv_rmssd: 20 }), history.slice(0, 4)).findings.some((f) => f.ruleId === 'hrv-below-usual')).toBe(false);
+  });
+
+  it('never sets a body-area status or a "not measured" finding when skipped', () => {
+    const skipped = ids(checkin(43, seated));
+    expect(skipped.findings.some((f) => f.summary.toLowerCase().includes('breathing') || f.summary.includes('HRV'))).toBe(false);
+  });
+});
+
+describe('distance from Earth: food, kidneys, behavioral crisis', () => {
+  const rule = (result: ReturnType<typeof ids>, id: string) => result.findings.find((f) => f.ruleId === id);
+
+  it('trends low food energy on 3 of 5 sols, not one low day, and mentions poor appetite', () => {
+    const history = [checkin(41, { calorie_intake: 1600 }), checkin(42, { calorie_intake: 1800 })];
+    expect(rule(ids(checkin(43, { calorie_intake: 1900 }, ['poor_appetite']), history), 'energy-intake-low')?.summary).toMatch(/3 of the last 5.*Poor appetite/);
+    expect(rule(ids(checkin(43, { calorie_intake: 1900 })), 'energy-intake-low')).toBeUndefined();
+  });
+
+  it('flags weight 3% below the personal usual and routes 5% to the Crew Medical Officer', () => {
+    const history = [36, 37, 38, 39, 40].map((sol) => checkin(sol, { body_mass: 61 }));
+    expect(rule(ids(checkin(43, { body_mass: 60 }), history), 'body-mass-loss')).toBeUndefined();
+    const flagged = ids(checkin(43, { body_mass: 58.9 }), history);
+    expect(rule(flagged, 'body-mass-loss')?.summary).toMatch(/3\.4% below the personal usual of 61 kg/);
+    expect(flagged.recommendedTier).toBe('self_care');
+    expect(ids(checkin(43, { body_mass: 57.5 }), history).recommendedTier).toBe('crew_medical_officer');
+  });
+
+  it('sends side/back pain to the Crew Medical Officer and names recent low fluid', () => {
+    const result = ids(checkin(43, { fluid_intake: 1.4 }, ['flank_pain']));
+    expect(rule(result, 'kidney-stone-screen')?.summary).toMatch(/Fluid intake was below 2 L on 1/);
+    expect(result.recommendedTier).toBe('crew_medical_officer');
+    expect(result.actionCardIds).toContain('kidney-stone-care');
+  });
+
+  it('routes "hopeless or unable to cope" to the Crew Medical Officer immediately', () => {
+    const result = ids(checkin(43, {}, ['feeling_hopeless']));
+    expect(rule(result, 'behavioral-crisis')).toBeDefined();
+    expect(result.recommendedTier).toBe('crew_medical_officer');
+    expect(result.findings[0].ruleId).toBe('behavioral-crisis');
+  });
+
+  it('adds the bone + kidney risk multiplier only when short exercise meets low food or water', () => {
+    const shortExercise = [checkin(41, { exercise_minutes: 20, calorie_intake: 1700 }), checkin(42, { exercise_minutes: 30, calorie_intake: 1800 })];
+    expect(rule(ids(checkin(43, { exercise_minutes: 40, calorie_intake: 2500 }), shortExercise), 'bone-kidney-compound')?.kind).toBe('contextual_association');
+    const exerciseOnly = [checkin(41, { exercise_minutes: 20, calorie_intake: 2600 }), checkin(42, { exercise_minutes: 30, calorie_intake: 2600 })];
+    expect(rule(ids(checkin(43, { exercise_minutes: 40, calorie_intake: 2500 }), exerciseOnly), 'bone-kidney-compound')).toBeUndefined();
+  });
+});

@@ -1,0 +1,48 @@
+Vital Camera SDK
+Copyright 2025 Kegang Wang
+
+This product includes models and code from the following third-party projects.
+
+================================================================================
+
+1. FacePhys — Remote Photoplethysmography (rPPG)
+   Models: model.tflite, proj.tflite, sqi_model.tflite, psd_model.tflite, state.gz
+   License: MIT with Privacy Addendum (Copyright 2025 Kegang Wang)
+
+================================================================================
+
+2. MediaPipe Face Detection (BlazeFace short-range)
+   Used via: @mediapipe/tasks-vision
+   License: Apache 2.0 (Copyright Google LLC)
+   Note: face_mesh / face_landmarker is NOT used by this SDK — only the
+   short-range face detector + its 6 keypoints (eyes, nose, ears, mouth)
+
+================================================================================
+
+3. HSEmotion — Facial Emotion Recognition (EfficientNet-B0, VGAF)
+   Model: enet_b0_8_best_vgaf_dynamic_int8.tflite
+   License: Apache 2.0 (Copyright Andrey V. Savchenko)
+   Source: https://github.com/av-savchenko/face-emotion-recognition
+
+================================================================================
+
+4. Gaze Estimation (based on L2CS-Net with MobileOne-S0 backbone)
+   Model: mobileone_s0_gaze_float16.tflite
+   License: MIT (Copyright 2024 Yakhyokhuja Valikhujaev)
+   Source: https://github.com/yakhyo/gaze-estimation
+
+================================================================================
+
+5. TensorFlow Lite / LiteRT
+   License: Apache 2.0 (Copyright The TensorFlow Authors)
+   Source: https://github.com/google-ai-edge/LiteRT
+
+================================================================================
+
+6. OCEC — Open / Closed Eyes Classification
+   Model: ocec_p.tflite (converted from ocec_p.onnx via onnx2tf)
+   License: see upstream repository (Copyright Katsuya Hyodo / PINTO0309)
+   Source: https://github.com/PINTO0309/OCEC
+   DOI:    https://doi.org/10.5281/zenodo.17505461
+
+================================================================================

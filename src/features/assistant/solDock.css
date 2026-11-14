@@ -1,0 +1,117 @@
+/* Sol on every tab: a bubble button and a compact panel that leaves the page visible. */
+.sol-dock {
+  position: fixed; z-index: 900;
+  --dock-right: max(16px, var(--safe-right, 0px));
+  --dock-bottom: max(16px, var(--safe-bottom, 0px));
+  right: var(--dock-right);
+  bottom: var(--dock-bottom);
+  display: grid; justify-items: end; gap: 12px;
+  pointer-events: none;
+}
+.sol-dock > * { pointer-events: auto; }
+.sol-dock-button {
+  grid-row: 2;
+  position: relative; width: 60px; height: 60px; padding: 0; border: 0; border-radius: 50%;
+  cursor: pointer; background: none; box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+.sol-dock-wake {
+  grid-row: 1;
+  padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--bg-raised); color: var(--text-secondary); font-size: .8125rem;
+}
+.sol-dock-button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.sol-dock-live {
+  position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--status-steady); border: 2px solid var(--bg-base);
+}
+.sol-dock-panel {
+  grid-row: 1;
+  box-sizing: border-box;
+  width: min(380px, calc(100vw - var(--dock-right) - max(12px, var(--safe-left, 0px))));
+  max-height: calc(100dvh - var(--dock-bottom) - var(--safe-top, 0px) - 84px);
+  display: grid; gap: 10px; padding: 14px; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--bg-raised);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+}
+.sol-dock-head { display: flex; align-items: center; gap: 10px; }
+.sol-dock-orb { width: 44px; height: 44px; flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: none; }
+.sol-dock-orb:not(:disabled) { cursor: pointer; }
+.sol-dock-title { display: grid; flex: 1; min-width: 0; }
+.sol-dock-title span { font-size: .875rem; color: var(--text-secondary); }
+.sol-dock-icon { min-width: 44px; min-height: 44px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-control); background: var(--bg-surface); color: var(--text-primary); cursor: pointer; }
+.sol-dock-body { display: grid; gap: 6px; max-height: 40dvh; overflow-y: auto; overflow-wrap: anywhere; }
+.sol-dock-body p { margin: 0; line-height: 1.45; }
+.sol-dock-you { color: var(--text-secondary); font-style: italic; }
+.sol-dock-sources { font-size: .8125rem; color: var(--text-muted); }
+.sol-dock-sources a { display: flex; align-items: center; width: fit-content; min-width: 44px; min-height: 44px; color: var(--text-secondary); }
+.sol-dock-error { padding: 10px; border: 1px solid var(--status-trend); border-radius: 8px; background: var(--tint-trend); }
+.sol-dock-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.sol-dock-actions .button, .sol-dock-settings { min-height: 44px; }
+.sol-dock-settings { display: inline-flex; align-items: center; gap: 6px; font-size: .875rem; color: var(--text-secondary); }
+.sol-dock-privacy { margin: 0; font-size: .75rem; color: var(--text-muted); }
+
+/* Phones: sit above the bottom navigation bar. */
+@media (max-width: 767px) {
+  .sol-dock { --dock-bottom: calc(84px + var(--safe-bottom, 0px)); --dock-right: max(12px, var(--safe-right, 0px)); }
+  .sol-dock-button { width: 52px; height: 52px; }
+}
+@media print { .sol-dock { display: none; } }
+/* Computer-use indicator: a centered island that floats in sync with the Sol bubble. */
+.sol-island {
+  position: fixed;
+  left: 50%;
+  bottom: max(26px, calc(var(--safe-bottom, 0px) + 10px));
+  z-index: 1100;
+  display: inline-flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px 10px 12px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-raised) 90%, transparent);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .5);
+  color: var(--text-primary); font-size: .9375rem; font-weight: 600; line-height: 1;
+  pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+  animation: sol-island-in 240ms ease both, sol-island-float 2.6s ease-in-out 240ms infinite;
+}
+.sol-island-dot {
+  position: relative; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 66% 24%, var(--text-primary), transparent 50%),
+    radial-gradient(ellipse at 20% 80%, #76513f, transparent 55%),
+    linear-gradient(150deg, #dfc3a5 18%, #b88b6b 62%, #76513f 96%);
+}
+.sol-island-dot-glow {
+  position: absolute; inset: -4px; border-radius: 50%;
+  background: color-mix(in srgb, #dfc3a5 60%, transparent);
+  animation: sol-island-pulse 2.6s ease-in-out infinite;
+}
+.sol-island-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+@keyframes sol-island-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes sol-island-float { 50% { transform: translate(-50%, -4px); } }
+@keyframes sol-island-pulse { 0%, 100% { opacity: .45; transform: scale(1); } 50% { opacity: 0; transform: scale(1.5); } }
+
+/* Phones: sit above the bottom navigation and the dock bubble. */
+@media (max-width: 767px) {
+  .sol-island { bottom: calc(96px + var(--safe-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-island { animation: sol-island-in 160ms ease both; }
+  .sol-island-dot-glow { animation: none; opacity: .4; }
+}
+@media print { .sol-island { display: none; } }
+
+
+/* Emergency steps: the alert line, then large numbered actions that are easy to follow at a glance. */
+.reply-steps {
+  display: grid; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--status-trend); border-radius: 10px;
+  background: var(--tint-red, var(--tint-trend)); text-align: left;
+}
+.reply-steps p { margin: 0; line-height: 1.45; }
+.reply-steps-lead { font-weight: 700; color: var(--text-primary); }
+.reply-steps ol { margin: 0; padding-left: 1.6em; display: grid; gap: 6px; }
+.reply-steps li { line-height: 1.45; font-size: 1rem; color: var(--text-primary); }
+.reply-steps li::marker { font-weight: 700; color: var(--status-trend); }
+.reply-steps-tail { font-size: .875rem; color: var(--text-secondary); }

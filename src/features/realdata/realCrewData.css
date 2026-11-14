@@ -1,0 +1,19 @@
+.real-crew { display: grid; gap: 12px; margin-top: 24px; min-width: 0; }
+.real-crew-lead, .real-crew-takeaway { margin: 0; max-width: 72ch; }
+.real-crew-takeaway { color: var(--text-primary); font-weight: 600; }
+.real-crew-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 10px; margin: 0; }
+.real-crew-stats div { padding: 12px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 8px; }
+.real-crew-stats dt { color: var(--text-secondary); font-size: 0.875rem; }
+.real-crew-stats dd { margin: 4px 0 0; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.real-crew-table { overflow-x: auto; min-width: 0; }
+.real-crew-table table { min-width: 560px; }
+.real-crew-table caption { text-align: left; color: var(--text-secondary); padding-bottom: 6px; }
+.real-change, .real-range { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.real-change.is-flagged { color: var(--status-change); font-weight: 600; }
+.real-range { color: var(--status-steady); }
+.real-crew-details summary { cursor: pointer; color: var(--accent); }
+.real-crew-details h3 { margin: 14px 0 6px; font-size: 1rem; }
+.real-crew-details ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.real-crew-details p { max-width: 72ch; }
+.real-crew-sources a { overflow-wrap: anywhere; }
+.tabular { font-variant-numeric: tabular-nums; }

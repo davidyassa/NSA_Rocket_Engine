@@ -1,0 +1,4 @@
+participant,camera_bpm,reference_bpm,device,notes
+bench-24fps,82,82,synthetic test video (known pulse),public-domain NASA portrait; skin pulsing at exactly 82 bpm; 24 fps like a laptop camera
+bench-15fps,67,67,synthetic test video (known pulse),dim-laptop case: 15 fps
+bench-30fps,104,104,synthetic test video (known pulse),phone-like 30 fps

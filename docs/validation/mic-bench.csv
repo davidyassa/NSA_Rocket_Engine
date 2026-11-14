@@ -1,0 +1,6 @@
+kind,true_value,sol_check_value,unit,result_text,true_pace_syllables_s,sol_check_pace_syllables_s,true_pause_percent,sol_check_pause_percent
+heart,58.00,58,bpm,"Heart rate from heart sounds | 58 beats per minute | Heart-sound loudness over the recording; ticks mark heart sounds |  Technical details",,,,
+heart,84.00,84,bpm,"Heart rate from heart sounds | 84 beats per minute | Heart-sound loudness over the recording; ticks mark heart sounds |  Technical details",,,,
+breath,12.00,12,breaths/min,"Breathing rate from breath sounds | 12 breaths per minute | Two separate methods agreed: the repeating sound pattern (12.2) and counting 8 breaths (12). | Breath-sound loudness over the recording; ticks mark counted breaths",,,,
+breath,18.00,18,breaths/min,"Breathing rate from breath sounds | 18 breaths per minute | Two separate methods agreed: the repeating sound pattern (17.9) and counting 11 breaths (18.1). | Breath-sound loudness over the recording; ticks mark counted breaths",,,,
+voice,2.13,2.13,semitones (pitch movement),"Pitch movement | 2.13 semitones | Speaking pace | 4.6 syllables/s",4.63,4.6,17.52,16.9

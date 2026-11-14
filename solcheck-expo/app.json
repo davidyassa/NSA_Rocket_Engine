@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Sol Check NASA",
+    "slug": "solcheck-nasa",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#070B14",
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Sol Check to access your camera for contactless heart rate evaluation."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "gov.nasa.solcheck",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Sol Check to access your camera for contactless heart rate evaluation.",
+        "NSMicrophoneUsageDescription": "Allow Sol Check to access microphone."
+      }
+    },
+    "android": {
+      "package": "gov.nasa.solcheck",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#070B14",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

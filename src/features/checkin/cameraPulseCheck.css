@@ -1,0 +1,621 @@
+.camera-pulse-container {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.camera-pulse-open-btn {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.camera-pulse-card {
+  margin-top: 0.6rem;
+  padding: 0.9rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+}
+
+.camera-pulse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.camera-pulse-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.camera-pulse-badge-opt {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--muted);
+}
+
+.camera-pulse-consent-text {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.camera-pulse-consent-points {
+  margin: 0 0 0.85rem;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.camera-pulse-consent-points li + li {
+  margin-top: 0.3rem;
+}
+
+.camera-pulse-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.camera-pulse-actions .button {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.camera-video-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 4 / 3;
+  border-radius: calc(var(--radius) - 3px);
+  overflow: hidden;
+  background: var(--bg-base);
+  margin: 0.6rem auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+/* Face positioning reticle overlay */
+.camera-face-reticle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.camera-reticle-oval {
+  position: relative;
+  width: 135px;
+  height: 180px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.camera-face-reticle.searching .camera-reticle-oval {
+  border: 2px dashed color-mix(in srgb, var(--border-subtle) 45%, transparent);
+  animation: reticlePulse 2s infinite ease-in-out;
+}
+
+.camera-face-reticle.calibrating .camera-reticle-oval {
+  border: 2px solid var(--status-trend);
+}
+
+.camera-face-reticle.good .camera-reticle-oval {
+  border: 2px solid var(--status-steady);
+}
+
+@keyframes reticlePulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.03); opacity: 1; }
+}
+
+/* Corner HUD brackets around the reticle */
+.camera-reticle-bracket {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: color-mix(in srgb, var(--border-subtle) 70%, transparent);
+  border-style: solid;
+  border-width: 0;
+  transition: border-color 0.3s ease;
+}
+
+.camera-face-reticle.calibrating .camera-reticle-bracket {
+  border-color: var(--status-trend);
+}
+
+.camera-face-reticle.good .camera-reticle-bracket {
+  border-color: var(--status-steady);
+}
+
+.camera-reticle-bracket.top-left {
+  top: -8px;
+  left: -8px;
+  border-top-width: 2px;
+  border-left-width: 2px;
+}
+
+.camera-reticle-bracket.top-right {
+  top: -8px;
+  right: -8px;
+  border-top-width: 2px;
+  border-right-width: 2px;
+}
+
+.camera-reticle-bracket.bottom-left {
+  bottom: -8px;
+  left: -8px;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+}
+
+.camera-reticle-bracket.bottom-right {
+  bottom: -8px;
+  right: -8px;
+  border-bottom-width: 2px;
+  border-right-width: 2px;
+}
+
+.camera-video-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  background: color-mix(in srgb, var(--bg-base) 82%, transparent);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.camera-pulse-measuring-info {
+  margin: 0.5rem 0;
+  font-size: 0.82rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.camera-pulse-status-msg {
+  display: block;
+  font-weight: 550;
+  margin-bottom: 0.2rem;
+}
+
+.camera-pulse-sqi-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.camera-pulse-sqi-track {
+  flex: 1;
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.camera-pulse-sqi-fill {
+  height: 100%;
+  background: var(--status-steady);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.camera-pulse-sqi-fill.weak {
+  background: var(--status-change);
+}
+
+.camera-pulse-sqi-fill.optimal {
+  background: var(--status-steady);
+}
+
+.camera-pulse-sqi-pct {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.camera-sqi-badge {
+  font-size: 0.8rem;
+  font-weight: 650;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.camera-sqi-badge.weak {
+  color: var(--accent);
+  background: var(--bg-raised);
+}
+
+.camera-sqi-badge.good {
+  color: var(--status-steady);
+  background: var(--bg-raised);
+}
+
+.camera-sqi-badge.optimal {
+  color: var(--status-steady);
+  background: var(--bg-raised);
+}
+
+/* Real-time Movement & Environmental Coaching Banner */
+
+
+
+
+
+
+
+
+
+/* Collapsible Quality & Movement Tips Guide */
+.camera-quality-guide {
+  margin-top: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--bg-surface);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.camera-quality-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.camera-quality-guide summary::-webkit-details-marker {
+  display: none;
+}
+
+.camera-quality-guide summary:hover {
+  color: var(--accent);
+}
+
+.camera-quality-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.camera-tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.camera-tip-card strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 650;
+  margin-bottom: 0.1rem;
+}
+
+.camera-tip-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.camera-tip-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* Weak signal troubleshooting box */
+.camera-troubleshoot-box {
+  margin: 0.5rem 0 0.8rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.camera-troubleshoot-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.camera-troubleshoot-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.camera-troubleshoot-list li + li {
+  margin-top: 0.25rem;
+}
+
+.camera-pulse-weak-alert {
+  color: var(--accent);
+  font-weight: 550;
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+}
+
+.camera-pulse-result {
+  margin: 0.5rem 0 0.85rem;
+  padding: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) - 3px);
+}
+
+.camera-pulse-result-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.3rem;
+}
+
+.camera-pulse-result-val {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+.camera-pulse-result-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.camera-pulse-disclaimer {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+.camera-pulse-privacy-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.camera-pulse-result-meta {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.camera-pulse-method {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.camera-pulse-window-progress {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.camera-pulse-scanlog {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.camera-pulse-scanlog .button {
+  align-self: flex-start;
+}
+
+.camera-pulse-scanlog p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.camera-pulse-error-msg {
+  color: var(--accent);
+  font-size: 0.82rem;
+  margin: 0.4rem 0 0.75rem;
+  line-height: 1.4;
+}
+
+/* ───────── Guided capture (plain-language coaching) ───────── */
+.camera-setup-steps { display: grid; gap: 10px; margin: 0.8rem 0; padding: 0; list-style: none; }
+.camera-setup-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.camera-setup-steps strong { display: block; color: var(--text-primary); font-size: 1rem; }
+.camera-setup-steps p { margin: 2px 0 0; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.45; }
+.camera-setup-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--tint-accent);
+}
+.camera-privacy-line { display: flex; align-items: center; gap: 8px; margin: 0.4rem 0; color: var(--status-steady); font-weight: 600; font-size: 0.92rem; }
+.camera-privacy-details, .camera-tech-details { margin: 0.4rem 0; color: var(--text-secondary); font-size: 0.85rem; }
+.camera-privacy-details summary, .camera-tech-details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+
+.camera-capture-stages { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 14px; margin: 0.4rem 0 0; padding: 0; list-style: none; color: var(--text-muted); font-size: 0.85rem; }
+.camera-capture-stages li { display: inline-flex; align-items: center; gap: 6px; }
+.camera-capture-stages li > span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 600 0.8rem var(--mono);
+}
+.camera-capture-stages li.is-current { color: var(--accent); font-weight: 600; }
+.camera-capture-stages li.is-done { color: var(--status-steady); }
+
+.camera-pulse-measuring .camera-video-wrapper { max-width: 420px; border: 3px solid var(--border-subtle); transition: border-color 200ms ease; }
+.camera-video-wrapper.cue-action { border-color: var(--status-change); }
+.camera-video-wrapper.cue-progress { border-color: var(--accent); }
+.camera-video-wrapper.cue-good { border-color: var(--status-steady); }
+
+/* "Look here" marker at the top edge, where front cameras sit on phones and laptops */
+.camera-look-here {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-base) 80%, transparent);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.camera-look-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.camera-pulse-measuring .camera-video-overlay { bottom: 10px; left: 10px; right: 10px; padding: 8px 10px; font-size: 1rem; }
+.camera-cue-title { display: block; font-size: 1.05rem; line-height: 1.3; }
+.cue-action .camera-cue-title { color: var(--status-change); }
+.cue-good .camera-cue-title { color: var(--status-steady); }
+
+.camera-capture-progress { height: 10px; max-width: 420px; margin: 0 auto 0.6rem; border-radius: var(--radius-pill); background: var(--bg-raised); border: 1px solid var(--border-subtle); overflow: hidden; }
+.camera-capture-progress-fill { height: 100%; background: var(--accent); transition: width 400ms ease; }
+.camera-pulse-measuring .camera-pulse-status-msg { display: block; color: var(--text-primary); font-size: 1rem; line-height: 1.45; text-align: center; }
+.camera-signal-plain { margin: 6px 0; text-align: center; color: var(--text-secondary); font-size: 0.9rem; }
+
+.camera-pulse-result-val small { font-size: 0.45em; font-weight: 500; color: var(--text-secondary); }
+.camera-pulse-result-plain { margin: 6px 0; font-size: 1rem; line-height: 1.45; }
+.camera-pulse-result-plain.verdict-usual { color: var(--status-steady); }
+.camera-pulse-result-plain.verdict-low, .camera-pulse-result-plain.verdict-high { color: var(--status-change); }
+
+/* ───────── Oval-only preview: nothing outside the face oval is shown ───────── */
+.camera-oval-stage {
+  max-width: 360px;
+  aspect-ratio: 4 / 3;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.camera-oval-stage .camera-video-feed {
+  /* Same ellipse as captureCoach OVAL: centre 50%/50%, radii 30% × 45%. */
+  clip-path: ellipse(30% 45% at 50% 50%);
+}
+.camera-oval-stage .camera-face-reticle .camera-reticle-oval {
+  width: 60%;
+  height: 90%;
+  box-shadow: none;
+  border-width: 4px;
+  border-style: solid;
+  animation: none;
+}
+.camera-oval-stage .camera-reticle-bracket { display: none; }
+.camera-oval-stage.cue-action .camera-reticle-oval { border-color: var(--status-change); }
+.camera-oval-stage.cue-progress .camera-reticle-oval { border-color: var(--accent); }
+.camera-oval-stage.cue-good .camera-reticle-oval { border-color: var(--status-steady); }
+.camera-oval-stage .camera-look-here { top: -2px; }
+
+/* Instruction sits under the oval so it never covers the face */
+.camera-pulse-measuring .camera-video-overlay {
+  position: static;
+  margin: 0 auto 0.5rem;
+  padding: 0;
+  background: none;
+  text-align: center;
+}
+.camera-pulse-measuring .camera-cue-title { font-size: 1.25rem; }
+.cue-text-action .camera-cue-title { color: var(--status-change); }
+.cue-text-progress .camera-cue-title { color: var(--accent); }
+.cue-text-good .camera-cue-title { color: var(--status-steady); }
+
+/* Result appears in the same oval */
+.camera-result-oval {
+  position: absolute;
+  left: 20%;
+  top: 5%;
+  width: 60%;
+  height: 90%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  border: 4px solid var(--status-steady);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--status-steady) 16%, var(--bg-raised)), var(--bg-base));
+  animation: camera-result-in 260ms ease-out;
+}
+.camera-result-label { color: var(--text-secondary); font: 500 0.75rem/1.2 var(--font-body); }
+.camera-result-number { color: var(--text-primary); font: 600 clamp(2.6rem, 9vw, 3.4rem)/1 var(--mono); }
+.camera-result-unit { color: var(--status-steady); font-size: 0.9rem; font-weight: 600; }
+.camera-result-how { margin: 4px 0; color: var(--text-primary); font-size: 0.95rem; line-height: 1.45; }
+.camera-pulse-success .camera-pulse-result-reading { margin: 0; }
+@keyframes camera-result-in { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .camera-result-oval { animation: none; } }

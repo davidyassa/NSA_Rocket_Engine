@@ -1,0 +1,20 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-13T12:37:53.990Z",
+        "reason": "brief: the user's pasted Sol Check UI plan specifies Space Grotesk 600 for headings and Inter for body text"
+      },
+      {
+        "rule": "overused-font",
+        "value": "space grotesk",
+        "createdAt": "2026-11-13T12:37:54.004Z",
+        "reason": "brief: the user's pasted Sol Check UI plan specifies Space Grotesk 600 for headings and Inter for body text"
+      }
+    ]
+  }
+}
