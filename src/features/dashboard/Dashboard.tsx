@@ -1,5 +1,8 @@
 import {
-  ArrowRight, ArrowUpRight, CalendarClock, CircleAlert, MapPin, Radiation, Radio,
+  AlertOctagon,
+  AlertTriangle,
+  ArrowRight, ArrowUpRight, CalendarClock, CircleAlert, MapPin, Radio,
+  ShieldCheck,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { DailyCheckin, DemoScenario, RiskAssessment } from '../../contracts';
@@ -9,18 +12,10 @@ import { RoutineChecklist, useRoutineChecklist } from './RoutineChecklist';
 import { MissedCheckin, missedPreviousSol } from './MissedCheckin';
 import { tasksForScenario, useFollowUpStore } from '../followups/useFollowUpStore';
 import { radiationSimCondition, useRadiationSimStore } from '../radiation/radiationSimStore';
-import type { VehicleRadiationStatus } from '../radiation/radiationEngine';
 import { plainFinding } from '../../content/plainLanguage';
 import './dashboard.css';
 
 export { domainReading } from './HealthMetricCards';
-
-const RADIATION_TONE: Record<VehicleRadiationStatus, { color: string; tint: string }> = {
-  GREEN: { color: 'var(--status-steady)', tint: 'var(--tint-steady)' },
-  YELLOW: { color: 'var(--status-change)', tint: 'color-mix(in srgb, var(--status-change) 16%, transparent)' },
-  ORANGE: { color: 'var(--status-trend)', tint: 'color-mix(in srgb, var(--status-trend) 18%, transparent)' },
-  RED: { color: 'var(--nasa-red)', tint: 'color-mix(in srgb, var(--nasa-red) 18%, transparent)' },
-};
 
 export function Dashboard({ scenario, records, latest, assessment }: {
   scenario: DemoScenario;
@@ -47,8 +42,7 @@ export function Dashboard({ scenario, records, latest, assessment }: {
   const simKey = useRadiationSimStore((state) => state.scenarioKey);
   const simFrame = useRadiationSimStore((state) => state.frameIndex);
   const radiation = radiationSimCondition(simKey, simFrame);
-  const { status, statusLabel } = radiation.assessment;
-  const tone = RADIATION_TONE[status];
+  const { status, warningMessage } = radiation.assessment;
 
   return (
     <div className="dashboard">
@@ -69,37 +63,32 @@ export function Dashboard({ scenario, records, latest, assessment }: {
         <RoutineChecklist {...checklist} />
       </div>
 
-      {/* Deep-Space Transit Space Radiation Health Status Banner (mirrors the Radiation Monitor simulation) */}
-      <aside
-        className="panel dashboard-radiation-status"
-        data-status={status}
-        style={{ borderColor: `color-mix(in srgb, ${tone.color} 35%, var(--border-subtle))` }}
-        aria-label="Space Radiation Health Telemetry"
-      >
-        <div className="dashboard-radiation-main">
-          <span className="dashboard-radiation-icon" style={{ background: tone.tint, color: tone.color }}>
-            <Radiation size={20} aria-hidden="true" />
-          </span>
-          <div>
-            <div className="dashboard-radiation-title">
-              <span className="badge" style={{ background: tone.tint, color: tone.color }}>
-                VEHICLE: {status} · {statusLabel.toUpperCase()}
-              </span>
-              <strong>Space Radiation Health Monitoring</strong>
-            </div>
-            <p className="muted" role="status">
-              {radiation.isDefault
-                ? 'NASA-STD-3001 Universal 600 mSv Career Ceiling · CARN Compartment Sensors · Dynamic Lockdown Active'
-                : <>Simulated transit condition: <strong>{radiation.scenario.name}</strong>
-                  {radiation.frameCount > 1 && ` · sample ${radiation.frameIndex + 1} of ${radiation.frameCount}`}</>}
-            </p>
-          </div>
-          <span className="badge badge-synthetic">Simulated</span>
+      <section
+      className={`panel dashboard-radiation-status status-${status.toLowerCase()}`}
+      data-status={status}
+      aria-live="polite"
+      aria-labelledby="dashboard-radiation-heading"
+    >
+      <div className="dashboard-radiation-main">
+        <div className="banner-title-group">
+            {status === 'RED' && <AlertOctagon size={26} color="var(--nasa-red)" aria-hidden="true" />}
+            {status === 'ORANGE' && <AlertTriangle size={26} color="var(--status-trend)" aria-hidden="true" />}
+            {status === 'YELLOW' && <AlertTriangle size={24} color="var(--status-change)" aria-hidden="true" />}
+            {status === 'GREEN' && <ShieldCheck size={24} color="var(--status-steady)" aria-hidden="true" />}
+            <span className="banner-status-badge">RADIATION STATUS: {status}</span>
         </div>
-        <Link to="/hazards/radiation" className="button button-secondary" style={{ whiteSpace: 'nowrap' }}>
-          Open Radiation Monitor <ArrowRight size={15} aria-hidden="true" style={{ marginLeft: '4px' }} />
-        </Link>
-      </aside>
+          <h2 id="banner-heading" className="banner-message">{warningMessage}</h2>
+
+      </div>
+
+      <Link
+        to="/hazards/radiation"
+        className="button button-primary dashboard-radiation-link"
+      >
+        Go to Radiation
+        <ArrowUpRight size={17} aria-hidden="true" />
+      </Link>
+    </section>
 
       {showHealthSummary && (
         <section className="panel dashboard-health-summary" aria-labelledby="health-summary-heading">

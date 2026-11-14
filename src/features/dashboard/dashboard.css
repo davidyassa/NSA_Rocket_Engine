@@ -528,36 +528,134 @@
   .dashboard .twin-viewport { aspect-ratio: 1; }
 }
 
-/* ───────── Radiation status banner (mirrors the Radiation Monitor simulation) ───────── */
+/* ───────── Prominent radiation status card ───────── */
 .dashboard-radiation-status {
-  /* Clear gap between the Mission Dashboard block and this block. */
-  margin-top: 22px;
-  padding: 12px 18px;
-  background: var(--bg-surface);
+  position: relative;
+  margin-top: 18px;
+  padding: clamp(18px, 2.4vw, 26px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  display: flex;
+  background: var(--bg-surface);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 18px;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
-.dashboard-radiation-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 320px; }
-.dashboard-radiation-main > div { min-width: 0; flex: 1 1 auto; }
+
+.dashboard-radiation-status.status-green {
+  border-color: color-mix(in srgb, var(--status-steady) 55%, transparent);
+  background: color-mix(in srgb, var(--status-steady) 9%, var(--bg-surface));
+}
+
+.dashboard-radiation-status.status-yellow {
+  border-color: color-mix(in srgb, var(--status-change) 55%, transparent);
+  background: color-mix(in srgb, var(--status-change) 10%, var(--bg-surface));
+}
+
+.dashboard-radiation-status.status-orange {
+  border-color: color-mix(in srgb, var(--status-trend) 65%, transparent);
+  background: color-mix(in srgb, var(--status-trend) 12%, var(--bg-surface));
+}
+
+.dashboard-radiation-status.status-red {
+  border-color: color-mix(in srgb, var(--nasa-red) 75%, transparent);
+  background: color-mix(in srgb, var(--nasa-red) 14%, var(--bg-surface));
+  animation: dashboard-radiation-pulse 3s infinite ease-in-out;
+}
+
+@keyframes dashboard-radiation-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 105, 77, 0); }
+  50% { box-shadow: 0 0 22px -5px rgba(255, 105, 77, 0.35); }
+}
+
+.dashboard-radiation-main {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
 .dashboard-radiation-icon {
   display: grid;
   place-items: center;
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: var(--bg-raised);
 }
-.dashboard-radiation-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.dashboard-radiation-title .badge { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; }
-.dashboard-radiation-title strong { font-size: 0.98rem; }
-.dashboard-radiation-status .muted { margin: 3px 0 0; font-size: 0.84rem; }
+
+.status-green .dashboard-radiation-icon { color: var(--status-steady); }
+.status-yellow .dashboard-radiation-icon { color: var(--status-change); }
+.status-orange .dashboard-radiation-icon { color: var(--status-trend); }
+.status-red .dashboard-radiation-icon { color: var(--nasa-red); }
+
+.dashboard-radiation-copy { min-width: 0; }
+.dashboard-radiation-eyebrow {
+  margin: 0 0 5px;
+  color: var(--text-secondary);
+  font: 650 0.76rem/1.3 var(--mono);
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.dashboard-radiation-status-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0 0 7px;
+  padding: 3px 9px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font: 750 0.82rem/1.35 var(--mono);
+  letter-spacing: 0.045em;
+}
+
+.status-green .dashboard-radiation-status-label { color: var(--status-steady); background: color-mix(in srgb, var(--status-steady) 15%, transparent); }
+.status-yellow .dashboard-radiation-status-label { color: var(--status-change); background: color-mix(in srgb, var(--status-change) 15%, transparent); }
+.status-orange .dashboard-radiation-status-label { color: var(--status-trend); background: color-mix(in srgb, var(--status-trend) 15%, transparent); }
+.status-red .dashboard-radiation-status-label { color: var(--nasa-red); background: color-mix(in srgb, var(--nasa-red) 17%, transparent); }
+
+.dashboard-radiation-heading {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(1.08rem, 1.8vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.dashboard-radiation-description {
+  max-width: 66ch;
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.dashboard-radiation-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 @media (max-width: 730px) {
-  .dashboard-radiation-status { margin-top: 16px; }
+  .dashboard-radiation-status {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .dashboard-radiation-link { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-radiation-status.status-red { animation: none; }
 }
 
 /* ───────── Health Metrics cards beside the crew digital twin ───────── */
