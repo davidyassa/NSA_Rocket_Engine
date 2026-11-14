@@ -38,14 +38,14 @@ const Trends = lazyWithReload(() => import('../features/trends/Trends').then(({ 
 
 const primaryNavigation = [
   { to: '/', label: 'Dashboard', Icon: LayoutGrid },
-  { to: '/hazards/radiation', label: 'Radiation monitor', Icon: Radiation },
-  { to: '/check-in', label: 'Sol check-in', Icon: ClipboardList },
-  { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
+  { to: '/check-in', label: 'Check-in', Icon: ClipboardList },
+  { to: '/assistant', label: 'Ask Sol', Icon: MessagesSquare },
+  { to: '/hazards/radiation', label: 'Radiation', Icon: Radiation },
   { to: '/assessment', label: 'Assessment', Icon: Activity },
+  { to: '/cognitive', label: 'Cognitive lab', Icon: Brain },
   { to: '/cmo', label: 'CMO console', Icon: Stethoscope },
   { to: '/trends', label: 'Trends', Icon: ChartNoAxesCombined },
   { to: '/timeline', label: 'Timeline', Icon: RouteIcon },
-  { to: '/assistant', label: 'Ask Sol', Icon: MessagesSquare },
 ];
 /** Grouped under the sidebar's "About" disclosure. */
 const aboutNavigation = [
@@ -287,11 +287,10 @@ export function App() {
       <aside className="sidebar">
         <Link to="/" className="wordmark" aria-label="Sol Check dashboard">
           <span className="wordmark-icon"><img src={rocketEngineMark} alt="" /></span>
-          <span className="wordmark-name">Sol Check<small>Rocket Engine</small></span>
+          <span className="wordmark-name">Sol Check</span>
         </Link>
 
         <div className="sidebar-body">
-          <p className="sidebar-label">Crew health</p>
           <nav aria-label="Main navigation" className="side-nav">
             {primaryNavigation.map((item) => <NavItemLink key={item.to} item={item} pathname={pathname} />)}
             <div className="side-nav-group" data-has-active={aboutHasActive || undefined}>
@@ -317,13 +316,6 @@ export function App() {
           <button type="button" className="reset-link" onClick={openReset}>
             <RotateCcw size={16} aria-hidden="true" /> <span>Reset demo</span>
           </button>
-          <div className="crew-profile">
-            <span className="crew-avatar" aria-hidden="true">{initials}</span>
-            <div>
-              <strong>{profile.displayName}</strong>
-              <span>Synthetic crew</span>
-            </div>
-          </div>
         </div>
       </aside>
 
