@@ -262,7 +262,7 @@
 /* ───────── Step-by-step check-in ───────── */
 .checkin-intro { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
 .checkin-intro-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.checkin-wizard { max-width: 760px; margin: 0 auto; display: grid; gap: 14px; }
+.checkin-wizard { width: 100%; max-width: none; margin: 0; display: grid; gap: 14px; }
 .wizard-progress { display: grid; gap: 8px; }
 .wizard-progress-label { margin: 0; color: var(--text-secondary); font-size: 0.95rem; }
 .wizard-progress-label strong { color: var(--text-primary); }
@@ -554,3 +554,21 @@
   color: var(--status-steady, #34d399);
 }
 
+
+
+/* Page-level actions remain visible without the removed heading section. */
+.checkin-page-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.checkin-page-actions .checkin-intro-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
