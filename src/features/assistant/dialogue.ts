@@ -15,9 +15,10 @@ import { ACTION_CARDS, SOURCES } from '../../content';
 import { METRIC_IDS, METRICS } from '../../contracts';
 import type { KnowledgeIndex } from './knowledge';
 import { respond, type AssistantContext, type AssistantReply } from './respond';
-import { TOUR_ROUTES, describePage, guideFor, prewarmRoute, routeFromSpeech, subpageFromSpeech } from './pageGuides';
+import { PAGE_GUIDES, TOUR_ROUTES, describePage, guideFor, prewarmRoute, routeFromSpeech, speakPage, subpageFromSpeech } from './pageGuides';
 import { checkinCommand, type CheckinPatch } from './checkinCommands';
 import { missionAnswer } from './missionAnswers';
+import { ALL_FIGURES, describeFigures, figureFor } from './pageFigures';
 import { EMERGENCY_NEXT, EMERGENCY_REPEAT, EMERGENCY_STOP, STEPS_PER_TURN, emergencyById, emergencySources, emergencyTurn, type EmergencyProtocol } from './emergency';
 
 export interface DialogueState {
@@ -57,7 +58,7 @@ const RADIATION_ROOMS: { id: string; name: string; pattern: RegExp }[] = [
   { id: 'galley', name: 'Galley & Wardroom', pattern: /\bgalley\b|\bwardroom\b|\bkitchen\b|\bmess\b/i },
   { id: 'equipment-bay', name: 'Service & Equipment Bay', pattern: /\bequipment bay\b|\bservice bay\b|\bequipment\b|\bservice module\b/i },
 ];
-const ROOM_VERB = /^(?:please )?(?:show|open|select|go to|take me to|click(?: on)?|focus(?: on)?|zoom (?:in )?on|inspect|display)\s+(?:the\s+)?/i;
+const ROOM_VERB = /^(?:please )?(?:show(?: me)?|open|select|go to|take me to|click(?: on)?|tap(?: on)?|press(?: on)?|choose|pick|focus(?: on)?|zoom (?:in )?on|inspect|display)\s+(?:the\s+)?/i;
 function matchRoom(text: string): { id: string; name: string } | null {
   if (!ROOM_VERB.test(text)) return null;
   const rest = text.replace(ROOM_VERB, '');
@@ -248,12 +249,18 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
   }
   if (safety.kind === 'declined') return { reply: safety, state: { ...state, turns } };
   if (safety.kind === 'farewell') return { reply: safety, state: newDialogue() };
-  const scroll = whole.match(/^(?:please )?(?:scroll|go) (?:to (?:the )?)?(up|down|top|bottom)(?: of (?:this|the) page)?[.!]*$/i)?.[1]?.toLowerCase();
+  // On-screen commands work with polite wrappers: "can you scroll down a bit, please".
+  const command = whole
+    .replace(/^(?:(?:hey )?(?:sol|soul|saul)[,!.\s]+)?(?:(?:can|could|would|will) you |please |sol,? )+/i, '')
+    .replace(/[\s,]+(?:please|for me|a bit|a little(?: bit)?|now)[.!?]*$/i, '')
+    .replace(/[?]+$/, '')
+    .trim();
+  const scroll = command.match(/^(?:please )?(?:scroll|go|move|page) (?:to (?:the )?)?(up|down|top|bottom)(?: of (?:this|the) page)?(?: (?:a bit|a little|more))?[.!]*$/i)?.[1]?.toLowerCase();
   if (scroll === 'up' || scroll === 'down' || scroll === 'top' || scroll === 'bottom') return {
     reply: { kind: 'help', text: `Scrolling ${scroll === 'up' || scroll === 'down' ? scroll : `to the ${scroll}`}.`, sources: [] },
     state: { ...state, turns }, action: { scroll },
   };
-  const scrollLines = whole.match(/^(?:please )?scroll (up|down)(?: by)? (\d{1,3})(?: lines?| rows?)?[.!]*$/i);
+  const scrollLines = command.match(/^(?:please )?scroll (up|down)(?: by)? (\d{1,3})(?: lines?| rows?)?[.!]*$/i);
   if (scrollLines) {
     const count = Math.min(200, parseInt(scrollLines[2], 10));
     const direction = scrollLines[1].toLowerCase();
@@ -262,12 +269,12 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
       state: { ...state, turns }, action: { scrollLines: (direction === 'up' ? -1 : 1) * count },
     };
   }
-  const scrollTo = whole.match(/^(?:please )?(?:scroll (?:down |up )?to|skip to)\s+(?:the )?(.+?)(?: section| part| heading| area)?[.!?]*$/i)?.[1]?.trim();
+  const scrollTo = command.match(/^(?:please )?(?:scroll (?:down |up )?to|skip to)\s+(?:the )?(.+?)(?: section| part| heading| area)?[.!?]*$/i)?.[1]?.trim();
   if (scrollTo) return {
     reply: { kind: 'help', text: `Scrolling to ${scrollTo}.`, sources: [] },
     state: { ...state, turns }, action: { scrollTo },
   };
-  const room = matchRoom(whole);
+  const room = matchRoom(command);
   if (room) return {
     reply: { kind: 'help', text: `Opening the ${room.name} on the radiation map.`, sources: [{ label: 'Radiation monitor', route: '/hazards/radiation' }] },
     state: { ...state, turns }, action: { radiationRoom: room.id, navigate: page === '/hazards/radiation' ? undefined : '/hazards/radiation' },
@@ -360,10 +367,27 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
   }
   if (WHERE.test(whole)) {
     const guide = guideFor(page);
-    return { reply: { kind: 'help', text: describePage(guide), sources: [{ label: guide.name.replace(/^the /, ''), route: guide.route }], suggestions: [guide.tryAsking, 'Give me a tour'] }, state: { ...state, turns } };
+    return { reply: { kind: 'help', text: describePage(guide), speech: `You’re on ${guide.name}. ${guide.how}`, sources: [{ label: guide.name.replace(/^the /, ''), route: guide.route }], suggestions: [guide.tryAsking, 'Give me a tour'] }, state: { ...state, turns } };
   }
+  // "How do I use the timeline?" (a tab by name, from anywhere)
+  const howTo = whole.match(/\bhow (?:do i|do you|to|can i|should i) use (?:the )?(.+?)(?: tab| page| screen)?[.!?]*$/i)?.[1];
+  const named = howTo && PAGE_GUIDES.find((g) => g.aliases.some((alias) => new RegExp(`\\b${alias.replace(/[-]/g, '[- ]?')}\\b`, 'i').test(howTo)));
+  if (named) {
+    return { reply: { kind: 'help', text: describePage(named, false), speech: speakPage(named), sources: [{ label: named.name.replace(/^the /, ''), route: named.route }] }, state: { ...state, turns } };
+  }
+  // The numbers on this tab: all of them, or the one asked about.
+  if (ALL_FIGURES.test(whole)) {
+    const figures = describeFigures(page);
+    if (figures) return { reply: { kind: 'help', text: figures.text, speech: figures.speech, sources: [{ label: guideFor(page).name.replace(/^the /, ''), route: guideFor(page).route }] }, state: { ...state, turns } };
+  }
+  const personalValue = /\b(?:my|mine|today'?s|current|latest)\b/i.test(whole) && !/\b(?:mean|means|meaning|significan\w*|normal|good|bad|high|low|safe)\b/i.test(whole);
+  const figure = !personalValue && figureFor(whole, page);
+  const figureReply = figure && { reply: { kind: 'help' as const, text: `${figure.name}: ${figure.means}`, sources: [{ label: guideFor(page).name.replace(/^the /, ''), route: guideFor(page).route }] }, state: { ...state, turns } };
+  // "What does the 30-day dose mean?" → the meaning; "what is the radiation status?" → live data first.
+  if (figureReply && /\b(?:mean|means|meaning|stand for|significan\w*|explain|define|normal|good|bad|safe|high|low|limit|what does)\b/i.test(whole)) return figureReply;
   const mission = missionAnswer(whole, ctx, page, search);
   if (mission) return { reply: mission, state: { ...state, turns } };
+  if (figureReply) return figureReply;
 
   // 3. Follow-ups use what we just talked about.
   if (state.topic && sentences.length === 1 && FOLLOW_UP.test(sentences[0].trim())) {
@@ -396,9 +420,10 @@ export function converse(utterance: string, state: DialogueState, ctx: Assistant
 
   // 5. The cited answer engine for the real question.
   const reply = respond(questions.join(' ') || whole, ctx, index);
+  // A real question gets a straight answer: no "Hi, good to hear from you" before it.
   const lead = userStatedWell && askedAboutSol
     ? `I’m glad to hear that, ${ctx.crewName.split(' ')[0]}! I’m doing well too, thanks for asking. `
-    : (chat.length ? `${[...new Set(chat)].join(' ')} ` : '');
+    : (chat.length && reply.kind === 'out_of_scope' ? `${[...new Set(chat)].join(' ')} ` : '');
   const topic = reply.kind === 'answer' || reply.kind === 'personal'
     ? { question: questions.join(' ') || whole, cards: [], label: (reply.sources[0]?.label ?? 'that').toLowerCase() }
     : state.topic;

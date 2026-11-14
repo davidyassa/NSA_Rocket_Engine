@@ -23,8 +23,8 @@ flowchart LR
 | Synthetic mission | The [scenario fixtures](../src/scenarios/index.ts) provide Sol 43, routine and bad-entry cases. The default mission starts its interactive flow on Sol 43. |
 | Local assessment | The [engine](../src/engine/index.ts) compares eligible observations with the crew member's history. The [rule definitions](../src/engine/rules.ts) pair conditions with source references and review status. |
 | Research data | The [bundled datasets](../src/data/nasa/) support Curiosity radiation replay and a separate Inspiration4 blood-count analysis. The [provenance guide](real-datasets-and-citations.md) describes the imports and interpretation. |
-| Measurements and presentation | The [check-in](../src/features/checkin/) offers manual entry, camera pulse and optional camera breathing/HRV estimates, and a read-aloud microphone check. The [dashboard](../src/features/dashboard/) uses a Three.js astronaut with health-area hotspots and a 2D fallback. |
-| Local assistant | [Ask Sol](../src/features/assistant/) uses deterministic responses and retrieval from local project content and context. Bundled Whisper and Kokoro models handle speech recognition and synthesis. Text interaction remains available when voice is unavailable. |
+| Measurements and presentation | The [check-in](../src/features/checkin/) offers manual entry, camera pulse and optional camera breathing/HRV estimates, and a read-aloud microphone check. The [dashboard](../src/features/dashboard/) uses a three.js astronaut with health-area hotspots and keyboard-accessible health cards that remain available if the 3D view fails. |
+| Local assistant | [Ask Sol](../src/features/assistant/) uses deterministic responses and retrieval from local project content and context. On-device voice prioritizes Moonshine and Piper, with Whisper and Kokoro fallbacks. An optional development voice server can handle speech recognition and synthesis. Text remains available when voice is unavailable. |
 | Follow-up and handoff | [Follow-up tasks](../src/features/followups/) track local actions and timestamps. The [CMO console](../src/features/cmo/) presents findings and tasks. The [handoff generator](../src/features/assessment/medicalHandoff.ts) creates downloadable handoff packages. The [ground summary](../src/features/assessment/groundSummary.ts) supports a copyable local draft, and the [scenario record export](../src/app/recordExport.ts) covers check-in history. |
 
 ## How assessment works
@@ -63,7 +63,7 @@ npm run preview
 ```
 
 - In **Demo and data**, wait for the production web build to report that it is ready offline. Warm Ask Sol's speech models while connected to the host if you plan to demonstrate voice offline. Web voice files are cached on use, subject to the browser's storage policy.
-- Run `node scripts/verify-offline-p1.mjs` after a web build for automated offline checks on macOS with Google Chrome installed in `/Applications`. See the [verification implementation](../scripts/verify-offline-p1.mjs) and [bench notes](validation/README.md) for coverage.
+- Follow the [offline interaction checks](validation/README.md#app-interaction-checks) after a web build. The [legacy Chrome smoke script](../scripts/verify-offline-p1.mjs) still expects the retired health-link markup and stops on the current dashboard.
 - Read the [mobile guide](mobile-roadmap.md) for the Capacitor 8 apps, which bundle the web assets locally, and the Expo Go wrapper, which loads an existing web host.
 
 See the [judging runbook](submission-handoff.md) for the demo sequence and the [3D asset guide](3d-model-integration.md) for model export and integration.

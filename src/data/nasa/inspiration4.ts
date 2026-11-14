@@ -3,8 +3,7 @@
  *
  * Sol Check's core idea is "compare each crew member with their own usual, not
  * with population ranges". This module tests that idea on real crew data:
- *  1. a data-quality gate drops physically implausible entries (the published
- *     file contains a few obvious unit/entry errors);
+ *  1. a data-quality gate excludes entries outside the prototype plausibility ranges;
  *  2. each crew member's baseline is the median of their pre-flight samples;
  *  3. a post-flight change counts only if it exceeds the analyte's reference
  *     change value (RCV), computed from published within-person biological

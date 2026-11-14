@@ -42,6 +42,8 @@ export interface AssistantReply {
   stepStart?: number;
   /** id of the emergency protocol this reply belongs to */
   emergency?: string;
+  /** what to say out loud, when it differs from the short version of `text` */
+  speech?: string;
 }
 
 /** Below this BM25 score the question is treated as outside Sol Check's knowledge. */
@@ -170,7 +172,9 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
   if (URGENT.test(q)) {
     return { kind: 'urgent', text: `${URGENT_CREW} Follow your crew’s emergency procedure. Don’t wait for a check-in or for Earth.`, sources: [{ label: 'Crew medical officer console', route: '/cmo' }] };
   }
-  if (MEDICINE.test(q) || DIAGNOSIS.test(q)) {
+  // "30-day dose", "dose rate", "career dose limit": radiation, not medicine.
+  const notRadiation = q.replace(/\b(?:radiation|30[- ]?day|thirty[- ]day|career|lifetime|daily|projected|transit|absorbed|mission|total|rolling|shelter|room)\s+doses?\b|\bdoses?\s+(?:rate|limit|budget|reading|map)s?\b/gi, ' ');
+  if (MEDICINE.test(notRadiation) || DIAGNOSIS.test(q)) {
     // Share related, non-treatment facts about the topic only (e.g. the headache), never about the medicine.
     const topic = q.replace(MEDICINE, ' ').replace(DIAGNOSIS, ' ').replace(/\b(take|taking|use|using|need|give|get|should|can|could|for|best|good)\b/gi, ' ');
     const hit = tokenize(topic).length ? index.search(topic, 1)[0] : undefined;
@@ -245,7 +249,10 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
 
   const hits = index.search(q, 3);
   const best = hits[0];
-  if (!best || best.score < MIN_SCORE) {
+  const covered = best && index.coverage(q, best.doc);
+  // A real answer shares two of the question's words, or its only word: one shared word
+  // out of several ("hard" from "I'm experiencing very hard") is a coincidence.
+  if (!best || best.score < MIN_SCORE || (covered && covered.total >= 2 && covered.matched < 2)) {
     return {
       kind: 'out_of_scope',
       text: 'I only answer from Sol Check’s NASA health information and your check-in, and I couldn’t find that there. Try asking about a reading, a spaceflight hazard, the Sol 43 mission or the NASA data in the app.',

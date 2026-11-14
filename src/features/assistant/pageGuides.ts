@@ -89,8 +89,18 @@ export function routeFromSpeech(text: string): PageGuide | null {
   return matches[0]?.g ?? null;
 }
 
-export function describePage(guide: PageGuide): string {
-  return `You’re on ${guide.name}. ${guide.what} ${guide.how} You could ask me: “${guide.tryAsking}”`;
+/** Spoken: the tab's name and how to use it (what it is for stays on screen). */
+export function speakPage(guide: PageGuide): string {
+  const name = guide.name.replace(/^the /, '');
+  return `${name[0].toUpperCase()}${name.slice(1)}. ${guide.how}`;
+}
+
+/** What a tab is for and how to use it, in two short parts. */
+export function describePage(guide: PageGuide, here = true): string {
+  const name = guide.name.replace(/^the /, '');
+  return here
+    ? `You’re on ${guide.name}. ${guide.what} How to use it: ${guide.how}`
+    : `${name[0].toUpperCase()}${name.slice(1)}: ${guide.what} How to use it: ${guide.how}`;
 }
 
 /** Subpages, categories, modes or tabs of a page that Sol Computer use can navigate to. */

@@ -12,7 +12,7 @@ From the repository root, run `npm ci`, `npm run build` and `npm run preview`. O
 | **Assessment → Why this finding? → CMO console** | The reviewer can trace the finding to readings, the baseline, the rule, and its source. The follow-up queue gives the crew a place to acknowledge findings and document what happens next. |
 | **Assessment → Follow-up tasks and ground handoff** | The scenario uses 20 minutes one way and a 40-minute round-trip light-time. Prepare a local summary or download the handoff. The simulator rehearses the delay and verifies an imported JSON payload using a non-cryptographic FNV-1a-32 checksum. |
 | **Timeline → Sol 41** | Curiosity’s archived radiation measurements retain the original UTC dates and units. The chart aligns the 11 September 2017 event with the fictional shelter timeline as context. |
-| **Demo and data → Tested on real astronaut data** | For 20 day-after-return comparisons from the Inspiration4 study, none fell outside the lab reference ranges. Four exceeded the app’s personal change threshold, and each was back within it at the next sampled visit. Two implausible source entries were excluded from the analysis. |
+| **Demo and data → Tested on real astronaut data** | For 20 day-after-return comparisons from the Inspiration4 study, none fell outside the lab reference ranges. Four exceeded the app’s personal change threshold. Three were back within it on day 45 and the fourth on day 82. Two implausible source entries were excluded from the analysis. |
 
 ### Optional stops
 

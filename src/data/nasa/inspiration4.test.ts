@@ -16,7 +16,7 @@ describe('real Inspiration4 crew blood counts (NASA OSDR OSD-569)', () => {
     expect(referenceChangePercent(2.71)).toBeCloseTo(7.1, 1); // haemoglobin
   });
 
-  it('catches the entry errors in the published file instead of using them', () => {
+  it('excludes values that fall outside the plausibility ranges', () => {
     expect(find('C003', 'neutrophils').points.find((p) => p.timepoint === 'L-92')?.gated).toBe(true); // 10.1 cells/µL
     expect(find('C003', 'platelets').points.find((p) => p.timepoint === 'L-92')?.gated).toBe(true); // 12.9 ×10³/µL
     expect(summary.gatedEntries).toBe(2);
@@ -32,7 +32,8 @@ describe('real Inspiration4 crew blood counts (NASA OSDR OSD-569)', () => {
     expect(lymph.returnPoint?.outsidePopulationRange).toBe(false);
   });
 
-  it('shows recovery at the next visit for the flagged changes', () => {
+  it('identifies the first later visit within the threshold for each flagged change', () => {
     expect(summary.recovered).toBe(summary.personalChanges);
+    expect(series.filter((s) => s.recoveredBy).map((s) => s.recoveredBy).sort()).toEqual(['R+45', 'R+45', 'R+45', 'R+82']);
   });
 });

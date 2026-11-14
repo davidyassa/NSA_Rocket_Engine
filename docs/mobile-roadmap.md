@@ -41,4 +41,4 @@ For a native build, check first launch in airplane mode, reload after saving a c
 
 ## Expo Go preview
 
-[The Expo project](../solcheck-expo/AGENTS.md) is a development WebView wrapper that loads a reachable web server. It currently uses endpoints embedded in `App.js`. The QR helper writes its URL to `appUrl.js`, which that screen does not consume. The Capacitor projects bundle the app for native offline use.
+[The Expo project](../solcheck-expo/AGENTS.md) is a development WebView wrapper that loads a reachable web server. Its HTTPS mode reads the URL from `appUrl.js`, which the QR helper writes. The Wi-Fi mode reads a separate address from `App.js`. The Capacitor projects bundle the app for native offline use.

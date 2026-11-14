@@ -6,6 +6,7 @@ import { MOOD_QUESTIONS, moodQuestionSpeech, moodReply, parseMoodAnswer } from '
 import { type AssistantContext, type AssistantReply } from './respond';
 import { converse, newDialogue, speculateIntent, type DialogueAction } from './dialogue';
 import { ReplySteps } from './ReplySteps';
+import { isEmergencyCall } from './emergency';
 import { spokenText } from './spoken';
 import { SolBubble } from './SolBubble';
 import { setVoiceModeOpen } from './solListener';
@@ -144,6 +145,19 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
 
         let lastSpeculativeMs = 0;
         let speculativePending = false;
+        // Phrases are transcribed in order while the microphone keeps listening. Words
+        // from a sentence the person has not finished are held, then answered together.
+        let queue: Promise<void> = Promise.resolve();
+        let transcribing = 0;
+        let held = '';
+        const flush = () => {
+          const said = held.trim();
+          held = '';
+          if (!said || busy.current || cancelled) return;
+          busy.current = true;
+          setHeard(said);
+          void answer(said, segmenter);
+        };
 
         processor.onaudioprocess = (event) => {
           if (cancelled) return;
@@ -173,25 +187,23 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
             lastSpeculativeMs = 0;
             setPhase('hearing');
           } else if (result.type === 'discarded') {
-            setPhase('listening');
+            if (!transcribing && held) flush();
+            else setPhase(transcribing ? 'thinking' : 'listening');
           } else {
-            busy.current = true;
             setPhase('thinking');
-            speechToText.transcribe(resampleTo16k(result.audio, rate)).then((text) => {
-              if (cancelled) return;
-              if (!text || NOISE.test(text)) {
-                segmenter.reset();
-                busy.current = false;
-                setPhase('listening');
-                return;
-              }
-              setHeard(text);
-              return answer(text, segmenter);
-            }).catch(() => {
-              if (cancelled) return;
-              segmenter.reset();
-              busy.current = false;
-              setPhase('listening');
+            transcribing += 1;
+            const audio16k = resampleTo16k(result.audio, rate);
+            queue = queue.then(() => speechToText.transcribe(audio16k)).then((text) => {
+              transcribing -= 1;
+              if (cancelled || busy.current) return;
+              if (text && !NOISE.test(text)) held = held ? `${held} ${text}` : text;
+              // Still talking, or more speech queued: wait and answer the whole sentence.
+              if ((segmenter.isSpeaking || transcribing > 0) && !isEmergencyCall(held)) return;
+              if (held) flush();
+              else setPhase('listening');
+            }, () => {
+              transcribing -= 1;
+              if (!cancelled && !busy.current && !transcribing) setPhase('listening');
             });
           }
         };

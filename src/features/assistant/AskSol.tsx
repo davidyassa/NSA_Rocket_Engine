@@ -39,7 +39,12 @@ export function AskSol({ ctx, onAction }: {
   const logEnd = useRef<HTMLLIElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { logEnd.current?.scrollIntoView({ block: 'end' }); }, [messages, mood]);
+  /** set when Sol was asked to scroll, so the chat log does not jump back to its end */
+  const keepScroll = useRef(false);
+  useEffect(() => {
+    if (keepScroll.current) { keepScroll.current = false; return; }
+    logEnd.current?.scrollIntoView({ block: 'end' });
+  }, [messages, mood]);
   useEffect(() => { if (typing) input.current?.focus(); }, [typing]);
   useEffect(() => () => playback.current?.abort(), []);
   useEffect(() => {
@@ -69,6 +74,7 @@ export function AskSol({ ctx, onAction }: {
     const turn = converse(text, dialogue.current, ctx, index, pathname, search);
     dialogue.current = turn.state;
     const reply = turn.reply;
+    if (turn.action?.scroll || turn.action?.scrollLines || turn.action?.scrollTo) keepScroll.current = true;
     addExchange(text, reply);
     if (turn.action?.navigate && turn.action.navigate !== pathname) {
       onAction(turn.action);

@@ -115,6 +115,8 @@ export class SolListener {
   private audio: AudioContext | null = null;
   private queue: Promise<void> = Promise.resolve();
   private pendingPhrases = 0;
+  /** words heard so far in a sentence the person has not finished */
+  private held = '';
   private hasFrames = false;
   private handlers: ListenerHandlers;
   private stopped = true;
@@ -133,6 +135,7 @@ export class SolListener {
     if (mode === this.currentMode) return;
     this.currentMode = mode;
     this.modeRevision += 1;
+    this.held = '';
     this.segmenter?.reset();
   }
 
@@ -223,10 +226,27 @@ export class SolListener {
           // Switch to listening without resetting the recorder, so whatever is said
           // right after "Hey Sol" is kept and answered.
           this.currentMode = 'active';
+          if (wake.rest && (segmenter.isSpeaking || this.pendingPhrases > 1) && !isEmergencyCall(wake.rest)) {
+            // "Hey Sol, I'm experiencing…" and still talking: listen on, answer the whole sentence.
+            this.held = wake.rest;
+            this.handlers.onWake('');
+            return;
+          }
           this.handlers.onWake(wake.rest);
         } else if (this.currentMode === 'active' && !NOISE.test(text)) {
-          this.handlers.onUtterance(text);
+          // A pause mid-sentence ("I'm experiencing very hard… heart palpitations") must not
+          // be answered as two questions: hold the first part while the person is still
+          // talking or more speech is queued, then answer it all at once. A clear
+          // emergency is answered straight away.
+          this.held = this.held ? `${this.held} ${text}` : text;
+          if ((segmenter.isSpeaking || this.pendingPhrases > 1) && !isEmergencyCall(this.held)) return;
+          flushHeld();
         }
+      };
+      const flushHeld = () => {
+        const said = this.held.trim();
+        this.held = '';
+        if (said && this.currentMode === 'active') this.handlers.onUtterance(said);
       };
       const enqueue = (audio: Float32Array, durationMs: number) => {
         const revision = this.modeRevision;
@@ -284,6 +304,8 @@ export class SolListener {
           return;
         }
         if (result.type === 'discarded') {
+          // The sound after a held phrase was only a cough or click: answer what was said.
+          if (this.pendingPhrases === 0 && this.held) flushHeld();
           if (this.pendingPhrases === 0) this.handlers.onBusy?.(false);
           return;
         }
@@ -330,5 +352,6 @@ export class SolListener {
     this.segmenter = null;
     this.queue = Promise.resolve();
     this.pendingPhrases = 0;
+    this.held = '';
   }
 }

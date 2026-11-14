@@ -1,0 +1,6 @@
+faster-whisper==1.2.1
+kokoro-onnx==0.6.1
+onnxruntime>=1.20
+phonemizer>=3.3
+espeakng-loader>=0.2
+numpy>=2.0

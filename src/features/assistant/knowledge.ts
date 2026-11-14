@@ -80,7 +80,7 @@ function buildDocs(): KnowledgeDoc[] {
   const { summary } = analyzeInspiration4();
   docs.push({
     id: 'dataset:inspiration4', kind: 'dataset', title: 'Real astronaut data: Inspiration4 blood counts and personal baselines',
-    text: `Sol Check's personal-baseline method was tested on the published blood counts of the four Inspiration4 crew (NASA OSDR OSD-569). ${summary.populationFlags} of ${summary.returnComparisons} day-after-return values were outside the lab's normal range, but ${summary.personalChanges} were real changes from the crew member's own pre-flight baseline, and ${summary.recovered} of those were back to usual at the next visit. Sol Check also caught ${summary.gatedEntries} entry errors in the published file. Comparing a person with their own usual finds changes that population ranges miss.`,
+    text: `In Sol Check's analysis of the four Inspiration4 crew (NASA OSDR OSD-569), ${summary.populationFlags} of ${summary.returnComparisons} day-after-return blood-count values were outside the lab’s reference ranges. ${summary.personalChanges} exceeded the personal-change threshold, and ${summary.recovered} were back within that threshold at a later visit. The plausibility check excluded ${summary.gatedEntries} source values.`,
     cite: { label: INSPIRATION4_SOURCE.title, url: INSPIRATION4_SOURCE.url ?? undefined, route: '/demo' },
   });
 
@@ -113,7 +113,7 @@ function buildDocs(): KnowledgeDoc[] {
   return docs;
 }
 
-const STOPWORDS = new Set('a an and are as at be by can could did do does for from has have how i if in into is it its me my of on or our should so than that the their them then there these this to was we what when where which who why will with would you your yours about tell explain please mean means'.split(' '));
+const STOPWORDS = new Set('a an and are as at be by can could did do does for from has have how i if in into is it its me my of on or our should so than that the their them then there these this to was we what when where which who why will with would you your yours about tell explain please mean means m s t d ll re ve im ive very really just hey hi hello um uh okay ok'.split(' '));
 
 /** Everyday words → the words Sol Check's content uses. */
 const SYNONYMS: Record<string, string[]> = {
@@ -190,5 +190,19 @@ export class KnowledgeIndex {
       return { doc, score };
     });
     return scored.filter((h) => h.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  /**
+   * How much of the question a passage actually covers: the share of the question's own
+   * words (or their synonyms) found in it. One shared word ("hard" in "hard days") is
+   * not an answer.
+   */
+  coverage(query: string, doc: KnowledgeDoc): { matched: number; total: number } {
+    const i = this.docs.indexOf(doc);
+    const words = [...new Set(tokenize(query))];
+    if (i < 0) return { matched: 0, total: words.length };
+    const counts = this.tf[i];
+    const matched = words.filter((word) => counts.has(word) || expand([word]).some((alt) => counts.has(alt))).length;
+    return { matched, total: words.length };
   }
 }
