@@ -1,10 +1,16 @@
 import { BrowserAdapter, type HeartRateData, type FaceData } from 'vitalcamera-sdk';
+import { FOCUS_HOLD_MS, FOCUS_ON_FACE, drawFaceOnly, focusEllipse, type PixelBox } from './faceFocus';
+import { colourSample, type ColourSample } from './posPulse';
 
 export interface PulseCheckCallbacks {
   onHeartRate: (data: { hr: number; sqi: number; timestamp: number }) => void;
   onFaceDetected: (detected: boolean) => void;
   /** Face centre and width as fractions of the camera frame (raw, not mirrored); null when no face. */
   onFaceBox?: (box: { cx: number; cy: number; size: number } | null) => void;
+  /** Face keypoints (eyes, nose, mouth, ears) as frame fractions, raw (not mirrored); null when none. */
+  onFaceKeypoints?: (keypoints: { x: number; y: number }[] | null) => void;
+  /** Skin colour of forehead and cheeks plus the background, per analysed frame (second pulse measurement). */
+  onColourSample?: (sample: ColourSample) => void;
   /** Raw camera pulse wave sample (blood-volume pulse), ms timestamp. Used for breathing rate. */
   onBvp?: (sample: { t: number; v: number }) => void;
   /** One detected heartbeat: inter-beat interval (ms) and peak time (ms). */
@@ -106,6 +112,53 @@ export class VitalCameraService {
   private realTimeOf = new Map<number, number>();
   /** Measured camera frame rate (frames per second), null until known. */
   measuredFps: number | null = null;
+  /** Latest face box (camera pixels) and when it was seen, for face-only frames. */
+  private lastFace: { box: PixelBox; at: number } | null = null;
+  private focusCanvas: HTMLCanvasElement | null = null;
+  private focusCtx: CanvasRenderingContext2D | null = null;
+  /** Latest face keypoints (frame fractions) and a small canvas for colour sampling. */
+  private lastKeypoints: { x: number; y: number }[] | null = null;
+  private colourCtx: CanvasRenderingContext2D | null = null;
+  private onColour: ((sample: ColourSample) => void) | null = null;
+
+  /** Skin and background colours of this frame, from a 160×120 copy of the whole (unmasked) frame. */
+  private sampleColours(video: HTMLVideoElement, t: number) {
+    if (!this.onColour || !this.lastKeypoints || !video.videoWidth) return;
+    if (!this.colourCtx) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160; canvas.height = 120;
+      this.colourCtx = canvas.getContext('2d', { willReadFrequently: true });
+    }
+    const ctx = this.colourCtx;
+    if (!ctx) return;
+    try {
+      ctx.drawImage(video, 0, 0, 160, 120);
+      const sample = colourSample(t, ctx.getImageData(0, 0, 160, 120).data, 160, 120, this.lastKeypoints);
+      if (sample) this.onColour(sample);
+    } catch {
+      // Colour sampling is an extra measurement; never interrupt the scan.
+    }
+  }
+
+  /**
+   * The frame the model analyses: black outside an ellipse around the face, so
+   * hair and background never reach the pulse signal (see faceFocus.ts). Whole
+   * frames when no face was seen recently, so the face can be found again.
+   */
+  private faceOnly(video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement {
+    const face = this.lastFace;
+    const w = video.videoWidth; const h = video.videoHeight;
+    if (!FOCUS_ON_FACE || !face || Date.now() - face.at > FOCUS_HOLD_MS || !w || !h) return video;
+    if (!this.focusCanvas) {
+      this.focusCanvas = document.createElement('canvas');
+      this.focusCtx = this.focusCanvas.getContext('2d');
+    }
+    const canvas = this.focusCanvas; const ctx = this.focusCtx;
+    if (!ctx) return video;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    drawFaceOnly(ctx, video, w, h, focusEllipse(face.box));
+    return canvas;
+  }
 
   /**
    * Feed the camera model one call per NEW camera frame, with its real capture
@@ -152,7 +205,8 @@ export class VitalCameraService {
         }
       }
       lastProcessed = captured;
-      adapter.processVideoFrame(video, captured);
+      adapter.processVideoFrame(this.faceOnly(video), captured);
+      this.sampleColours(video, captured);
       if (typeof timing._virtualTime === 'number') {
         this.realTimeOf.set(timing._virtualTime, captured);
         if (this.realTimeOf.size > 600) this.realTimeOf.delete(this.realTimeOf.keys().next().value as number);
@@ -200,6 +254,8 @@ export class VitalCameraService {
 
   private adapter: BrowserAdapter | null = null;
   private stream: MediaStream | null = null;
+  /** The live camera track, so the scan can hold exposure and white balance steady. */
+  get videoTrack(): MediaStreamTrack | null { return this.stream?.getVideoTracks()[0] ?? null; }
   private videoEl: HTMLVideoElement | null = null;
   private scan: AbortController | null = null;
 
@@ -303,9 +359,11 @@ export class VitalCameraService {
       }
     });
 
+    this.onColour = callbacks.onColourSample ?? null;
     adapter.vitalcamera.on('face', (face: FaceData | null) => {
       if (!signal.aborted) {
         const detected = Boolean(face?.detected && face.box);
+        this.lastFace = detected && face?.box ? { box: { ...face.box }, at: Date.now() } : this.lastFace;
         callbacks.onFaceDetected(detected);
         if (callbacks.onFaceBox) {
           const box = face?.box;
@@ -314,6 +372,16 @@ export class VitalCameraService {
           callbacks.onFaceBox(detected && box && width > 0 && height > 0
             ? { cx: (box.x + box.w / 2) / width, cy: (box.y + box.h / 2) / height, size: box.w / width }
             : null);
+        }
+        {
+          const width = face?.videoWidth ?? 0;
+          const height = face?.videoHeight ?? 0;
+          const kps = face?.keypoints;
+          const normalized = detected && kps && kps.length >= 4 && width > 0 && height > 0
+            ? kps.map(p => ({ x: p.x / width, y: p.y / height }))
+            : null;
+          this.lastKeypoints = normalized;
+          callbacks.onFaceKeypoints?.(normalized);
         }
       }
     });
@@ -351,6 +419,12 @@ export class VitalCameraService {
   }
 
   private releaseStream() {
+    this.lastFace = null;
+    this.focusCanvas = null;
+    this.focusCtx = null;
+    this.lastKeypoints = null;
+    this.colourCtx = null;
+    this.onColour = null;
     if (this.stream) {
       for (const track of this.stream.getTracks()) {
         try {

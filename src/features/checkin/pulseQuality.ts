@@ -17,6 +17,8 @@ import type { MeasurementCapture } from '../../contracts';
 export const PULSE_SQI_DISPLAY_FLOOR = 0.38;
 export const PULSE_SQI_ACCEPT_FLOOR = 0.55;
 export const MIN_ACCEPT_SAMPLES = 5;
+/** How many of the latest MIN_ACCEPT_SAMPLES may be unusable without restarting the wait. */
+export const MAX_UNUSABLE_RECENT = 1;
 export const PULSE_WINDOW_SIZE = 12;
 export const PULSE_MIN_SESSION_MS = 15_000;
 export const PULSE_MAX_SAMPLE_AGE_MS = 2_500;
@@ -175,7 +177,11 @@ export function assessPulseSession(
 
   const recent = window.slice(-MIN_ACCEPT_SAMPLES);
   if (recent.length < MIN_ACCEPT_SAMPLES) return notReady('collecting');
-  if (recent.some(sample => !isUsable(sample))) return notReady('collecting');
+  // One odd sample among the latest five is tolerated (the median gate below still
+  // decides), but never the newest one: that is the signal right now. Two or more
+  // odd samples mean the signal is not settled.
+  if (!isUsable(recent[recent.length - 1])) return notReady('collecting');
+  if (recent.filter(sample => !isUsable(sample)).length > MAX_UNUSABLE_RECENT) return notReady('collecting');
   return gate;
 }
 

@@ -40,6 +40,21 @@ describe('emergency detection', () => {
     ['the master alarm is going off', 'alarm'],
     ['emergency', 'help'],
     ['help help', 'help'],
+    ['my nose is bleeding', 'nosebleed'],
+    ['there is a piece of metal stuck in his leg', 'impaled'],
+    ['he is trapped under the rack', 'crush'],
+    ['she hurt her neck and can’t feel her legs', 'spinal'],
+    ['I’m having an asthma attack', 'asthma'],
+    ['my knee pain after the EVA is getting worse', 'decompression'],
+    ['he is pale, cold and clammy', 'shock'],
+    ['my blood sugar is low', 'low-sugar'],
+    ['I think it’s heat exhaustion', 'heat'],
+    ['I can’t stop shivering', 'hypothermia'],
+    ['he swallowed some cleaner', 'poison'],
+    ['I knocked my tooth out', 'tooth'],
+    ['I twisted my ankle', 'sprain'],
+    ['I cut my finger', 'minor-cut'],
+    ['I can’t stop vomiting', 'vomiting'],
     ['Help me!', 'help'],
     ['someone is hurt', 'help'],
   ];
@@ -127,5 +142,33 @@ describe('emergency conversation', () => {
     const first = converse('I have chest pain', newDialogue(), ctx, index);
     const med = converse('Should I take an aspirin?', first.state, ctx, index);
     expect(med.reply.kind).toBe('declined');
+  });
+});
+
+describe('first aid for common cases', () => {
+  const ctxFA: AssistantContext = { crewName: 'Alex Rivera', sol: 43, oneWayDelayMinutes: 12, latest: null, assessment: null, history: [] };
+  it('opens Emergency Mode only when the medical officer is needed now', () => {
+    expect(converse('he swallowed some cleaner', newDialogue(), ctxFA, index).action?.emergency).toMatchObject({ id: 'poison' });
+    for (const minor of ['my nose is bleeding', 'I twisted my ankle', 'I cut my finger', 'I can’t stop vomiting']) {
+      const turn = converse(minor, newDialogue(), ctxFA, index);
+      expect(turn.reply.kind, minor).toBe('urgent');
+      expect(turn.reply.steps?.length, minor).toBeGreaterThan(0);
+      expect(turn.action?.emergency, minor).toBeUndefined();
+    }
+  });
+
+  it('gives the standard counts and times', () => {
+    const steps = (id: string) => EMERGENCIES.find((p) => p.id === id)!.steps.join(' ');
+    expect(steps('nosebleed')).toMatch(/lean slightly forward.*10 minutes/);
+    expect(steps('sprain')).toMatch(/20 minutes, every 2 to 3 hours/);
+    expect(steps('low-sugar')).toMatch(/Wait 15 minutes/);
+    expect(steps('poison')).toMatch(/^Do not make them vomit/);
+    expect(steps('impaled')).toMatch(/^Do not pull the object out/);
+    expect(steps('spinal')).toMatch(/^Do not move them/);
+  });
+
+  it('does not treat machines or feelings as medical emergencies', () => {
+    expect(matchEmergency('the laptop is overheating')).toBeNull();
+    expect(matchEmergency('I’m in shock about the news')).toBeNull();
   });
 });

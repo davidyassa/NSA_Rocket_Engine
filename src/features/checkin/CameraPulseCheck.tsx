@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Armchair, Camera, Check, Eye, Settings2, ShieldCheck, Smartphone, Sun } from 'lucide-react';
+import { Armchair, Camera, Check, Eye, Lightbulb, LightbulbOff, Settings2, ShieldCheck, Smartphone, Sun } from 'lucide-react';
 import { VitalCameraService } from './vitalCameraService';
+import { FACE_LIGHT, SETTLE_MS, holdCameraSettings, releaseCameraSettings } from './cameraTuning';
+import { faceLight as measureFaceLight, mouthMovement, mouthOpening, signalLevel, signalTip, type FaceKeypoints, type SignalTip } from './sqiCoach';
+import { posHeartRate, type ColourSample } from './posPulse';
+
+/** Algorithm label when the multi-region POS measurement gives the reading. */
+export const POS_ALGORITHM = 'Multi-region skin POS (forehead + cheeks, background light reference), fine spectrum, agreement-checked · local';
 import {
   assessPulseSession,
   estimateFromGate,
@@ -15,7 +21,7 @@ import {
   type PulseSample,
 } from './pulseQuality';
 import {
-  MAX_CAPTURE_MS, PROBLEM_ADVICE, analyzeLight, coachCue, explainHeartRate, mostCommonProblem, plainSignal,
+  MAX_CAPTURE_MS, PROBLEM_ADVICE, analyzeLight, coachCue, explainHeartRate, insideOval, mostCommonProblem, plainSignal,
   type CueId, type FaceBox, type LightSample,
 } from './captureCoach';
 import {
@@ -35,6 +41,8 @@ export const TARGET_VITALS_MS = 45_000;
 export const TARGET_PULSE_MS = 16_000;
 /** Keep waiting this long for HRV once breathing is ready; then finish with what we have. */
 const VITALS_HRV_GRACE_MS = 55_000;
+/** A face missing for less than this (a blink or a small head tilt) does not restart the scan. */
+export const FACE_LOSS_GRACE_MS = 1500;
 /** Trust the SDK's RMSSD only once it is computed from at least this many clean beat intervals. */
 const MIN_HRV_INTERVALS = 20;
 const MAX_BVP_SAMPLES = 30 * 90;
@@ -128,6 +136,29 @@ function sqiTone(sqi: number): 'weak' | 'good' | 'optimal' {
   return sqi >= 0.7 ? 'optimal' : 'good';
 }
 
+/**
+ * Face ID-style progress ring: tick marks around the face oval light up clockwise as
+ * the scan progresses while the head is held still. Same ellipse as the oval
+ * (centre 50 %/50 %, radii 30 % × 45 % of the 4:3 stage).
+ */
+const RING_TICKS = 60;
+function FaceRing({ progress, tone }: { progress: number; tone: 'good' | 'progress' | 'action' }) {
+  const lit = Math.round(Math.max(0, Math.min(1, progress)) * RING_TICKS);
+  const cx = 200; const cy = 150; const rx = 120; const ry = 135;
+  return (
+    <svg className={`camera-face-ring tone-${tone}`} viewBox="0 0 400 300" aria-hidden="true" preserveAspectRatio="none">
+      {Array.from({ length: RING_TICKS }, (_, i) => {
+        const a = -Math.PI / 2 + (i / RING_TICKS) * Math.PI * 2;
+        const x = cx + rx * Math.cos(a); const y = cy + ry * Math.sin(a);
+        // Outward normal of the ellipse at this point.
+        const nx = Math.cos(a) / rx; const ny = Math.sin(a) / ry; const nl = Math.hypot(nx, ny);
+        const ux = nx / nl; const uy = ny / nl;
+        return <line key={i} className={i < lit ? 'is-lit' : undefined} x1={x + ux * 8} y1={y + uy * 8} x2={x + ux * 20} y2={y + uy * 20} />;
+      })}
+    </svg>
+  );
+}
+
 export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVitals, withHrv = true }: {
   onAcceptEstimate?: (estimate: CameraPulseEstimate, vitals?: CameraVitalsEstimate) => void;
   /** 'breathing' measures breathing rate (and HRV, unless withHrv is false) from the face pulse signal (about 45 s). */
@@ -148,7 +179,22 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
   const [scanLogMessage, setScanLogMessage] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [faceBox, setFaceBox] = useState<FaceBox | null>(null);
+  /** Face keypoints and recent face positions, for "how to get a better signal" tips. */
+  const keypointsRef = useRef<FaceKeypoints | null>(null);
+  const facePathRef = useRef<{ t: number; cx: number; cy: number }[]>([]);
+  const faceLightRef = useRef<ReturnType<typeof measureFaceLight> | null>(null);
+  const [tip, setTip] = useState<SignalTip | null>(null);
+  const faceBoxRef = useRef<FaceBox | null>(null);
+  const fpsRef = useRef<number | null>(null);
+  const pendingTipRef = useRef<SignalTip['id'] | null>(null);
+  /** Mouth position (eye-spans) over the last ~1.5 s, for the "don't talk" tip. */
+  const mouthRef = useRef<{ t: number; v: number }[]>([]);
   const [light, setLight] = useState<LightSample | null>(null);
+  /** Screen glows white around the oval to light the face in a dark room. */
+  const [faceLight, setFaceLight] = useState(false);
+  /** Set once the person turned the face light on or off themselves: no more automatic switching. */
+  const faceLightChosenRef = useRef(false);
+  const darkSinceRef = useRef<number | null>(null);
   const [retryAdvice, setRetryAdvice] = useState<CueId | null>(null);
   const [measuredSeconds, setMeasuredSeconds] = useState<number | null>(null);
   const [fps, setFps] = useState<number | null>(null);
@@ -161,12 +207,18 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
   const hrvRef = useRef<{ rmssd: number; n: number } | null>(null);
   /** Fine-resolution heart-rate estimates, one per half second. */
   const spectralRef = useRef<SpectralHistoryEntry[]>([]);
+  /** Second measurement: skin colour samples and its rate history. */
+  const colourRef = useRef<ColourSample[]>([]);
+  const posRef = useRef<SpectralHistoryEntry[]>([]);
+  const glareRef = useRef(0);
   const [spectralTick, setSpectralTick] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const serviceRef = useRef<VitalCameraService | null>(null);
   const samplesRef = useRef<PulseSample[]>([]);
   const faceDetectedRef = useRef(false);
+  /** A face lost for less than FACE_LOSS_GRACE_MS (a blink, a head tilt) keeps the session. */
+  const faceLossTimerRef = useRef<number | undefined>(undefined);
   const sessionStartedAtRef = useRef<number | null>(null);
   const populatedCaptureRef = useRef<string | null>(null);
   const cueCountsRef = useRef<Partial<Record<CueId, number>>>({});
@@ -175,7 +227,8 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
 
   const gate = useMemo(() => assessPulseSession(samples, {
     sessionStartedAt: sessionStartedAtRef.current ?? now,
-    facePresent: faceDetected,
+    // Within the grace period after a brief face loss the session is still alive.
+    facePresent: faceDetected || sessionStartedAtRef.current !== null,
     now,
   }), [samples, faceDetected, now]);
   const latest = samples.at(-1) ?? null;
@@ -225,7 +278,16 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [spectralTick, modelHr],
   );
-  const pulseDone = (gate.ready && gate.medianHr !== null) || fast.ready;
+  // Second measurement: steady, clean, and agreeing with the camera model (or very
+  // clean on its own). Never accepted when the model's own fine estimate disagrees.
+  const posFast = useMemo(() => {
+    const result = assessSpectralHistory(posRef.current, modelHr);
+    const sdkFine = spectralRef.current.at(-1)?.bpm ?? null;
+    return result.ready && result.bpm !== null && sdkFine !== null && Math.abs(sdkFine - result.bpm) > 6
+      ? { ...result, ready: false } : result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spectralTick, modelHr]);
+  const pulseDone = (gate.ready && gate.medianHr !== null) || fast.ready || posFast.ready;
   const respiratory = useMemo(
     () => combinedMode && status === 'measuring' && faceDetected && now - lastRespiratorySampleAtRef.current < 1000
       ? estimateBvpBreathing(respiratoryBvpRef.current) : null,
@@ -306,9 +368,10 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
   useEffect(() => {
     if (status !== 'measuring' || breathingMode || !faceDetectedRef.current) return;
     const estimate = spectralHeartRate(bvpRef.current);
-    if (!estimate) return;
-    spectralRef.current = [...spectralRef.current, estimate].slice(-20);
-    setSpectralTick((tick) => tick + 1);
+    if (estimate) spectralRef.current = [...spectralRef.current, estimate].slice(-20);
+    const pos = posHeartRate(colourRef.current);
+    if (pos) posRef.current = [...posRef.current, { bpm: pos.bpm, snrDb: pos.snrDb, seconds: pos.seconds }].slice(-20);
+    if (estimate || pos) setSpectralTick((tick) => tick + 1);
   }, [now, status, breathingMode]);
 
   // Measure the real camera frame rate (slow cameras blur the pulse; dim light lowers it).
@@ -321,7 +384,7 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     let stopped = false;
     const count = () => { frames += 1; if (!stopped) handle = video.requestVideoFrameCallback!(count); };
     handle = video.requestVideoFrameCallback(count);
-    const timer = setInterval(() => { setFps(frames / 2); frames = 0; }, 2000);
+    const timer = setInterval(() => { setFps(frames / 2); fpsRef.current = frames / 2; frames = 0; }, 2000);
     return () => { stopped = true; clearInterval(timer); video.cancelVideoFrameCallback?.(handle); };
   }, [status]);
 
@@ -330,6 +393,69 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     if (status !== 'measuring') return;
     cueCountsRef.current[cue.id] = (cueCountsRef.current[cue.id] ?? 0) + 1;
   }, [now, status, cue.id]);
+
+  // "How to get a better signal": recompute twice a second; a new tip must repeat
+  // once before it replaces the old one, so the instruction does not flicker.
+  useEffect(() => {
+    if (status !== 'measuring') { setTip(null); return; }
+    const timer = window.setInterval(() => {
+      const recent = samplesRef.current.slice(-3).filter((sample) => Number.isFinite(sample.sqi));
+      if (!recent.length || !faceDetectedRef.current) { setTip(null); return; }
+      const sqi = recent.map((sample) => sample.sqi).sort((a, b) => a - b)[recent.length >> 1];
+      const path = facePathRef.current;
+      const span = path.length > 1 ? (path[path.length - 1].t - path[0].t) / 1000 : 0;
+      let travelled = 0;
+      for (let i = 1; i < path.length; i += 1) travelled += Math.hypot(path[i].cx - path[i - 1].cx, path[i].cy - path[i - 1].cy);
+      const next = signalTip({
+        sqi, face: faceBoxRef.current, keypoints: keypointsRef.current, light: faceLightRef.current,
+        speed: span > 0.4 ? travelled / span : null, fps: fpsRef.current,
+        mouth: mouthMovement(mouthRef.current.map((m) => m.v)),
+        glare: colourRef.current.length > 15 ? glareRef.current : null,
+      });
+      if (!next) { pendingTipRef.current = null; setTip(null); return; }
+      setTip((current) => {
+        if (current?.id === next.id) return current;
+        if (pendingTipRef.current === next.id || !current) { pendingTipRef.current = null; return next; }
+        pendingTipRef.current = next.id;
+        return current;
+      });
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [status]);
+
+  // Dark face: switch the face light on automatically (once), unless the person chose.
+  useEffect(() => {
+    if (status !== 'measuring' || faceLight || faceLightChosenRef.current || !light) return;
+    if (light.center < FACE_LIGHT.onBelow) {
+      darkSinceRef.current ??= Date.now();
+      if (Date.now() - darkSinceRef.current >= FACE_LIGHT.afterMs) setFaceLight(true);
+    } else darkSinceRef.current = null;
+  }, [light, status, faceLight]);
+
+  // Let the camera settle to the current light, then hold exposure, white balance and
+  // focus for the scan. When the face light changes, let it re-settle and start a fresh
+  // measuring window (the jump in brightness is not a pulse).
+  useEffect(() => {
+    if (status !== 'measuring') return;
+    const track = serviceRef.current?.videoTrack ?? null;
+    let cancelled = false;
+    void releaseCameraSettings(track);
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      void holdCameraSettings(track);
+      if (faceDetectedRef.current && sessionStartedAtRef.current !== null) {
+        sessionStartedAtRef.current = Date.now();
+        resetSamples();
+      }
+    }, SETTLE_MS);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, faceLight]);
+
+  function toggleFaceLight() {
+    faceLightChosenRef.current = true;
+    setFaceLight((on) => !on);
+  }
 
   // Sample frame brightness twice a second to coach on lighting (pixels never leave this function).
   // Heart rate, breathing and HRV come ONLY from the camera model's face signal: nothing is
@@ -347,6 +473,7 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
         setLight(analyzeLight(data, canvas.width, canvas.height));
+        faceLightRef.current = measureFaceLight(data, canvas.width, canvas.height, insideOval);
       } catch {
         // Lighting hints are optional; never interrupt the measurement.
       }
@@ -388,6 +515,10 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     beatsRef.current = [];
     hrvRef.current = null;
     spectralRef.current = [];
+    colourRef.current = [];
+    posRef.current = [];
+    mouthRef.current = [];
+    glareRef.current = 0;
   }
 
   async function handleConsentAndStart() {
@@ -401,10 +532,14 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     setPopulatedIntoForm(false);
     setFaceBox(null);
     setLight(null);
+    setFaceLight(false);
+    faceLightChosenRef.current = false;
+    darkSinceRef.current = null;
     setRetryAdvice(null);
     finishingRef.current = false;
     cueCountsRef.current = {};
     faceDetectedRef.current = false;
+    window.clearTimeout(faceLossTimerRef.current);
     sessionStartedAtRef.current = null;
     populatedCaptureRef.current = null;
     resetSamples();
@@ -458,7 +593,28 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
           },
         } : {}),
         onFaceBox: box => {
-          if (serviceRef.current === service) setFaceBox(box);
+          if (serviceRef.current !== service) return;
+          setFaceBox(box);
+          faceBoxRef.current = box;
+          if (box) {
+            const path = facePathRef.current;
+            path.push({ t: Date.now(), cx: box.cx, cy: box.cy });
+            while (path.length && path[0].t < Date.now() - 1000) path.shift();
+          } else facePathRef.current = [];
+        },
+        onFaceKeypoints: kps => {
+          if (serviceRef.current !== service) return;
+          keypointsRef.current = kps;
+          const opening = kps ? mouthOpening(kps) : null;
+          const now = performance.now();
+          mouthRef.current = opening === null ? [] : [...mouthRef.current.filter((m) => m.t > now - 1500), { t: now, v: opening }];
+        },
+        onColourSample: sample => {
+          if (serviceRef.current !== service) return;
+          const list = colourRef.current;
+          list.push(sample);
+          while (list.length && list[0].t < sample.t - 20_000) list.shift();
+          glareRef.current = glareRef.current * 0.9 + sample.glare * 0.1;
         },
         onFaceDetected: detected => {
           if (serviceRef.current !== service) return;
@@ -466,12 +622,22 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
           faceDetectedRef.current = detected;
           setFaceDetected(detected);
           if (!detected) {
-            // A gap breaks the measurement window: start again when the face returns.
-            sessionStartedAtRef.current = null;
-            if (changed || samplesRef.current.length > 0) resetSamples();
+            // A brief loss (blink, small head turn) keeps the session; only a real
+            // absence longer than FACE_LOSS_GRACE_MS breaks the window and starts again.
+            if (changed) {
+              window.clearTimeout(faceLossTimerRef.current);
+              faceLossTimerRef.current = window.setTimeout(() => {
+                if (serviceRef.current !== service || faceDetectedRef.current) return;
+                sessionStartedAtRef.current = null;
+                resetSamples();
+              }, FACE_LOSS_GRACE_MS);
+            }
           } else if (changed) {
-            sessionStartedAtRef.current = Date.now();
-            resetSamples();
+            window.clearTimeout(faceLossTimerRef.current);
+            if (sessionStartedAtRef.current === null) {
+              sessionStartedAtRef.current = Date.now();
+              resetSamples();
+            }
           }
         },
         onError: error => showCameraError(service, error.message),
@@ -544,19 +710,26 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     const now = Date.now();
     const gateNow = assessPulseSession(samplesRef.current, {
       sessionStartedAt,
-      facePresent: faceDetectedRef.current,
+      facePresent: faceDetectedRef.current || sessionStartedAtRef.current !== null,
       now,
     });
     const recent = samplesRef.current.slice(-5).filter(isDisplayableSample);
     const sortedHr = recent.map((sample) => sample.hr).sort((a, b) => a - b);
     const sortedSqi = recent.map((sample) => sample.sqi).sort((a, b) => a - b);
     // Returns null when neither the quality gate nor the clean fine-resolution estimate is ready.
-    return finalHeartRate(estimateFromGate(gateNow, new Date(now)), spectralRef.current, {
+    const info = {
       sqi: gateNow.medianSqi ?? sortedSqi[Math.floor(sortedSqi.length / 2)] ?? 0,
       sampleCount: Math.max(gateNow.usableSamples, recent.length),
       capturedAt: new Date(now),
       modelHr: sortedHr.length >= 3 ? sortedHr[Math.floor(sortedHr.length / 2)] : null,
-    });
+    };
+    const primary = finalHeartRate(estimateFromGate(gateNow, new Date(now)), spectralRef.current, info);
+    if (primary) return primary;
+    // The second measurement, with the same steadiness and agreement checks.
+    const pos = assessSpectralHistory(posRef.current, info.modelHr);
+    const sdkFine = spectralRef.current.at(-1)?.bpm ?? null;
+    if (!pos.ready || pos.bpm === null || (sdkFine !== null && Math.abs(sdkFine - pos.bpm) > 6)) return null;
+    return { bpm: pos.bpm, sqi: info.sqi, capturedAtUtc: new Date(now).toISOString(), sampleCount: info.sampleCount, algorithm: POS_ALGORITHM };
   }
 
   async function handleStop(accept = false) {
@@ -581,6 +754,7 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     const service = serviceRef.current;
     serviceRef.current = null;
     faceDetectedRef.current = false;
+    window.clearTimeout(faceLossTimerRef.current);
     sessionStartedAtRef.current = null;
     respiratoryBvpRef.current = [];
     const finishedAt = combinedMode && estimate ? Date.parse(estimate.capturedAtUtc) : Date.now();
@@ -622,6 +796,7 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
     serviceRef.current = null;
     void service?.stop();
     faceDetectedRef.current = false;
+    window.clearTimeout(faceLossTimerRef.current);
     sessionStartedAtRef.current = null;
     populatedCaptureRef.current = null;
     setStatus('idle');
@@ -775,7 +950,11 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
 
         {/* 6. Measuring: live coaching, one instruction at a time */}
         {(status === 'measuring' || status === 'requesting') && (
-          <div className="camera-pulse-measuring">
+          <div className={`camera-pulse-measuring${faceLight ? ' face-light' : ''}`}>
+            <button type="button" className="camera-face-light-toggle" aria-pressed={faceLight} onClick={toggleFaceLight}>
+              {faceLight ? <LightbulbOff size={16} aria-hidden="true" /> : <Lightbulb size={16} aria-hidden="true" />}
+              {faceLight ? 'Face light off' : 'Face light'}
+            </button>
             <ol className="camera-capture-stages" aria-label="Measurement steps">
               {['Get in position', breathingMode ? 'Measuring vitals' : 'Hold still', 'Done'].map((label, index) => (
                 <li key={label} className={stage === index + 1 ? 'is-current' : stage > index + 1 ? 'is-done' : undefined}
@@ -798,6 +977,9 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
                 <span className="camera-look-dot" />
                 Look here at the camera
               </div>
+              {status === 'measuring' && (
+                <FaceRing progress={progress} tone={isDone ? 'good' : cue.tone === 'good' ? 'progress' : cue.tone} />
+              )}
               {status === 'measuring' && (
                 <div
                   className={`camera-face-reticle ${faceDetected ? (latestDisplayable ? 'good' : 'calibrating') : 'searching'}`}
@@ -836,6 +1018,11 @@ export function CameraPulseCheck({ onAcceptEstimate, mode = 'pulse', onAcceptVit
               {latest && (
                 <p className="camera-signal-plain">
                   Signal: <strong className={`camera-sqi-badge ${sqiTone(latest.sqi)}`}>{plainSignal(latest.sqi)}</strong>
+                </p>
+              )}
+              {latest && tip && cue.tone !== 'action' && (
+                <p className="camera-signal-tip" aria-live="polite">
+                  <span>{signalLevel(latest.sqi) === 'Weak' ? 'To improve the signal' : 'To reach Excellent'}:</span> {tip.text}
                 </p>
               )}
 

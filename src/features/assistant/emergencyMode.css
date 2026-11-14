@@ -69,7 +69,7 @@
 .emergency-end:hover { background: rgba(255, 43, 43, .18); }
 .emergency-end:focus-visible { outline: 3px solid var(--em-ink); outline-offset: 3px; }
 
-/* Safe mode: the same island, turned green, with one button. */
+/* Safe mode: the same island, turned green, saying "All good". */
 .emergency-mode.is-safe {
   --em-red: #2fe37f;
   grid-template-rows: auto 1fr;
@@ -82,13 +82,21 @@
 }
 .emergency-backdrop.is-safe { background: radial-gradient(ellipse at center, rgba(0, 90, 45, .3), rgba(0, 8, 4, .8)); }
 .emergency-all-good {
-  min-width: min(320px, 70vw); min-height: 72px; padding: 0 40px;
-  border: 3px solid var(--em-red); border-radius: 999px;
-  background: rgba(47, 227, 127, .14); color: var(--em-ink);
-  font: inherit; font-size: clamp(1.5rem, 4vw, 2.5rem); font-weight: 800; cursor: pointer;
+  margin: 0; color: var(--em-ink);
+  font-size: clamp(2rem, 6vw, 4rem); font-weight: 800; line-height: 1.1; letter-spacing: -.01em;
 }
-.emergency-all-good:hover { background: rgba(47, 227, 127, .24); }
-.emergency-all-good:focus-visible { outline: 3px solid var(--em-ink); outline-offset: 4px; }
+
+/* 2 s after safe mode starts, every floating island fades and drifts out before closing. */
+.islands-leaving .emergency-mode,
+.islands-leaving .sol-dock-panel {
+  animation: islands-out 450ms ease-in forwards;
+}
+/* Sol's control island is centred with translateX(-50%); keep that while it leaves. */
+.islands-leaving .sol-island { animation: islands-out-centred 450ms ease-in forwards; }
+.islands-leaving .emergency-backdrop { animation: islands-fade 450ms ease-in forwards; }
+@keyframes islands-out { to { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes islands-out-centred { to { opacity: 0; transform: translate(-50%, 8px) scale(.98); } }
+@keyframes islands-fade { to { opacity: 0; } }
 
 @keyframes em-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes em-glow {
@@ -100,5 +108,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .emergency-mode { animation: none; }
+  .islands-leaving .emergency-mode, .islands-leaving .sol-dock-panel, .islands-leaving .sol-island, .islands-leaving .emergency-backdrop { animation: none; }
 }
 @media print { .emergency-mode, .emergency-backdrop { display: none; } }

@@ -5,11 +5,15 @@ import './emergencyMode.css';
 
 /** The buffering dots after "Contacting Medical Officer", in this order. */
 export const CONTACT_DOTS = ['...', '.', '..'] as const;
+/** Safe mode stays this long (2 s), then every floating island fades out and closes. No button needed. */
+export const SAFE_CLOSE_DELAY_MS = 2000;
+const EXIT_MS = 450;
 
 /**
  * Emergency Mode: a red-framed island over every tab while the crew medical officer is
  * being called. Sol's bubble stays above it, so voice keeps working. When the crew says
- * they are safe it turns green (safe mode): only "All good", which closes Sol's islands.
+ * they are safe it turns green (safe mode) and says "All good"; 2 seconds later every
+ * floating island fades out and closes on its own.
  */
 export function EmergencyMode({ alert, onSafe, onAllGood }: { alert: EmergencyAlert & { safe?: boolean }; onSafe: () => void; onAllGood: () => void }) {
   const [dot, setDot] = useState(0);
@@ -19,13 +23,24 @@ export function EmergencyMode({ alert, onSafe, onAllGood }: { alert: EmergencyAl
     const timer = window.setInterval(() => setDot((i) => (i + 1) % CONTACT_DOTS.length), 450);
     return () => window.clearInterval(timer);
   }, []);
-  const allGood = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     box.current?.focus({ preventScroll: true });
     document.documentElement.classList.add('emergency-active');
-    return () => document.documentElement.classList.remove('emergency-active');
+    return () => document.documentElement.classList.remove('emergency-active', 'islands-leaving');
   }, []);
-  useEffect(() => { if (alert.safe) allGood.current?.focus({ preventScroll: true }); }, [alert.safe]);
+  // Safe mode: after 2 s, fade every floating island out (html.islands-leaving), then close them.
+  const close = useRef(onAllGood);
+  close.current = onAllGood;
+  useEffect(() => {
+    if (!alert.safe) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const fade = window.setTimeout(() => document.documentElement.classList.add('islands-leaving'), SAFE_CLOSE_DELAY_MS);
+    const done = window.setTimeout(() => {
+      document.documentElement.classList.remove('islands-leaving');
+      close.current();
+    }, SAFE_CLOSE_DELAY_MS + (reduced ? 0 : EXIT_MS));
+    return () => { window.clearTimeout(fade); window.clearTimeout(done); document.documentElement.classList.remove('islands-leaving'); };
+  }, [alert.safe]);
 
   if (alert.safe) {
     return (
@@ -37,7 +52,7 @@ export function EmergencyMode({ alert, onSafe, onAllGood }: { alert: EmergencyAl
             <h2 id="emergency-title">Safe Mode</h2>
           </header>
           <div className="emergency-core">
-            <button ref={allGood} type="button" className="emergency-all-good" onClick={onAllGood}>All good</button>
+            <p className="emergency-all-good" role="status">All good</p>
           </div>
         </section>
       </>

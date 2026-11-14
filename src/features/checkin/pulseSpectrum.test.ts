@@ -64,6 +64,13 @@ describe('early finish (fast path)', () => {
     expect(assessSpectralHistory([...steady(82).slice(0, 5), { bpm: 90, snrDb: 6, seconds: 13 }], 80).ready).toBe(false);
     expect(assessSpectralHistory(steady(82), 70).ready).toBe(false);
     expect(assessSpectralHistory(steady(82), null).ready).toBe(false);
+  });
+
+  it('stands alone without the camera model only when the signal is very clean', () => {
+    expect(assessSpectralHistory(steady(82, 9.5), null)).toMatchObject({ ready: true, bpm: 82 });
+    expect(assessSpectralHistory(steady(82, 8), null).ready).toBe(false);
+    // A model reading that disagrees still blocks, however clean our signal is.
+    expect(assessSpectralHistory(steady(82, 12), 70).ready).toBe(false);
     const drifting = Array.from({ length: 6 }, (_, i) => ({ bpm: 85 - i * 0.25, snrDb: 8, seconds: 8 + i * 0.5 }));
     expect(assessSpectralHistory(drifting, 84).ready).toBe(false);
   });

@@ -115,6 +115,12 @@ export const FAST_PATH = {
   minSeconds: 9.5,
   /** the camera model's own (coarser) heart rate must be within this of ours */
   modelAgreeBpm: 6,
+  /**
+   * When the camera model has no reading at all (its quality score is low), our own
+   * estimate may stand alone, but only with a clearly stronger signal than usual.
+   * A model reading that disagrees still blocks the result.
+   */
+  aloneSnrDb: 9,
 } as const;
 
 export interface SpectralHistoryEntry { bpm: number; snrDb: number; seconds: number }
@@ -134,7 +140,8 @@ export function assessSpectralHistory(history: readonly SpectralHistoryEntry[], 
   const long = last[last.length - 1].seconds >= FAST_PATH.minSeconds;
   const settledTrend = Math.abs(last[last.length - 1].bpm - last[0].bpm) <= FAST_PATH.maxDriftBpm;
   const agrees = modelHr !== null && Math.abs(modelHr - median) <= FAST_PATH.modelAgreeBpm;
-  return { ready: steady && settledTrend && clean && long && agrees, bpm: Math.round(median), snrDb };
+  const standsAlone = modelHr === null && snrDb >= FAST_PATH.aloneSnrDb;
+  return { ready: steady && settledTrend && clean && long && (agrees || standsAlone), bpm: Math.round(median), snrDb };
 }
 
 /**

@@ -635,3 +635,51 @@
 }
 @keyframes camera-result-in { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .camera-result-oval { animation: none; } }
+
+/* ───────── Face ID-style progress ring around the oval ───────── */
+.camera-face-ring {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible; pointer-events: none; z-index: 2;
+}
+.camera-face-ring line {
+  stroke: var(--border-subtle); stroke-width: 4; stroke-linecap: round;
+  transition: stroke 220ms ease;
+}
+.camera-face-ring.tone-progress line.is-lit { stroke: var(--accent); }
+.camera-face-ring.tone-good line.is-lit { stroke: var(--status-steady); }
+/* Moving or badly placed: the ring stops filling and turns the "fix this" colour. */
+.camera-face-ring.tone-action line.is-lit { stroke: var(--status-change); }
+.camera-face-ring.tone-action { animation: face-ring-wait 1.4s ease-in-out infinite; }
+@keyframes face-ring-wait { 50% { opacity: .55; } }
+/* The ring replaces the solid oval outline while measuring. */
+.camera-oval-stage .camera-face-ring ~ .camera-face-reticle .camera-reticle-oval { border-width: 1px; border-color: color-mix(in srgb, var(--text-muted) 40%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  .camera-face-ring line { transition: none; }
+  .camera-face-ring.tone-action { animation: none; }
+}
+
+/* ───────── Face light: the screen lights the face in a dark room ───────── */
+.camera-face-light-toggle {
+  display: flex; align-items: center; gap: 6px; width: fit-content; margin: 0 0 8px auto;
+  min-height: 36px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-primary);
+  font: inherit; font-size: .85rem; cursor: pointer;
+}
+.camera-face-light-toggle[aria-pressed='true'] { border-color: var(--accent); }
+/* Full screen, bright white around the oval: the screen becomes the face's light. */
+.camera-pulse-measuring.face-light {
+  --text-primary: #111111; --text-secondary: #333333; --text-muted: #555555;
+  --bg-raised: #f1f1f1; --bg-surface: #ffffff; --border-subtle: #d0d0d0;
+  /* Darker status colours so coaching text stays readable on white. */
+  --accent: #a34f00; --on-accent: #ffffff; --status-change: #8a5a00; --status-steady: #11713f; --status-trend: #a3361a;
+  position: fixed; inset: 0; z-index: 1200; display: grid;
+  align-content: center; justify-items: center; gap: 10px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  overflow-y: auto; background: #ffffff; color: #111111;
+}
+.camera-pulse-measuring.face-light .camera-face-light-toggle { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 16px; }
+.camera-pulse-measuring.face-light .camera-oval-stage { width: min(360px, 80vw); }
+
+/* "To reach Excellent: …" — the one change that should raise the signal most */
+.camera-signal-tip { margin: 2px auto 6px; max-width: 420px; text-align: center; font-size: .95rem; line-height: 1.4; color: var(--text-primary); }
+.camera-signal-tip span { color: var(--accent); font-weight: 650; }

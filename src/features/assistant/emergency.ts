@@ -10,7 +10,8 @@
  */
 import { URGENT_CREW, URGENT_HABITAT } from './urgentSpeech';
 
-export type EmergencyScope = 'crew' | 'habitat' | 'calm' | 'triage';
+/** crew: medical officer needed now (Emergency Mode); minor: first aid you can do yourself. */
+export type EmergencyScope = 'crew' | 'minor' | 'habitat' | 'calm' | 'triage';
 
 export interface EmergencyProtocol {
   id: string;
@@ -57,6 +58,36 @@ export const EMERGENCIES: EmergencyProtocol[] = [
     ],
   },
   {
+    id: 'nosebleed', label: 'Nosebleed', scope: 'minor',
+    pattern: /\b(?:nose ?bleed(?:ing)?|bleeding (?:from )?(?:my|his|her|their|the) nose|(?:my|his|her|their) nose is bleeding|bloody nose)\b/i,
+    steps: [
+      'Sit up and lean slightly forward. Do not tip the head back.',
+      'Pinch the soft part of the nose firmly for 10 minutes without letting go. Breathe through your mouth.',
+      'Still bleeding? Pinch for another 10 minutes. In microgravity, catch drops with a cloth.',
+      'Bleeding over 20 minutes, very heavy, or after a head injury? Medical officer now.',
+    ],
+  },
+  {
+    id: 'impaled', label: 'Object stuck in the body', scope: 'crew',
+    pattern: /\b(?:impaled|(?:something|a piece of \w+|metal|glass|a rod|a tool) (?:is )?(?:stuck|sticking|lodged) (?:in|into|out of) (?:my|his|her|their) (?!throat|windpipe|eye)\w+)\b/i,
+    steps: [
+      'Do not pull the object out: it may be holding back bleeding.',
+      'Press around the object, not on it, with clean cloths.',
+      'Pad both sides so it cannot move, and tape the padding in place.',
+      'Keep them still, lying down, and watch for pale, cold, sweaty skin.',
+    ],
+  },
+  {
+    id: 'crush', label: 'Crush injury', scope: 'crew',
+    pattern: /\b(?:crushed|trapped (?:under|in|by)|pinned (?:under|by)|caught in (?:the |a )?(?:hatch|door|machine|equipment))\b/i,
+    steps: [
+      'Make it safe first. Free them only if you can do it quickly and safely; note the time they were trapped.',
+      'Press hard on any bleeding with a clean cloth.',
+      'Lay them flat, keep them warm and still. Nothing to eat or drink.',
+      'Watch breathing. Not breathing normally? CPR: 30 pushes, 2 breaths.',
+    ],
+  },
+  {
     id: 'bleeding', label: 'Severe bleeding', scope: 'crew',
     pattern: /\b(?:bleeding (?:heavily|badly|a lot|everywhere|won'?t stop)|severe bleeding|heavy bleeding|lots? of blood|blood (?:everywhere|is (?:pouring|spurting|gushing)|won'?t stop)|(?:can'?t|won'?t) stop (?:the )?bleeding|(?:deep|bad) (?:cut|wound|gash)|(?:is |are |i'?m |he'?s |she'?s )?bleeding|cut (?:my|his|her|their) \w+ (?:open|badly|deep(?:ly)?)|gash|stab(?:bed)?)\b/i,
     steps: [
@@ -88,6 +119,16 @@ export const EMERGENCIES: EmergencyProtocol[] = [
       'Breathe in for 4 seconds, out for 6. Repeat 10 times.',
       'Count again after 5 minutes. Still over 120 at rest, or chest pain, fainting or breathlessness? Medical officer now.',
       'No exercise or caffeine until the medical officer checks you.',
+    ],
+  },
+  {
+    id: 'spinal', label: 'Possible neck or back injury', scope: 'crew',
+    pattern: /\b(?:neck injury|back injury|spin(?:e|al) injury|(?:hurt|injured|broke) (?:my|his|her|their) (?:neck|back|spine)|can'?t (?:feel|move) (?:my|his|her|their) legs|numb(?:ness)? in (?:both )?(?:my|his|her|their) legs after)\b/i,
+    steps: [
+      'Do not move them unless they are in danger.',
+      'Hold the head still with a hand on each side, in line with the body.',
+      'Keep talking to them and watch their breathing.',
+      'Not breathing normally? CPR: 30 pushes, 2 breaths, keeping the head in line as much as you can.',
     ],
   },
   {
@@ -125,6 +166,27 @@ export const EMERGENCIES: EmergencyProtocol[] = [
     ],
   },
   {
+    id: 'asthma', label: 'Asthma attack', scope: 'crew',
+    pattern: /\b(?:asthma(?: attack)?|wheez(?:e|es|ing)|tight chest and wheez\w*)\b/i,
+    steps: [
+      'Sit upright, leaning slightly forward. Do not lie down.',
+      'Breathe slowly and steadily: in through the nose, out through pursed lips.',
+      'Get the medical officer and the emergency kit now; they decide on treatment.',
+      'Too breathless to speak, lips blue, or exhausted? It is critical: medical officer immediately.',
+      'Stops breathing normally? CPR: 30 pushes, 2 breaths.',
+    ],
+  },
+  {
+    id: 'decompression', label: 'Possible decompression sickness', scope: 'crew',
+    pattern: /\b(?:decompression sickness|the bends|(?:joint|knee|shoulder|elbow) pain after (?:the |an? )?(?:eva|spacewalk)|(?:itch\w*|tingl\w*|numb\w*|rash) after (?:the |an? )?(?:eva|spacewalk))\b/i,
+    steps: [
+      'Stop all activity and lie still. Exercise makes it worse.',
+      'Tell the medical officer and Mission Control now: treatment is repressurization, which they decide.',
+      'Note when the spacewalk ended and when the symptoms started.',
+      'Breathlessness, chest pain, confusion or weakness? Medical officer immediately.',
+    ],
+  },
+  {
     id: 'breathing', label: 'Trouble breathing', scope: 'crew',
     pattern: /\b(?:can'?t breathe|cannot breathe|can'?t catch (?:my|his|her|their) breath|struggling to breathe|trouble breathing|difficulty breathing|hard to breathe|short(?:ness)? of breath|gasping(?: for air)?|lips (?:are |turning )?blue)\b/i,
     steps: [
@@ -144,6 +206,16 @@ export const EMERGENCIES: EmergencyProtocol[] = [
       'Not breathing normally? CPR: 30 pushes, 2 breaths, and use the defibrillator.',
       'Cool any burns with cool water for 20 minutes.',
       'The medical officer must check them even if they seem fine: the heart rhythm can change later.',
+    ],
+  },
+  {
+    id: 'shock', label: 'Shock', scope: 'crew',
+    pattern: /\b(?:going into shock|(?:he'?s|she'?s|they'?re|he is|she is|they are) in shock|(?:pale|grey|gray),? cold and (?:clammy|sweaty)|cold,? clammy skin)\b/i,
+    steps: [
+      'Lay them flat and raise the legs 30 centimetres, unless that hurts an injury.',
+      'Keep them warm with a blanket. Loosen tight clothing.',
+      'Nothing to eat or drink.',
+      'Check breathing every minute. Not breathing normally? CPR: 30 pushes, 2 breaths.',
     ],
   },
   {
@@ -209,6 +281,86 @@ export const EMERGENCIES: EmergencyProtocol[] = [
       'No food and no medicine. Water only if the medical officer says so.',
       'Note where it hurts, when it started, and any vomiting, fever or blood.',
       'Pale, sweaty, confused or faint? Medical officer immediately.',
+    ],
+  },
+  {
+    id: 'low-sugar', label: 'Low blood sugar', scope: 'crew',
+    pattern: /\b(?:low blood sugar|blood sugar (?:is )?(?:low|dropping|crashing)|hypo(?:glycaemi\w*|glycemi\w*)?|diabetic (?:emergency|attack)|shaky,? sweaty and confused)\b/i,
+    steps: [
+      'Sit them down.',
+      'If they are awake and can swallow, give a sugary drink or sweets right away.',
+      'Wait 15 minutes. Not better? Give sugar again. Once better, give a snack.',
+      'Drowsy or unable to swallow? Nothing by mouth: on their side, medical officer now.',
+    ],
+  },
+  {
+    id: 'heat', label: 'Heat illness', scope: 'crew',
+    pattern: /\b(?:heat ?stroke|heat exhaustion|(?:i'?m|i am|he'?s|she'?s|they'?re|feel(?:ing)?) (?:overheat(?:ed|ing)|way too hot)|too hot in (?:my|his|her|the) suit|very hot and confused)\b/i,
+    steps: [
+      'Move to the coolest module and lie down with the legs raised.',
+      'Remove extra clothing. Cool the skin with wet cloths and moving air.',
+      'Awake and not confused? Small sips of water, often.',
+      'Confused, hot dry skin, or fainting? That is heat stroke: medical officer now, and keep cooling.',
+    ],
+  },
+  {
+    id: 'hypothermia', label: 'Too cold (hypothermia)', scope: 'crew',
+    pattern: /\b(?:hypotherm\w*|can'?t stop shivering|freezing cold and (?:confused|drowsy|shivering)|frostbite)\b/i,
+    steps: [
+      'Move to a warm module. Replace wet clothing with dry.',
+      'Wrap the body and head in blankets. Warm the core first, not the hands and feet.',
+      'Awake? Give a warm, sweet drink. No rubbing, no direct heat on the skin.',
+      'Drowsy, confused or stops shivering? Medical officer now.',
+    ],
+  },
+  {
+    id: 'poison', label: 'Swallowed something harmful', scope: 'crew',
+    pattern: /\b(?:swallowed (?:a |some )?(?:chemical|cleaner|cleaning \w+|coolant|poison|something (?:toxic|poisonous|harmful))|drank (?:a |some )?(?:chemical|cleaner|coolant)|poison(?:ed|ing))\b/i,
+    steps: [
+      'Do not make them vomit.',
+      'Rinse the mouth with water and spit it out. Keep the container or label.',
+      'Note what it was, how much, and when.',
+      'Medical officer now. Drowsy or not breathing normally? On their side, or CPR: 30 pushes, 2 breaths.',
+    ],
+  },
+  {
+    id: 'tooth', label: 'Knocked-out tooth', scope: 'minor',
+    pattern: /\b(?:knocked (?:out )?(?:a |my |his |her )?tooth(?: out)?|tooth (?:fell|came|got knocked) out|lost a tooth)\b/i,
+    steps: [
+      'Hold the tooth by the crown, not the root. Do not scrub it.',
+      'Rinse it briefly with clean water and push it back into its socket if you can.',
+      'If not, keep it in milk or in the cheek, and bite on a clean cloth to stop bleeding.',
+      'Medical officer within 30 minutes gives the best chance of saving it.',
+    ],
+  },
+  {
+    id: 'sprain', label: 'Sprain or strain', scope: 'minor',
+    pattern: /\b(?:sprain(?:ed)?|twisted (?:my|his|her|their|an?) (?:ankle|knee|wrist)|rolled (?:my|his|her|their|an?) ankle|strain(?:ed)? (?:my|his|her|their|a) (?:muscle|back|neck))\b/i,
+    steps: [
+      'Rest it: stop using it.',
+      'Hold a wrapped cold pack on it for 20 minutes, every 2 to 3 hours.',
+      'Wrap it firmly with a bandage, not tight, and keep it raised.',
+      'Cannot bear weight, the shape looks wrong, or numbness? Treat as a broken bone and tell the medical officer.',
+    ],
+  },
+  {
+    id: 'minor-cut', label: 'Small cut or graze', scope: 'minor',
+    pattern: /\b(?:(?:small|minor|little|tiny) cut|cut (?:my|his|her|their) (?:finger|thumb|hand|arm|leg|knee|lip)|graze|scrape)\b/i,
+    steps: [
+      'Wash your hands, then rinse the cut under clean running water.',
+      'Press with a clean cloth until it stops bleeding.',
+      'Cover it with a clean dressing or plaster.',
+      'Gaping, deep, still bleeding after 10 minutes, or red and swollen later? Tell the medical officer.',
+    ],
+  },
+  {
+    id: 'vomiting', label: 'Vomiting or diarrhoea', scope: 'minor',
+    pattern: /\b(?:can'?t stop (?:vomiting|throwing up)|keep (?:vomiting|throwing up)|vomiting (?:a lot|all day|non-?stop)|diarrh(?:o)?ea)\b/i,
+    steps: [
+      'Rest, and keep a sickness bag close.',
+      'Take small sips of fluid every few minutes, even if you cannot eat.',
+      'Wash hands and clean surfaces: it may spread to the crew.',
+      'Blood, unable to keep fluids down for 6 hours, dizziness, or a high temperature? Medical officer.',
     ],
   },
   {
@@ -366,6 +518,7 @@ export function emergencySources(protocol: EmergencyProtocol): { label: string; 
 
 const OPENING: Record<EmergencyScope, string> = {
   crew: URGENT_CREW,
+  minor: 'Here’s what to do.',
   habitat: URGENT_HABITAT,
   calm: 'Stop and breathe with me.',
   triage: URGENT_HABITAT,

@@ -155,6 +155,16 @@ describe('pulse session freshness', () => {
     })).toMatchObject({ ready: false, medianHr: null, reason: 'stale' });
   });
 
+  it('tolerates one odd sample among the latest five, but not the newest', () => {
+    // Eight samples one second apart, as in a real scan window.
+    const t0 = latestTimestamp - 7_000;
+    const good = (i: number) => sample(72, 0.8, t0 + i * 1_000);
+    const odd = [0, 1, 2, 3, 4, 5].map(good).concat(sample(300, 0.95, t0 + 6_000), good(7));
+    expect(assessPulseSession(odd, { sessionStartedAt: t0 - 20_000, facePresent: true, now: latestTimestamp })).toMatchObject({ ready: true, medianHr: 72 });
+    const twoOdd = [0, 1, 2, 3, 4].map(good).concat(sample(300, 0.95, t0 + 5_000), sample(25, 0.95, t0 + 6_000), good(7));
+    expect(assessPulseSession(twoOdd, { sessionStartedAt: t0 - 20_000, facePresent: true, now: latestTimestamp }).ready).toBe(false);
+  });
+
   it('does not hide a new implausible sample behind older good samples', () => {
     const samples = [...readySamples, sample(300, 0.95, latestTimestamp + 1_000)];
     expect(assessPulseSession(samples, {
