@@ -17,13 +17,10 @@ import {
   RefreshCw,
   RotateCcw,
   Salad,
-  Shield,
   ShieldCheck,
   SkipForward,
   Thermometer,
-  Timer,
   Unlock,
-  Users,
   Volume2,
   VolumeX,
   Wind,
@@ -298,78 +295,12 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
 
   return (
     <div className="radiation-container">
-      {/* Page Header */}
-      <header className="page-intro">
-        <Link to="/hazards" className="text-link">
-          All five hazards
-        </Link>
-        <h1>1. Space Radiation Health Monitoring</h1>
-        <p>
-          Deep-space transit autonomous radiation protection specification per{' '}
-          <strong>NASA-STD-3001</strong>. Universal 600 mSv career limit, CARN sensor compartment mapping,
-          personalized room lockdown matrix, directional storm localization, and post-event hysteresis de-escalation.
-        </p>
-        <div className="radiation-badge-row">
-          <span className="badge">
-            <Shield size={13} aria-hidden="true" /> Universal Career Limit: 600 mSv
-          </span>
-          <span className="badge">
-            <Timer size={13} aria-hidden="true" /> Rolling 30-Day Budget: 250 mSv
-          </span>
-          <span className="badge">
-            <Radiation size={13} aria-hidden="true" /> 1-Min CARN Telemetry Stream
-          </span>
-          <span className="badge badge-synthetic">Simulated Deep-Space Transit</span>
-        </div>
-      </header>
-
-      {/* Vehicle Status Banner */}
-      <section
-        className={`radiation-status-banner status-${vehicleAssessment.status.toLowerCase()}`}
-        aria-live="polite"
-        aria-labelledby="banner-heading"
-      >
-        <div className="banner-header">
-          <div className="banner-title-group">
-            {vehicleAssessment.status === 'RED' && <AlertOctagon size={26} color="var(--nasa-red)" aria-hidden="true" />}
-            {vehicleAssessment.status === 'ORANGE' && <AlertTriangle size={26} color="var(--status-trend)" aria-hidden="true" />}
-            {vehicleAssessment.status === 'YELLOW' && <AlertTriangle size={24} color="var(--status-change)" aria-hidden="true" />}
-            {vehicleAssessment.status === 'GREEN' && <ShieldCheck size={24} color="var(--status-steady)" aria-hidden="true" />}
-            <div>
-              <span className="banner-status-badge">
-                VEHICLE STATUS: {vehicleAssessment.status}
-              </span>
-              <h2 id="banner-heading" className="banner-message">
-                {vehicleAssessment.warningMessage}
-              </h2>
-            </div>
-          </div>
-          <span className="badge" style={{ background: 'var(--bg-surface)' }}>
-            {vehicleAssessment.statusLabel}
-          </span>
-        </div>
-
-        <p className="banner-condition">
-          <strong>Trigger Condition:</strong> {vehicleAssessment.conditionMet}
-        </p>
-
-        <div className="radiation-badge-row">
-          {vehicleAssessment.countermeasures.map((cm, idx) => (
-            <span key={idx} className="badge" style={{ background: 'var(--bg-raised)', border: '1px solid var(--border-control)' }}>
-              • {cm.split(':')[0]}
-            </span>
-          ))}
-        </div>
-      </section>
-
       {/* Interactive Simulation Preset Controller Bar */}
       <section className="radiation-sim-bar" aria-labelledby="sim-bar-title">
         <div className="sim-bar-title">
           <span id="sim-bar-title">
-            <RefreshCw size={14} style={{ display: 'inline', marginRight: '6px' }} />
-            Simulate Transit Conditions & CARN Flare Telemetry
+            DEMO SIMULATION
           </span>
-          <span>Click a scenario, then replay to watch the event unfold:</span>
         </div>
 
         <div className="sim-scenario-groups">
@@ -438,14 +369,84 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
           >
             <RotateCcw size={14} /> Reset
           </button>
-          <span className="sim-frame-indicator">
-            Sample {clampedIndex + 1} / {frames.length}
-          </span>
         </div>
+      </section>
 
-        <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-          {envScenario.description}
-        </p>
+      {/* Post-event de-escalation: shown only while the simulation is in recovery. */}
+      {envScenario.recoveryActive && (
+        <section className="recovery-box recovery-box-compact" aria-labelledby="recovery-heading">
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+            <div>
+              <h2 id="recovery-heading" style={{ margin: 0, fontSize: '1.1rem' }}>Post-Event De-escalation</h2>
+              <p className="muted" style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>
+                Complete the recovery checks, then restore room access when the six-hour stabilization window is satisfied.
+              </p>
+            </div>
+            <span className="badge" style={{ background: 'var(--bg-surface)' }}>
+              {(recoveryState?.hoursBelowThreshold ?? 0).toFixed(1)} / 6 hours stable
+            </span>
+          </div>
+          <div className="hysteresis-bar" aria-label="Recovery stabilization progress">
+            <div className="hysteresis-fill" style={{ width: `${Math.min(100, ((recoveryState?.hoursBelowThreshold ?? 0) / 6) * 100)}%` }} />
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.75rem' }}>
+            <button type="button" className="button button-xs button-secondary" onClick={() => setAssay24Done(true)} disabled={assay24Done || activeScenarioKey === 'RECOVERY'}>
+              {assay24Done || activeScenarioKey === 'RECOVERY' ? '24-hour assay complete' : 'Log 24-hour assay'}
+            </button>
+            <button type="button" className="button button-xs button-secondary" onClick={() => setAssay48Done(true)} disabled={assay48Done}>
+              {assay48Done ? '48-hour assay complete' : 'Log 48-hour assay'}
+            </button>
+            <button
+              type="button"
+              className="button button-xs button-primary"
+              onClick={() => { setReopenPhasedDone(true); selectScenario('GREEN'); }}
+              disabled={reopenPhasedDone}
+            >
+              {reopenPhasedDone ? 'Access restored' : 'Restore room access'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Current Radiation Status */}
+      <section
+        className={`radiation-status-banner status-${vehicleAssessment.status.toLowerCase()}`}
+        aria-live="polite"
+        aria-labelledby="banner-heading"
+      >
+        <div className="banner-header">
+          <div className="banner-title-group">
+            {vehicleAssessment.status === 'RED' && <AlertOctagon size={26} color="var(--nasa-red)" aria-hidden="true" />}
+            {vehicleAssessment.status === 'ORANGE' && <AlertTriangle size={26} color="var(--status-trend)" aria-hidden="true" />}
+            {vehicleAssessment.status === 'YELLOW' && <AlertTriangle size={24} color="var(--status-change)" aria-hidden="true" />}
+            {vehicleAssessment.status === 'GREEN' && <ShieldCheck size={24} color="var(--status-steady)" aria-hidden="true" />}
+            <span className="banner-status-badge">RADIATION STATUS: {vehicleAssessment.status}</span>
+          </div>
+          {alarm && (
+              <div className="env-alert-actions">
+            <button
+              type="button"
+              className="button button-xs button-secondary"
+              onClick={() => setAlarmSoundEnabled((on) => !on)}
+              aria-pressed={alarmSoundEnabled}
+            >
+              {alarmSoundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+              {alarmSoundEnabled ? 'Alarm sound on' : 'Enable alarm sound'}
+            </button>
+            {alarmSoundEnabled && (
+              <button
+                type="button"
+                className="button button-xs button-secondary"
+                onClick={() => setAlarmAcknowledged(true)}
+                disabled={alarmAcknowledged}
+              >
+                {alarmAcknowledged ? 'Audio acknowledged (visual alarm stays)' : 'Acknowledge / mute audio'}
+              </button>
+            )}
+          </div>
+          )}
+          <h2 id="banner-heading" className="banner-message">{vehicleAssessment.warningMessage}</h2>
+        </div>
       </section>
 
       {/* Main Grid: Spacecraft Map & Telemetry HUD */}
@@ -455,10 +456,10 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
           <div className="map-header">
             <div>
               <h2 style={{ margin: 0, fontSize: '1.15rem' }}>
-                Spacecraft Compartment Map & CARN Nodes
+                Space Station Model
               </h2>
               <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.82rem' }}>
-                Each node shows temperature (°C), radiation (mSv/h) and CO₂ (mmHg) over the ISS model.
+                Select any compartment to inspect its environmental and radiation readings.
               </p>
             </div>
             <span className="badge">
@@ -466,94 +467,8 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
             </span>
           </div>
 
-          {/* Three ISS-wide sensor averages */}
-          <div className="env-averages" role="group" aria-label="ISS-wide sensor averages">
-            <div className="env-averages-head">
-              <span>ISS-WIDE SENSOR AVERAGES</span>
-              <span className="badge badge-synthetic">
-                Simulated · {minReporting}/{summary.totalNodes} nodes reporting
-              </span>
-            </div>
-            <div className="env-averages-row">
-              <div className="env-avg-cell">
-                <span className="env-avg-label"><Thermometer size={13} aria-hidden="true" /> Avg Temp</span>
-                <span className="env-avg-value">{fmtAvg(summary.avgTemperatureC, 1, '°C')}</span>
-              </div>
-              <div className="env-avg-cell">
-                <span className="env-avg-label"><Radiation size={13} aria-hidden="true" /> Avg Radiation</span>
-                <span className="env-avg-value">{fmtAvg(summary.avgRadiationMsvH, 2, 'mSv/h')}</span>
-              </div>
-              <div className="env-avg-cell">
-                <span className="env-avg-label"><Wind size={13} aria-hidden="true" /> Avg CO₂</span>
-                <span className="env-avg-value">{fmtAvg(summary.avgCo2Mmhg, 1, 'mmHg')}</span>
-              </div>
-            </div>
-            <p className="env-averages-foot muted">
-              Averages are the arithmetic mean of valid nodes (including the shelter). Hazard severity uses the
-              peak affected room{peakRoomName ? <> — currently <strong>{peakRoomName}</strong> at {(localization.peakDoseRateMsvH ?? 0).toFixed(2)} mSv/h</> : ''}, not the mean.
-            </p>
-          </div>
-
-          {/* Possible radiation event / environmental alert */}
-          {alarm && (
-            <div className="env-alert env-alert-critical" role="alert">
-              <div className="env-alert-head">
-                <span className="env-alert-sign" aria-hidden="true">⚠️</span>
-                <div>
-                  <strong className="env-alert-title">
-                    POSSIBLE RADIATION EVENT · {alarmSeverity}
-                  </strong>
-                  <p className="env-alert-sector">
-                    {localization.estimatedSector
-                      ? <>Estimated exposure sector (simulation): <strong>{localization.estimatedSector}</strong> · {localization.confidence} confidence</>
-                      : <>Direction uncertain — evidence is diffuse or insufficient</>}
-                  </p>
-                </div>
-                <span className="badge badge-synthetic">Simulated</span>
-              </div>
-              <p className="env-alert-body">
-                {firstHitNames.length > 0 && <>First detected in <strong>{firstHitNames.join(' and ')}</strong>. </>}
-                {localization.temperatureCorroborated
-                  ? 'Temperature rose in those modules as corroboration. '
-                  : 'Temperature did not corroborate; the radiation reading alarms on its own. '}
-                Proceed to the Central Storm Shelter and follow the lowest-dose route below.
-              </p>
-              <div className="env-alert-actions">
-                <button
-                  type="button"
-                  className="button button-xs button-secondary"
-                  onClick={() => setAlarmSoundEnabled((on) => !on)}
-                  aria-pressed={alarmSoundEnabled}
-                >
-                  {alarmSoundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
-                  {alarmSoundEnabled ? 'Alarm sound on' : 'Enable alarm sound'}
-                </button>
-                {alarmSoundEnabled && (
-                  <button
-                    type="button"
-                    className="button button-xs button-secondary"
-                    onClick={() => setAlarmAcknowledged(true)}
-                    disabled={alarmAcknowledged}
-                  >
-                    {alarmAcknowledged ? 'Audio acknowledged (visual alarm stays)' : 'Acknowledge / mute audio'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          {!alarm && (localization.state === 'WATCH' && localization.co2Anomaly) && (
-            <div className="env-alert env-alert-watch" role="status">
-              <div className="env-alert-head">
-                <Wind size={18} aria-hidden="true" />
-                <div>
-                  <strong className="env-alert-title">AIR-QUALITY WATCH — CO₂ elevated</strong>
-                  <p className="env-alert-sector">Independent environmental warning. This is <strong>not</strong> a solar-radiation event.</p>
-                </div>
-                <span className="badge badge-synthetic">Simulated</span>
-              </div>
-            </div>
-          )}
-
+          <div className="station-overview-grid">
+            <div className="station-model-panel">
           <RadiationStationMap
             snapshotByRoom={snapshotByRoom}
             crew={crewProfiles}
@@ -564,6 +479,42 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
             onSelectRoom={setSelectedRoomId}
             focusCommand={command}
           />
+
+
+
+
+            </div>
+            <div className="station-averages-panel">
+          <div className="env-averages env-averages-prominent" role="group" aria-label="ISS-wide sensor averages">
+            <div className="env-averages-head">
+              <span>ISS-WIDE SENSOR AVERAGES</span>
+              <span className="badge badge-synthetic">
+                Simulated · {minReporting}/{summary.totalNodes} nodes reporting
+              </span>
+            </div>
+            <div className="env-averages-row">
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Thermometer size={25} aria-hidden="true" /> Avg Temp</span>
+                <span className="env-avg-value" style={{ fontSize: '1.45rem', fontWeight: 700 }}>{fmtAvg(summary.avgTemperatureC, 1, '°C')}</span>
+              </div>
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Radiation size={25} aria-hidden="true" /> Avg Radiation</span>
+                <span className="env-avg-value" style={{ fontSize: '1.45rem', fontWeight: 700 }}>{fmtAvg(summary.avgRadiationMsvH, 2, 'mSv/h')}</span>
+              </div>
+              <div className="env-avg-cell">
+                <span className="env-avg-label"><Wind size={25} aria-hidden="true" /> Avg CO₂</span>
+                <span className="env-avg-value" style={{ fontSize: '1.45rem', fontWeight: 700 }}>{fmtAvg(summary.avgCo2Mmhg, 1, 'mmHg')}</span>
+              </div>
+            </div>
+            <p className="env-averages-foot muted">
+              Averages are the arithmetic mean of valid nodes (including the shelter). Hazard severity uses the
+              peak affected room{peakRoomName ? <> — currently <strong>{peakRoomName}</strong> at {(localization.peakDoseRateMsvH ?? 0).toFixed(2)} mSv/h</> : ''}, not the mean.
+            </p>
+          </div>
+
+
+            </div>
+          </div>
 
           {/* Directional Event Localization HUD Box */}
           <div className="directional-hud-panel">
@@ -594,16 +545,11 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right: Selected Room CARN Sensor Deep-Dive & Time-Series */}
-        <div className="gauge-card">
+<div className="gauge-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Dedicated CARN Sensor Node
-              </span>
-              <h3 style={{ margin: '2px 0 0', fontSize: '1.15rem' }}>{selectedCompartment.name}</h3>
-            </div>
+            <h3 style={{ margin: '2px 0 0', fontSize: '1.15rem' }}>{selectedCompartment.name}</h3>
             <span
               className={`matrix-status-cell ${
                 selectedTelemetry.doseRateMsvH > CARN_RATES.ACUTE_BREACH_HOURLY
@@ -625,6 +571,8 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
             </span>
           </div>
 
+      <div className="room-telemetry-layout">
+        <div className="room-measurements">
           {/* Tri-metric readings for the selected node */}
           <div className="selected-metric-trio">
             <div className="selected-metric">
@@ -672,6 +620,7 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
             </div>
           </div>
 
+            </div>
           {/* Per-Room Time-Series Chart */}
           <div className="carn-chart-wrap" style={{ padding: '10px' }}>
             <div className="chart-controls">
@@ -712,207 +661,101 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
               })()}
             </svg>
           </div>
-        </div>
-      </div>
-
-      {/* Dynamic Personalized Room Access Matrix Table */}
-      <section className="radiation-matrix-card" aria-labelledby="matrix-title">
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-          <div>
-            <h2 id="matrix-title" style={{ margin: 0, fontSize: '1.2rem' }}>
-              Personalized Room Access & Dynamic Lockdown Matrix
-            </h2>
-            <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>
-              Evaluates individual permissible dose safety per astronaut. Rooms are flagged <strong>RESTRICTED</strong> if acute rate &gt; 2.1 mSv/h,
-              projected 8-hour shift &gt; 5% remaining 30-day budget, &gt; 2% remaining career budget, or career ceiling reached.
-            </p>
           </div>
-          <span className="badge">
-            <Users size={14} style={{ display: 'inline', marginRight: '4px' }} /> 4 Active Crew Profiles
-          </span>
         </div>
 
-        <div className="matrix-table-wrap">
-          <table className="radiation-matrix-table">
-            <thead>
-              <tr>
-                <th>Crew Member</th>
-                <th>Role & Career Tier</th>
-                <th>Remaining 30D / Career</th>
-                {SPACECRAFT_COMPARTMENTS.map((comp) => (
-                  <th key={comp.id} title={`${comp.name} (${comp.shieldingFactor} g/cm²)`}>
-                    {comp.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {accessMatrix.map(({ crew, calculated, roomEvaluations }) => (
-                <tr key={crew.id}>
-                  <td>
-                    <strong>{crew.displayName}</strong>
-                    {crew.lastBeaconLocation && (
-                      <span className="beacon-badge" title="Last recorded location beacon">
-                        <MapPin size={11} /> {SPACECRAFT_COMPARTMENTS.find(c => c.id === crew.lastBeaconLocation)?.name}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      {crew.role}
-                    </span>
-                    <span className="badge" style={{ fontSize: '0.72rem', padding: '1px 5px' }}>
-                      {calculated.tier.name}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ font: '600 0.82rem var(--mono)' }}>
-                      <span style={{ color: calculated.remaining30DayBudgetMsv < 50 ? 'var(--nasa-red)' : 'var(--text-primary)' }}>
-                        30D: {calculated.remaining30DayBudgetMsv.toFixed(1)} mSv
-                      </span>
-                      <br />
-                      <span style={{ color: calculated.remainingCareerBudgetMsv < 150 ? 'var(--status-trend)' : 'var(--text-muted)' }}>
-                        Car: {calculated.remainingCareerBudgetMsv.toFixed(1)} mSv
-                      </span>
-                    </div>
-                  </td>
-                  {roomEvaluations.map((evalResult) => {
-                    const isRestricted = evalResult.isRestricted;
-                    const statusClass =
-                      evalResult.status === 'ALLOWED'
-                        ? 'allowed'
-                        : evalResult.status === 'EVACUATION_TRANSIT_ONLY'
-                        ? 'evac'
-                        : 'restricted';
-
-                    return (
-                      <td key={evalResult.roomId}>
-                        <span className={`matrix-status-cell ${statusClass}`}>
-                          {isRestricted ? <Lock size={12} /> : <CheckCircle2 size={12} />}
-                          {evalResult.status}
+      {/* Crew access overview */}
+      <section className="radiation-matrix-card members-section" aria-labelledby="matrix-title">
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <h2 id="matrix-title" style={{ margin: 0, fontSize: '1.2rem' }}>Members</h2>
+          <span className="badge">{accessMatrix.length} crew members</span>
+        </div>
+        <div className="members-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+          {accessMatrix.map(({ crew, calculated, roomEvaluations }) => {
+            const currentLocation = SPACECRAFT_COMPARTMENTS.find((room) => room.id === crew.lastBeaconLocation)?.name ?? 'Unknown';
+            const accessibleRooms = roomEvaluations.filter((room) => !room.isRestricted);
+            return (
+              <article key={crew.id} className="assay-card member-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}>{crew.displayName}</h3>
+                    <span className="muted" style={{ fontSize: '0.82rem' }}>{crew.role}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.75rem', fontSize: '0.88rem' }}>
+                  <MapPin size={15} aria-hidden="true" />
+                  <span><strong>Location:</strong> {currentLocation}</span>
+                </div>
+                <div style={{ marginTop: '0.75rem' }}>
+                  <strong style={{ fontSize: '0.85rem' }}>Accessible rooms</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                    {accessibleRooms.length > 0 ? accessibleRooms.map((room) => {
+                      const roomName = SPACECRAFT_COMPARTMENTS.find((item) => item.id === room.roomId)?.name ?? room.roomId;
+                      return (
+                        <span key={room.roomId} className={`matrix-status-cell ${room.status === 'EVACUATION_TRANSIT_ONLY' ? 'evac' : 'allowed'}`}>
+                          {room.status === 'EVACUATION_TRANSIT_ONLY' ? <Footprints size={12} /> : <CheckCircle2 size={12} />}
+                          {roomName}
                         </span>
-
-                        {isRestricted && (
-                          <small className="threat-warning-pill">
-                            {evalResult.lockoutReasons[0]}
-                          </small>
-                        )}
-
-                        {evalResult.beaconAlert && (
-                          <div style={{ marginTop: '4px', color: 'var(--nasa-red)', fontWeight: 700, fontSize: '0.75rem' }}>
-                            🚨 BEACON ALERT: Crew inside restricted hazard zone!
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      );
+                    }) : <span className="muted" style={{ fontSize: '0.82rem' }}>No rooms currently accessible</span>}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
 
-      {/* Turn-by-Turn Evacuation Routing Assistant */}
-      <section className="evac-route-box" aria-labelledby="evac-route-title">
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+      {/* Lowest-dose evacuation route */}
+      <section className="evac-route-box evac-route-compact" aria-labelledby="evac-route-title">
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
           <div>
-            <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--accent)', fontWeight: 600 }}>
-              Dijkstra Pathfinding Algorithm
-            </span>
-            <h2 id="evac-route-title" style={{ margin: '2px 0 0', fontSize: '1.15rem' }}>
-              Automated Turn-by-Turn Lowest-Dose Evacuation Route
-            </h2>
-            <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.84rem' }}>
-              Computes the safest path to the Central Storm Shelter from the astronaut's last known beacon check-in, avoiding CARN hotzones.
-            </p>
+            <h2 id="evac-route-title" style={{ margin: 0, fontSize: '1.1rem' }}>Evacuation Route</h2>
+            <p className="muted" style={{ margin: '3px 0 0', fontSize: '0.82rem' }}>Follow the lowest-dose route to the Central Storm Shelter.</p>
           </div>
-
           <div className="evac-crew-picker">
-            <label htmlFor="evac-crew-select" className="muted" style={{ fontSize: '0.85rem' }}>
-              Select Astronaut:
-            </label>
-            <select
-              id="evac-crew-select"
-              value={selectedCrewId}
-              onChange={(e) => setSelectedCrewId(e.target.value)}
-              className="button button-secondary button-sm"
-              style={{ colorScheme: 'dark' }}
-            >
-              {crewProfiles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.displayName} (at {SPACECRAFT_COMPARTMENTS.find(r => r.id === c.lastBeaconLocation)?.name})
+            <label htmlFor="evac-crew-select" className="muted" style={{ fontSize: '0.82rem', marginRight: '0.4rem' }}>Crew member</label>
+            <select id="evac-crew-select" value={selectedCrewId} onChange={(e) => setSelectedCrewId(e.target.value)} className="button button-secondary button-sm" style={{ colorScheme: 'dark' }}>
+              {crewProfiles.map((crew) => (
+                <option key={crew.id} value={crew.id}>
+                  {crew.displayName} — {SPACECRAFT_COMPARTMENTS.find((room) => room.id === crew.lastBeaconLocation)?.name ?? 'Unknown'}
                 </option>
               ))}
             </select>
           </div>
         </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '10px', background: 'var(--bg-raised)', borderRadius: '8px' }}>
-          <div>
-            <span className="muted" style={{ fontSize: '0.75rem' }}>Starting Beacon:</span>{' '}
-            <strong>{SPACECRAFT_COMPARTMENTS.find(c => c.id === evacuationRoute.startRoomId)?.name}</strong>
-          </div>
-          <div>
-            <span className="muted" style={{ fontSize: '0.75rem' }}>Destination:</span>{' '}
-            <strong>{shelterSafe
-              ? 'Central Storm Shelter (Surrounded by Water & Food Stores)'
-              : 'Central Storm Shelter — shelter status requires verification'}</strong>
-          </div>
-          <div>
-            <span className="muted" style={{ fontSize: '0.75rem' }}>Total Transit Exposure:</span>{' '}
-            <strong style={{ color: shelterSafe ? 'var(--status-steady)' : 'var(--nasa-red)' }}>
-              {evacuationRoute.estimatedTransitDoseMsv.toFixed(4)} mSv
-            </strong>
-          </div>
-          {evacuationRoute.avoidedHotzones.length > 0 && (
-            <div>
-              <span className="muted" style={{ fontSize: '0.75rem' }}>Rerouted around hotzones:</span>{' '}
-              <strong style={{ color: 'var(--nasa-red)' }}>{evacuationRoute.avoidedHotzones.join(', ')}</strong>
-            </div>
-          )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-raised)', borderRadius: '8px' }}>
+          <span><strong>From:</strong> {SPACECRAFT_COMPARTMENTS.find((room) => room.id === evacuationRoute.startRoomId)?.name ?? 'Unknown'}</span>
+          <ArrowRight size={15} aria-hidden="true" />
+          <span><strong>To:</strong> Central Storm Shelter</span>
+          <span style={{ marginLeft: 'auto', color: shelterSafe ? 'var(--status-steady)' : 'var(--nasa-red)', fontWeight: 700 }}>
+            {evacuationRoute.estimatedTransitDoseMsv.toFixed(4)} mSv estimated exposure
+          </span>
         </div>
-
-        <ol className="evac-steps-list">
+        {evacuationRoute.avoidedHotzones.length > 0 && (
+          <p className="muted" style={{ margin: '0.6rem 0 0', fontSize: '0.8rem' }}>Avoiding: {evacuationRoute.avoidedHotzones.join(', ')}</p>
+        )}
+        <ol className="evac-steps-list" style={{ marginTop: '0.75rem' }}>
           {evacuationRoute.turnByTurn.map((step) => (
             <li key={step.step} className={`evac-step-item${step.isHotzone ? ' is-hotzone' : ''}`}>
               <span className="step-num-badge">{step.step}</span>
               <div>
-                <p className="step-instruction">
+                <p className="step-instruction" style={{ margin: 0 }}>
                   <Footprints size={14} style={{ display: 'inline', marginRight: '6px', color: 'var(--accent)' }} />
                   {step.instruction}
                 </p>
-                <span className="muted" style={{ fontSize: '0.78rem' }}>
-                  Module: <strong>{step.roomName}</strong>
-                </span>
+                <span className="muted" style={{ fontSize: '0.78rem' }}>{step.roomName}</span>
               </div>
-              <span className="step-rate-badge">
-                CARN: {step.doseRateMsvH.toFixed(2)} mSv/h
-              </span>
+              <span className="step-rate-badge">{step.doseRateMsvH.toFixed(2)} mSv/h</span>
             </li>
           ))}
         </ol>
-
         {vehicleAssessment.status === 'RED' && (
-          <div style={{ padding: '12px', background: 'rgba(255, 105, 77, 0.15)', border: '1px solid var(--nasa-red)', borderRadius: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <strong style={{ color: 'var(--nasa-red)' }}>
-                  <Timer size={16} style={{ display: 'inline', marginRight: '6px' }} />
-                  MANDATORY 5-MINUTE CREW ACCOUNTABILITY CHECK
-                </strong>
-                <p style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>
-                  Verify that 100% of crew members have arrived inside the shielded perimeter within 5 minutes of storm alarm.
-                </p>
-              </div>
-              <button
-                type="button"
-                className={`button ${accountabilityChecked ? 'button-secondary' : 'button-warning'}`}
-                onClick={() => setAccountabilityChecked(true)}
-              >
-                {accountabilityChecked ? '✓ 4/4 Crew Accounted For in Shelter' : 'Confirm 100% Shelter Beacon Muster'}
-              </button>
-            </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255, 105, 77, 0.15)', border: '1px solid var(--nasa-red)', borderRadius: '8px' }}>
+            <strong style={{ color: 'var(--nasa-red)' }}>5-minute crew accountability</strong>
+            <button type="button" className={`button ${accountabilityChecked ? 'button-secondary' : 'button-warning'}`} onClick={() => setAccountabilityChecked(true)}>
+              {accountabilityChecked ? 'Crew accounted for' : 'Confirm crew in shelter'}
+            </button>
           </div>
         )}
       </section>
@@ -1077,135 +920,6 @@ export function RadiationHazard({ scenario, onInspectRoom, command }: {
           </div>
         </div>
       </section>
-
-      {/* Post-Event Monitoring & De-Escalation Workflow Console */}
-      <section className="recovery-box" aria-labelledby="recovery-heading">
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-          <div>
-            <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--status-check)', fontWeight: 600 }}>
-              Post-Event De-escalation & Biometric Recovery Protocol
-            </span>
-            <h2 id="recovery-heading" style={{ margin: '2px 0 0', fontSize: '1.2rem' }}>
-              Hysteresis Verification & Lymphocyte Recovery
-            </h2>
-            <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>
-              Hysteresis rule: The software <strong>must not</strong> unlock closed rooms or clear warnings upon a single low reading.
-              All compartment CARN sensors must verify &le; 0.15 mSv/h continuously for <strong>at least 6 consecutive hours</strong>.
-            </p>
-          </div>
-
-          <span className="badge" style={{ background: 'var(--bg-surface)' }}>
-            Hysteresis Window: 6.0 Hours
-          </span>
-        </div>
-
-        <div className="hysteresis-progress-wrap">
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-            <span>Consecutive Stabilized Hours:</span>
-            <strong>
-              {activeScenarioKey === 'RECOVERY'
-                ? (recoveryState?.hoursBelowThreshold ?? 3.5).toFixed(1)
-                : activeScenarioKey === 'GREEN'
-                ? '6.0 (Complete)'
-                : '0.0 (Event Active)'}{' '}
-              / 6.0 Hours
-            </strong>
-          </div>
-          <div className="hysteresis-bar">
-            <div
-              className="hysteresis-fill"
-              style={{
-                width: `${
-                  activeScenarioKey === 'RECOVERY'
-                    ? ((recoveryState?.hoursBelowThreshold ?? 3.5) / 6) * 100
-                    : activeScenarioKey === 'GREEN'
-                    ? 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="assay-cards-grid">
-          <div className="assay-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>24-Hour Lymphocyte Assay</strong>
-              <span className={`badge ${assay24Done || activeScenarioKey === 'RECOVERY' ? 'status-steady' : ''}`}>
-                {assay24Done || activeScenarioKey === 'RECOVERY' ? '✓ Completed' : 'Pending'}
-              </span>
-            </div>
-            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-              Finger-prick blood/saliva sample to evaluate bone marrow suppression & peripheral lymphocyte recovery.
-            </p>
-            <button
-              type="button"
-              className="button button-xs button-secondary"
-              onClick={() => setAssay24Done(true)}
-              disabled={assay24Done || activeScenarioKey === 'RECOVERY'}
-            >
-              {assay24Done || activeScenarioKey === 'RECOVERY' ? 'Result: 88% Baseline Lymphocytes' : 'Log 24h Finger-Prick Assay'}
-            </button>
-          </div>
-
-          <div className="assay-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>48-Hour Follow-Up Assay</strong>
-              <span className={`badge ${assay48Done ? 'status-steady' : ''}`}>
-                {assay48Done ? '✓ Completed' : 'Scheduled'}
-              </span>
-            </div>
-            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-              Confirm continued hematopoietic recovery before restoring full physical training and EVA clearance.
-            </p>
-            <button
-              type="button"
-              className="button button-xs button-secondary"
-              onClick={() => setAssay48Done(true)}
-              disabled={assay48Done}
-            >
-              {assay48Done ? 'Result: 96% Recovery (Nominal)' : 'Log 48h Follow-Up Assay'}
-            </button>
-          </div>
-
-          <div className="assay-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>Phased Re-Opening</strong>
-              <span className={`badge ${reopenPhasedDone ? 'status-steady' : ''}`}>
-                {reopenPhasedDone ? 'Unlocked' : 'Gated'}
-              </span>
-            </div>
-            <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>
-              Recalculates individual remaining dose budgets and selectively re-opens compartments per crew member.
-            </p>
-            <button
-              type="button"
-              className="button button-xs button-primary"
-              onClick={() => {
-                setReopenPhasedDone(true);
-                selectScenario('GREEN');
-              }}
-            >
-              Recalculate Budgets & Restore Access
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Navigation Footer */}
-      <footer style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginTop: '1rem' }}>
-        <Link to="/hazards" className="button button-secondary">
-          ← Back to all hazards
-        </Link>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <Link to="/cmo" className="button button-secondary">
-            CMO console <ArrowRight size={15} style={{ display: 'inline', marginLeft: '4px' }} />
-          </Link>
-          <Link to="/timeline" className="button button-secondary">
-            Mission Timeline <ArrowRight size={15} style={{ display: 'inline', marginLeft: '4px' }} />
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }
