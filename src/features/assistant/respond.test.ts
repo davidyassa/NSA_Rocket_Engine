@@ -73,6 +73,9 @@ describe('Ask Sol handles everyday conversation', () => {
     ['Good morning.', /Hi Maya/],
     ['Hey, how are you?', /ready to help/],
     ['Thank you, Sol.', /welcome/],
+    ['I\'m doing great. So, what about you?', /glad to hear that.*doing well too/i],
+    ['What about you?', /ready to help/],
+    ['I\'m doing great.', /Glad to hear/],
   ])('replies naturally to %s', (question, pattern) => {
     expect(ask(question)).toMatchObject({ kind: 'help', text: expect.stringMatching(pattern), sources: [] });
   });

@@ -56,12 +56,62 @@
   .sol-dock-button { width: 52px; height: 52px; }
 }
 @media print { .sol-dock { display: none; } }
-.sol-control-bar {
+/* Computer-use indicator: a centered island that floats in sync with the Sol bubble. */
+.sol-island {
   position: fixed;
-  inset: auto 0 0;
+  left: 50%;
+  bottom: max(26px, calc(var(--safe-bottom, 0px) + 10px));
   z-index: 1100;
-  height: 4px;
-  background: color-mix(in srgb, var(--text-primary) 75%, var(--accent-hover));
-  pointer-events: none;
+  display: inline-flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 18px 10px 12px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-raised) 90%, transparent);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .5);
+  color: var(--text-primary); font-size: .9375rem; font-weight: 600; line-height: 1;
+  pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transform: translateX(-50%);
+  animation: sol-island-in 240ms ease both, sol-island-float 2.6s ease-in-out 240ms infinite;
 }
+.sol-island-dot {
+  position: relative; flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 66% 24%, var(--text-primary), transparent 50%),
+    radial-gradient(ellipse at 20% 80%, #76513f, transparent 55%),
+    linear-gradient(150deg, #dfc3a5 18%, #b88b6b 62%, #76513f 96%);
+}
+.sol-island-dot-glow {
+  position: absolute; inset: -4px; border-radius: 50%;
+  background: color-mix(in srgb, #dfc3a5 60%, transparent);
+  animation: sol-island-pulse 2.6s ease-in-out infinite;
+}
+.sol-island-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
+@keyframes sol-island-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes sol-island-float { 50% { transform: translate(-50%, -4px); } }
+@keyframes sol-island-pulse { 0%, 100% { opacity: .45; transform: scale(1); } 50% { opacity: 0; transform: scale(1.5); } }
+
+/* Phones: sit above the bottom navigation and the dock bubble. */
+@media (max-width: 767px) {
+  .sol-island { bottom: calc(96px + var(--safe-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-island { animation: sol-island-in 160ms ease both; }
+  .sol-island-dot-glow { animation: none; opacity: .4; }
+}
+@media print { .sol-island { display: none; } }
+
+
+/* Emergency steps: the alert line, then large numbered actions that are easy to follow at a glance. */
+.reply-steps {
+  display: grid; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--status-trend); border-radius: 10px;
+  background: var(--tint-red, var(--tint-trend)); text-align: left;
+}
+.reply-steps p { margin: 0; line-height: 1.45; }
+.reply-steps-lead { font-weight: 700; color: var(--text-primary); }
+.reply-steps ol { margin: 0; padding-left: 1.6em; display: grid; gap: 6px; }
+.reply-steps li { line-height: 1.45; font-size: 1rem; color: var(--text-primary); }
+.reply-steps li::marker { font-weight: 700; color: var(--status-trend); }
+.reply-steps-tail { font-size: .875rem; color: var(--text-secondary); }

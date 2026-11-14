@@ -12,5 +12,6 @@ const clips = [
 
 export function urgentClipFor(text: string) {
   const clip = clips.find(([opening]) => text.startsWith(opening));
-  return clip && { url: new URL(`vendor/kokoro/alerts/${clip[1]}.mp3`, document.baseURI).href, rest: text.slice(clip[0].length).trim() };
+  // Pre-recorded in Sol's Piper voice (voice-server/make_alerts.py), so the opening plays instantly.
+  return clip && { url: new URL(`vendor/piper/alerts/${clip[1]}.wav`, document.baseURI).href, rest: text.slice(clip[0].length).trim() };
 }

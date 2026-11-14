@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Check, ExternalLink, Pencil } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CORE_SYMPTOM_OPTIONS,
   METRIC_IDS,
@@ -115,7 +116,29 @@ export function Checkin({ sol, profile, demoPrefill, initialEntry, voiceDraft, o
   const [saveError, setSaveError] = useState('');
   const [capture, setCapture] = useState<CheckinEntry['capture']>(() => initialEntry?.capture ?? {});
   const formRef = useRef<HTMLFormElement>(null);
-  const [step, setStep] = useState(initialEntry ? REVIEW_STEP : 0);
+  const [searchParams] = useSearchParams();
+  const stepParam = searchParams.get('step') ?? searchParams.get('page');
+  const [step, setStep] = useState(() => {
+    if (initialEntry) return REVIEW_STEP;
+    if (stepParam) {
+      const idx = STEPS.findIndex(s => s.id === stepParam || s.metrics.includes(stepParam as MetricId));
+      if (idx >= 0) return idx;
+      const num = parseInt(stepParam, 10);
+      if (Number.isFinite(num) && num >= 1 && num <= STEPS.length) return num - 1;
+    }
+    return 0;
+  });
+
+  useEffect(() => {
+    if (!stepParam) return;
+    const idx = STEPS.findIndex(s => s.id === stepParam || s.metrics.includes(stepParam as MetricId));
+    if (idx >= 0) {
+      setStep(idx);
+    } else {
+      const num = parseInt(stepParam, 10);
+      if (Number.isFinite(num) && num >= 1 && num <= STEPS.length) setStep(num - 1);
+    }
+  }, [stepParam]);
   const [focusTarget, setFocusTarget] = useState<string | null>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);

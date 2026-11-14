@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { METRIC_IDS, METRICS, type DailyCheckin, type MetricId } from '../../contracts';
 import { evaluateCheckin } from '../../engine';
 import { DEFAULT_SCENARIO_ID, DEMO_OPTIONS } from '../../scenarios';
-import { cleanSpeech, converse, newDialogue, type DialogueState } from './dialogue';
+import { cleanSpeech, converse, newDialogue, speculateIntent, type DialogueState } from './dialogue';
 import { KnowledgeIndex } from './knowledge';
 import { TOUR_ROUTES } from './pageGuides';
 import type { AssistantContext } from './respond';
@@ -27,10 +27,18 @@ describe('Ask Sol conversation (the transcript that went wrong)', () => {
   });
 
   it('answers small talk warmly, even with noise around it', () => {
-    const [how, old] = chat(['I don\'t know why, I don\'t know why. How are you?', '- Hello? - How old are you?']);
+    const [how, old, reciprocal, combined] = chat([
+      'I don\'t know why, I don\'t know why. How are you?',
+      '- Hello? - How old are you?',
+      'I\'m doing great. So, what about you?',
+      'Doing well, how about you?',
+    ]);
     expect(how.text).toMatch(/doing well/);
     expect(how.text).not.toMatch(/outside what I know/);
     expect(old.text).toMatch(/2026 NASA Space Apps/);
+    expect(reciprocal.text).toMatch(/glad to hear that.*doing well too/i);
+    expect(reciprocal.text).not.toMatch(/outside what I know/);
+    expect(combined.text).toMatch(/glad to hear that.*doing well too/i);
   });
 
   it('treats "oxygen is low in the room" as an urgent habitat problem', () => {
@@ -173,6 +181,34 @@ describe('Ask Sol conversation (the transcript that went wrong)', () => {
     expect(converse('Scroll down', newDialogue(), live, index).action).toEqual({ scroll: 'down' });
     expect(converse('Open supplies', newDialogue(), live, index).action?.navigate).toBe('/cmo?tab=kit');
     expect(converse('Select sol 41', newDialogue(), live, index).action?.navigate).toBe('/timeline?sol=41');
+    // Scroll a set number of lines, in either direction.
+    expect(converse('Scroll down 5 lines', newDialogue(), live, index).action).toEqual({ scrollLines: 5 });
+    expect(converse('scroll up by 3', newDialogue(), live, index).action).toEqual({ scrollLines: -3 });
+    // Scroll to a named destination on the page.
+    expect(converse('Scroll to the evidence passport', newDialogue(), live, index).action).toEqual({ scrollTo: 'evidence passport' });
+    expect(converse('skip to tested on real astronaut data', newDialogue(), live, index).action).toEqual({ scrollTo: 'tested on real astronaut data' });
+    // Click a compartment on the radiation 3D model.
+    expect(converse('Open the storm shelter', newDialogue(), live, index).action).toEqual({ radiationRoom: 'storm-shelter', navigate: '/hazards/radiation' });
+    expect(converse('zoom in on the flight deck', newDialogue(), live, index, '/hazards/radiation').action).toEqual({ radiationRoom: 'flight-deck' });
+    // "Jump to sol N" must still go to the timeline, not be eaten by scroll-to.
+    expect(converse('jump to sol 41', newDialogue(), live, index).action?.navigate).toBe('/timeline?sol=41');
+
+    // Computer use task: navigate to subpages of a page like cardiovascular trends on the trends page
+    const subpageTurn1 = converse('Navigate to cardiovascular trends on the trends page', newDialogue(), live, index);
+    expect(subpageTurn1.action?.navigate).toBe('/trends?category=cardiovascular&metric=heart_rate');
+    expect(subpageTurn1.action?.navigateLabel).toBe('Opening Cardiovascular trends');
+    expect(subpageTurn1.reply.text).toContain('Opening Cardiovascular trends on the Trends page');
+
+    const subpageTurn2 = converse('Navigate to subpages of a page like cardiovascular trends on the trends page', newDialogue(), live, index);
+    expect(subpageTurn2.action?.navigate).toBe('/trends?category=cardiovascular&metric=heart_rate');
+
+    const subpageTurn3 = converse('Open metabolic trends', newDialogue(), live, index);
+    expect(subpageTurn3.action?.navigate).toBe('/trends?category=metabolic&metric=blood_glucose');
+    expect(subpageTurn3.action?.navigateLabel).toBe('Opening Metabolic & physical trends');
+
+    const subpageTurn4 = converse('Navigate to timed mode on cognitive lab', newDialogue(), live, index);
+    expect(subpageTurn4.action?.navigate).toBe('/cognitive?mode=timed');
+    expect(subpageTurn4.action?.navigateLabel).toBe('Opening Timed vigilance check');
   });
 
   it('reviews mission evidence without extrapolating survival or offering clearance', () => {
@@ -195,6 +231,34 @@ describe('Ask Sol conversation (the transcript that went wrong)', () => {
     expect(converse('Give me my blood pressure', newDialogue(), live, index, '/demo').reply.text).toMatch(/over.*mercury/);
     expect(converse('What radiation status does the monitor show?', newDialogue(), live, index, '/timeline').reply.text).toMatch(/ORANGE.*2\.40.*simulated/);
     expect(converse('What happened on Sol 41?', newDialogue(), live, index, '/assistant').reply.sources.some(item => item.route === '/timeline')).toBe(true);
+  });
+
+  it('speculates intent and pre-warms routes with Aegis-Zero zero-latency prediction', () => {
+    // 1. "check my cardio..." while user is mid-speech
+    const cardioSpec = speculateIntent('check my cardio');
+    expect(cardioSpec.isActionable).toBe(true);
+    expect(cardioSpec.predictedRoute).toBe('/trends?category=cardiovascular&metric=heart_rate');
+    expect(cardioSpec.action?.navigate).toBe('/trends?category=cardiovascular&metric=heart_rate');
+    expect(cardioSpec.action?.navigateLabel).toBe('Cardiovascular trends');
+
+    // 2. "check my sleep"
+    const sleepSpec = speculateIntent('check my sleep');
+    expect(sleepSpec.isActionable).toBe(true);
+    expect(sleepSpec.predictedRoute).toBe('/trends?category=wellbeing&metric=sleep_duration');
+
+    // 3. 3D radiation room targeting
+    const roomSpec = speculateIntent('open the flight deck');
+    expect(roomSpec.isActionable).toBe(true);
+    expect(roomSpec.action?.radiationRoom).toBe('flight-deck');
+
+    // 4. Primary route navigation
+    const navSpec = speculateIntent('go to cognitive lab', '/');
+    expect(navSpec.isActionable).toBe(true);
+    expect(navSpec.predictedRoute).toBe('/cognitive');
+
+    // 5. Short noise or question should not trigger speculative routing
+    expect(speculateIntent('um').isActionable).toBe(false);
+    expect(speculateIntent('what is my heart rate').isActionable).toBe(false);
   });
 });
 

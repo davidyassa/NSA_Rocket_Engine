@@ -7,11 +7,15 @@ import { guideFor } from './pageGuides';
 import type { AssistantContext, AssistantReply } from './respond';
 import { SolBubble } from './SolBubble';
 import { SolListener, heySolWanted, isVoiceModeOpen, onHeySolChange, onVoiceModeChange, setHeySolWanted } from './solListener';
-import { prepareVoice, speak } from './voiceOutput';
+import { playEarcon, prepareVoice, speak } from './voiceOutput';
+import { ReplySteps } from './ReplySteps';
+import { spokenText } from './spoken';
 import './solDock.css';
 
 /** Back to waiting for "Hey Sol" after this much quiet in a conversation. */
 const IDLE_MS = 25_000;
+/** During an emergency Sol keeps listening much longer: hands are busy, "next" may take a while. */
+const EMERGENCY_IDLE_MS = 180_000;
 type DockState = 'idle' | 'starting' | 'resume' | 'waiting' | 'listening' | 'thinking' | 'speaking' | 'error';
 const STATUS: Record<DockState, string> = {
   idle: 'Tap the mic to talk',
@@ -72,17 +76,17 @@ export function SolDock({ ctx, onAction }: {
 
   const armIdle = useCallback(() => {
     window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(backToWaiting, IDLE_MS);
+    idleTimer.current = window.setTimeout(backToWaiting, dialogue.current.emergency ? EMERGENCY_IDLE_MS : IDLE_MS);
   }, [backToWaiting]);
 
-  const say = useCallback(async (text: string, farewell = false) => {
+  const say = useCallback(async (text: string, farewell = false, urgent = false) => {
     const l = listener.current;
     if (!l) return;
     l.mode = 'paused';
     const speech = new AbortController();
     playback.current = speech;
     setState('speaking');
-    await speak(text, speech.signal);
+    await speak(text, speech.signal, { urgent });
     if (playback.current !== speech || listener.current !== l) return;
     playback.current = null;
     if (farewell && !speech.signal.aborted) {
@@ -108,7 +112,7 @@ export function SolDock({ ctx, onAction }: {
       next = { ...next, text: 'To start your mood check, tap Talk to Sol on the Ask Sol page and say “start a mood check”.' };
     }
     setReply(next);
-    void say(next.text, next.kind === 'farewell');
+    void say(spokenText(next), next.kind === 'farewell', next.kind === 'urgent' || next.kind === 'crisis');
   }, [say]);
 
   const ensureListener = useCallback((mode: 'wake' | 'active') => {
@@ -117,16 +121,23 @@ export function SolDock({ ctx, onAction }: {
     if (!l) {
       const created = new SolListener({
         onWake: (rest) => {
+          // Open the conversation panel and answer anything said with "Hey Sol".
           setOpen(true);
           setHeard('');
-          if (rest) answer(rest);
-          else {
-            const text = `Yes? You’re on ${guideFor(live.current.pathname).name}.`;
-            setReply({ kind: 'help', text, sources: [] });
-            void say(text);
-          }
+          dialogue.current = newDialogue();
+          if (rest) { answer(rest); return; }
+          // Just "Hey Sol": a short chime and straight to listening. No spoken prompt,
+          // so the question that follows is never talked over or lost.
+          playEarcon();
+          setReply({ kind: 'help', text: 'I’m listening. Go ahead.', sources: [] });
+          setState('listening');
+          armIdle();
         },
-        onUtterance: answer,
+        onUtterance: (text) => answer(text),
+        onBargeIn: () => {
+          setState('listening');
+          armIdle();
+        },
         onAudioReady: (ready) => {
           if (created.mode === 'paused') return;
           window.clearTimeout(idleTimer.current);
@@ -164,7 +175,7 @@ export function SolDock({ ctx, onAction }: {
       setState(mode === 'wake' ? 'waiting' : 'listening');
       if (mode === 'active') armIdle();
     }
-  }, [answer, armIdle, say, stopListener]);
+  }, [answer, armIdle, stopListener]);
 
   useEffect(() => {
     const suspend = () => {
@@ -266,7 +277,9 @@ export function SolDock({ ctx, onAction }: {
             {state === 'error' ? <p className="sol-dock-error">{error}</p> : (
               <>
                 {heard && <p className="sol-dock-you"><span className="sr-only">You said </span>{heard}</p>}
-                <p className="sol-dock-sol"><span className="sr-only">Sol said </span>{reply?.text ?? `You’re on ${guideFor(pathname).name}. Select Talk or say “Hey Sol” if listening is on.`}</p>
+                {reply?.steps?.length
+                  ? <ReplySteps reply={reply} className="sol-dock-sol" />
+                  : <p className="sol-dock-sol"><span className="sr-only">Sol said </span>{reply?.text ?? `You’re on ${guideFor(pathname).name}. Select Talk or say “Hey Sol” if listening is on.`}</p>}
                 {reply && reply.sources.length > 0 && (
                   <p className="sol-dock-sources">From: {reply.sources.map((s, i) => (
                     <span key={`${s.label}-${i}`}>{s.url ? <a href={s.url} target="_blank" rel="noreferrer">{s.label}</a> : s.route ? <Link to={s.route}>{s.label}</Link> : s.label}</span>

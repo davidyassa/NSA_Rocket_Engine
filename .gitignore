@@ -11,3 +11,7 @@ bugtrace/
 
 # Internal AI prompts and working notes: kept locally, not published
 internal/
+
+# Sol voice server: local Python environment and generated voice cache
+voice-server/.venv/
+voice-server/.cache/

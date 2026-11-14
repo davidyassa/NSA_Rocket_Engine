@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
+    "voice:setup": "python3 -m venv voice-server/.venv && voice-server/.venv/bin/pip install -r voice-server/requirements.txt",
+    "voice:server": "voice-server/.venv/bin/python voice-server/server.py",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "preview": "SOLCHECK_HTTPS_PORT=4174 vite preview",

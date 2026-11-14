@@ -11,11 +11,14 @@ export function InteractiveStation({
   describedBy,
   anchors,
   incident,
+  focusCommand,
   renderOverlay,
 }: {
   describedBy: string;
   anchors?: readonly StationAnchor[];
   incident?: StationIncident | null;
+  /** External "focus this anchor" signal (e.g. from Sol's voice control). */
+  focusCommand?: { id: string; n: number };
   renderOverlay?: (points: StationProjection[], focusAnchor: (id: string) => void) => ReactNode;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -28,6 +31,10 @@ export function InteractiveStation({
     latestIncident.current = incident;
     viewport.current?.setIncident(incident ?? null);
   }, [incident]);
+
+  useEffect(() => {
+    if (focusCommand && status === 'ready') viewport.current?.focusAnchor(focusCommand.id);
+  }, [focusCommand, status]);
 
   useEffect(() => {
     const element = canvas.current;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { VigilanceReadings } from './VigilanceReadings';
 import { summarizeVigilance, type VigilanceTrial } from './pvtEngine';
 import { VIGILANCE_MODES, type VigilanceMode, type VigilanceSession } from './vigilance';
@@ -25,7 +25,16 @@ export function CognitiveLab({ currentSol, history, onSave }: {
   history: readonly VigilanceSession[];
   onSave: (session: VigilanceSession) => void;
 }) {
-  const [mode, setMode] = useState<VigilanceMode>('quick');
+  const [searchParams] = useSearchParams();
+  const queryMode = searchParams.get('mode');
+  const validMode = (queryMode === 'quick' || queryMode === 'standard' || queryMode === 'timed') ? queryMode : null;
+  const [mode, setMode] = useState<VigilanceMode>(validMode ?? 'quick');
+
+  useEffect(() => {
+    if (validMode && validMode !== mode) {
+      setMode(validMode);
+    }
+  }, [validMode]);
   const [stage, setStage] = useState<Stage>('idle');
   const [trialCount, setTrialCount] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);

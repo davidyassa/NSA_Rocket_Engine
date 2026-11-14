@@ -3,7 +3,7 @@
  *
  * Order matters, safety first:
  *  1. crisis words      → talk to the crew medical officer or a crewmate now (no counselling);
- *  2. emergency symptoms → tell the crew medical officer now;
+ *  2. emergencies       → the exact first-aid / habitat steps to take now (emergency.ts);
  *  3. medicine / dose / diagnosis requests → politely declined (Sol Check never prescribes or diagnoses);
  *  4. everyday greetings, farewells and help;
  *  5. "my …" questions  → the person's own readings, baseline and findings;
@@ -16,6 +16,7 @@ import { metricBaseline, usableMeasurement } from '../../engine';
 import { KnowledgeIndex, tokenize, type KnowledgeDoc } from './knowledge';
 import type { MissionEvidence } from './missionAnswers';
 import { URGENT_CREW, URGENT_CRISIS } from './urgentSpeech';
+import { emergencySources, emergencyTurn, matchEmergency } from './emergency';
 
 export interface AssistantContext {
   crewName: string;
@@ -35,6 +36,12 @@ export interface AssistantReply {
   /** cited passages the answer was built from */
   sources: KnowledgeDoc['cite'][];
   suggestions?: string[];
+  /** emergency steps spoken in this reply, shown as a numbered list */
+  steps?: string[];
+  /** number of the first item in `steps` */
+  stepStart?: number;
+  /** id of the emergency protocol this reply belongs to */
+  emergency?: string;
 }
 
 /** Below this BM25 score the question is treated as outside Sol Check's knowledge. */
@@ -49,7 +56,8 @@ const MOOD = /\b((mood|mode|mud|moon) (check|chat|test)|check (my|in on my) (moo
 // Whisper can transcribe the assistant's name as "Soul" or "Saul".
 const GREETING = /^(?:hi|hello|hey|salam|marhaba|good (?:morning|afternoon|evening))\b(?:[\s,.!?]+(?:there|sol|soul|saul)\b)*[\s,.!?;:–—-]*/i;
 const HELP = /^(?:help(?: me)?|what can you do|who are you)[.!?]*$/i;
-const HOW_ARE_YOU = /^how are you(?: doing)?(?: today)?(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
+const HOW_ARE_YOU = /^(?:(?:(?:so[, ]+)?(?:(?:i['’]?m|i am)\s+)?(?:(?:doing|feeling|feel)\s+)?(?:great|good|well|fine|okay|ok|awesome)[,.\s]+)*(?:so[, ]+)?(?:how are you(?: doing)?(?: today)?|how['’]?s it going|how do you feel|what about you|what about yourself|how about you|how about yourself|and you|and yourself))(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
+const USER_WELL = /^(?:(?:so[, ]+)?(?:(?:i['’]?m|i am)\s+)?(?:(?:doing|feeling|feel)\s+)?(?:great|good|well|fine|okay|ok|awesome|wonderful|pretty good|alright|all right)|all good|not bad)[.!?]*$/i;
 const THANKS = /^(?:thanks|thank you)(?: so much| very much| a lot)?(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
 const FAREWELL = /^(?:(?:okay|ok|thanks|thank you)[\s,.!?]+)*(?:good[ -]?bye|bye(?:[- ]bye)?|see you(?: later| soon| around)?|talk to you later|take care|good night)(?:[, ]+(?:sol|soul|saul))?[.!?]*$/i;
 const STARTERS = ['How am I doing today?', 'Why does CO2 cause headaches?', 'Start a mood check'];
@@ -151,6 +159,14 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
       sources: [{ label: 'Talk to someone now (action card)', route: '/assessment' }, { label: 'NASA behavioral health risk', url: 'https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders' }],
     };
   }
+  const emergency = matchEmergency(q);
+  if (emergency) {
+    const turn = emergencyTurn(emergency);
+    return {
+      kind: 'urgent', text: turn.text, steps: turn.steps, stepStart: turn.start, emergency: emergency.id,
+      sources: emergencySources(emergency),
+    };
+  }
   if (URGENT.test(q)) {
     return { kind: 'urgent', text: `${URGENT_CREW} Follow your crew’s emergency procedure. Don’t wait for a check-in or for Earth.`, sources: [{ label: 'Crew medical officer console', route: '/cmo' }] };
   }
@@ -177,7 +193,23 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
     return { kind: 'farewell', text: `Goodbye, ${firstName}. Take care!`, sources: [] };
   }
   if (HOW_ARE_YOU.test(q)) {
-    return { kind: 'help', text: 'I’m here and ready to help. How are you doing today?', sources: [], suggestions: STARTERS };
+    const hasUserWell = /\b(?:great|good|well|fine|okay|ok|awesome)\b/i.test(q);
+    return {
+      kind: 'help',
+      text: hasUserWell
+        ? `I’m glad to hear that, ${firstName}! I’m doing well too, thanks for asking. Ready to help with your check-in or show you around.`
+        : 'I’m here and ready to help. How are you doing today?',
+      sources: [],
+      suggestions: STARTERS,
+    };
+  }
+  if (USER_WELL.test(q)) {
+    return {
+      kind: 'help',
+      text: `Glad to hear you’re doing well, ${firstName}! I’m here whenever you want to log your check-in, review habitat air, or look over Sol 43.`,
+      sources: [],
+      suggestions: STARTERS,
+    };
   }
   if (THANKS.test(q)) {
     return { kind: 'help', text: 'You’re welcome! I’m here if you need anything else.', sources: [] };

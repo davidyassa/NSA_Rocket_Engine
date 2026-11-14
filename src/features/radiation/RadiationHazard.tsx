@@ -62,9 +62,11 @@ function fmtAvg(value: number | null, digits: number, unit: string) {
   return value === null ? 'Unavailable' : `${value.toFixed(digits)} ${unit}`;
 }
 
-export function RadiationHazard({ scenario, onInspectRoom }: {
+export function RadiationHazard({ scenario, onInspectRoom, command }: {
   scenario?: DemoScenario;
   onInspectRoom?: (roomId: string) => void;
+  /** External "click this compartment" signal from Sol's voice control. */
+  command?: { id: string; n: number };
 }) {
   // Scenario + sample live in the shared sim store so the dashboard shows the same condition.
   const activeScenarioKey = useRadiationSimStore((state) => state.scenarioKey);
@@ -182,6 +184,9 @@ export function RadiationHazard({ scenario, onInspectRoom }: {
   );
 
   useEffect(() => { onInspectRoom?.(selectedRoomId); }, [onInspectRoom, selectedRoomId]);
+  // Sol's voice can select a compartment ("open the storm shelter"); the nonce
+  // makes a repeated command for the same room re-fire.
+  useEffect(() => { if (command) setSelectedRoomId(command.id); }, [command]);
 
   const directionalEvent = useMemo(
     () => localizeDirectionalEvent(SPACECRAFT_COMPARTMENTS, telemetry),
@@ -557,6 +562,7 @@ export function RadiationHazard({ scenario, onInspectRoom }: {
             shelterSafe={shelterSafe}
             selectedRoomId={selectedRoomId}
             onSelectRoom={setSelectedRoomId}
+            focusCommand={command}
           />
 
           {/* Directional Event Localization HUD Box */}

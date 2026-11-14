@@ -48,7 +48,7 @@ function incidentCentroid(points: StationProjection[], firstHitRoomIds: string[]
 }
 
 export function RadiationStationMap({
-  snapshotByRoom, crew, directionalEvent, localization, shelterSafe, selectedRoomId, onSelectRoom,
+  snapshotByRoom, crew, directionalEvent, localization, shelterSafe, selectedRoomId, onSelectRoom, focusCommand,
 }: {
   snapshotByRoom: Record<string, CompartmentSnapshot>;
   crew: readonly CrewRadiationProfile[];
@@ -57,6 +57,8 @@ export function RadiationStationMap({
   shelterSafe: boolean;
   selectedRoomId: string;
   onSelectRoom: (id: string) => void;
+  /** External "focus this anchor" signal from Sol's voice control. */
+  focusCommand?: { id: string; n: number };
 }) {
   const hintId = useId();
   const { severity, primaryExposedModuleId, bearingDegrees } = directionalEvent;
@@ -69,6 +71,7 @@ export function RadiationStationMap({
         <InteractiveStation
           describedBy={hintId}
           anchors={ANCHORS}
+          focusCommand={focusCommand}
           incident={severity === 'NOMINAL' ? null : { roomId: primaryExposedModuleId, bearingDegrees }}
           renderOverlay={(points, focusAnchor) => {
             function selectSensor(id: string) {

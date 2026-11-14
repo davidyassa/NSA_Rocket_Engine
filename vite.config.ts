@@ -67,16 +67,31 @@ function phoneHttpsRedirectPlugin(): Plugin {
   };
 }
 
+/**
+ * The Sol voice server (voice-server/server.py: faster-whisper + Kokoro) listens on this
+ * laptop only. Dev and preview forward ./sol-voice/ to it, so phones reach it on the same
+ * https:// address as the app. If it is not running, the app uses its on-device voice models.
+ */
+const solVoiceProxy = {
+  '/sol-voice': {
+    target: `http://127.0.0.1:${process.env.SOL_VOICE_PORT ?? 8765}`,
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/sol-voice/, ''),
+  },
+};
+
 export default defineConfig({
   base: './',
   preview: {
     host: '0.0.0.0',
     port: 4173,
     allowedHosts: true,
+    proxy: solVoiceProxy,
   },
   server: {
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: solVoiceProxy,
   },
   plugins: [
     ...(useLocalHttps ? [basicSsl({ name: 'sol-check-local' })] : []),
@@ -110,14 +125,14 @@ export default defineConfig({
         importScripts: ['sw-esm-mime.js'],
         maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         globPatterns: [
-          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb,mp3}',
+          '**/*.{html,js,css,json,csv,svg,png,webp,woff,woff2,wasm,tflite,gz,glb,mp3,wav}',
           '**/+esm',
         ],
         // The voice models load on first use and are cached for later offline use.
-        globIgnores: ['**/vendor/whisper/**', '**/vendor/kokoro/onnx-community/**', '**/vendor/ort/**', '**/assets/ort-wasm*'],
+        globIgnores: ['**/vendor/whisper/**', '**/vendor/moonshine/**', '**/vendor/kokoro/onnx-community/**', '**/vendor/piper/*.onnx', '**/vendor/ort/**', '**/assets/ort-wasm*'],
         runtimeCaching: [
           {
-            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/vendor\/(whisper|kokoro\/onnx-community|ort)\//.test(url.pathname),
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/vendor\/(whisper|moonshine|piper|kokoro\/onnx-community|ort)\//.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'sol-check-voice-model', cacheableResponse: { statuses: [0, 200] } },
           },

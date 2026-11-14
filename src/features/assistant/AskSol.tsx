@@ -9,6 +9,8 @@ import { converse, newDialogue, type DialogueAction } from './dialogue';
 import { SolBubble } from './SolBubble';
 import { VoiceMode } from './VoiceMode';
 import { VoiceSettings } from './VoiceSettings';
+import { ReplySteps } from './ReplySteps';
+import { spokenText } from './spoken';
 import { enableVoiceAudio, speak } from './voiceOutput';
 import './askSol.css';
 
@@ -52,12 +54,12 @@ export function AskSol({ ctx, onAction }: {
     setMessages((list) => [...list, { id: nextId.current++, role: 'user', text: question }, { id: nextId.current++, role: 'assistant', reply }]);
   }
 
-  function say(text: string) {
+  function say(text: string, urgent = false) {
     if (!readAloud) return;
     playback.current?.abort();
     const speech = new AbortController();
     playback.current = speech;
-    void speak(text, speech.signal);
+    void speak(text, speech.signal, { urgent });
   }
 
   function ask(question: string) {
@@ -73,7 +75,7 @@ export function AskSol({ ctx, onAction }: {
       return;
     }
     if (turn.action) onAction(turn.action);
-    say(reply.text);
+    say(spokenText(reply), reply.kind === 'urgent' || reply.kind === 'crisis');
     if (reply.kind === 'mood_start') setMood({ step: 0, answers: {} });
     else if (reply.kind === 'crisis') setMood(null);
   }
@@ -88,7 +90,7 @@ export function AskSol({ ctx, onAction }: {
       setMood(null);
       const reply = moodReply(answers);
       addExchange(label, reply);
-      say(reply.text);
+      say(spokenText(reply));
     }
   }
 
@@ -126,7 +128,7 @@ export function AskSol({ ctx, onAction }: {
                 <li key={message.id} className="ask-msg ask-msg-user"><p>{message.text}</p></li>
               ) : (
                 <li key={message.id} className={`ask-msg ask-msg-sol kind-${message.reply.kind}`}>
-                  <p>{message.reply.text}</p>
+                  {message.reply.steps?.length ? <ReplySteps reply={message.reply} /> : <p>{message.reply.text}</p>}
                   {message.reply.sources.length > 0 && (
                     <ul className="ask-sources" aria-label="Where this answer comes from">
                       {message.reply.sources.map((source, i) => (

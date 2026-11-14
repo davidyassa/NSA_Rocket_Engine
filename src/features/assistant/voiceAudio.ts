@@ -13,11 +13,29 @@ export function resampleTo16k(input: Float32Array, inputRate: number): Float32Ar
   const ratio = inputRate / MODEL_SAMPLE_RATE;
   const length = Math.floor(input.length / ratio);
   const out = new Float32Array(length);
+  if (ratio <= 1) {
+    for (let i = 0; i < length; i += 1) {
+      const pos = i * ratio;
+      const j = Math.floor(pos);
+      const k = pos - j;
+      out[i] = input[j] * (1 - k) + (input[j + 1] ?? input[j]) * k;
+    }
+    return out;
+  }
+  // Downsampling: average each output sample's window of input samples. This
+  // filters out the hiss above 8 kHz that would otherwise fold back into the
+  // speech band and blur consonants ("Sol" vs "so"), so transcription is cleaner.
   for (let i = 0; i < length; i += 1) {
-    const pos = i * ratio;
-    const j = Math.floor(pos);
-    const k = pos - j;
-    out[i] = input[j] * (1 - k) + (input[j + 1] ?? input[j]) * k;
+    const from = i * ratio;
+    const to = Math.min(input.length, from + ratio);
+    let sum = 0;
+    let weight = 0;
+    for (let j = Math.floor(from); j < to; j += 1) {
+      const w = Math.min(j + 1, to) - Math.max(j, from);
+      sum += input[j] * w;
+      weight += w;
+    }
+    out[i] = weight ? sum / weight : 0;
   }
   return out;
 }
@@ -68,6 +86,24 @@ export class SpeechSegmenter {
   }
 
   get level(): number { return this.floor; }
+  get isSpeaking(): boolean { return this.speaking; }
+  get currentSpeechDurationMs(): number { return Math.max(0, this.speechMs - this.quietMs); }
+
+  /**
+   * Aegis-Zero helper: snapshot speech audio while speaker is mid-utterance.
+   * Enables speculative streaming inference before speech_end triggers.
+   */
+  getSnapshotAudio(minMs = 280): Float32Array | null {
+    if (!this.speaking || this.speechMs < minMs || this.chunks.length === 0) return null;
+    const total = this.chunks.reduce((sum, c) => sum + c.length, 0);
+    const snapshot = new Float32Array(total);
+    let offset = 0;
+    for (const c of this.chunks) {
+      snapshot.set(c, offset);
+      offset += c.length;
+    }
+    return snapshot;
+  }
 
   reset() {
     this.loudMs = 0; this.quietMs = 0; this.speaking = false; this.chunks = []; this.speechMs = 0; this.preRoll = []; this.preRollMs = 0;

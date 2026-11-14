@@ -4,6 +4,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-r
 import { isNavItemActive } from './navigation';
 import { radiationSimCondition, useRadiationSimStore } from '../features/radiation/radiationSimStore';
 import { SPACECRAFT_COMPARTMENTS } from '../features/radiation/radiationData';
+import { guideFor } from '../features/assistant/pageGuides';
 import type { CheckinEntry } from '../contracts';
 import rocketEngineMark from '../ui/assets/nasa/rocket-engine.webp';
 import { RADLAB_MANIFEST } from '../data/nasa';
@@ -108,9 +109,11 @@ export function App() {
   const [checkinDraft, setCheckinDraft] = useState<MissionEvidence['checkinDraft']>();
   const [officerReview, setOfficerReview] = useState<MissionEvidence['officerReview']>();
   const [controlled, setControlled] = useState(false);
+  const [controlLabel, setControlLabel] = useState('');
   const controlTimer = useRef<number>(0);
   const [voiceDraft, setVoiceDraft] = useState<{ scope: string; patches: NonNullable<DialogueAction['checkin']>[] }>();
   const [radiationRoom, setRadiationRoom] = useState('flight-deck');
+  const [roomCommand, setRoomCommand] = useState<{ id: string; n: number }>();
   const resetDialog = useRef<HTMLDialogElement>(null);
   const glossaryDialog = useRef<HTMLDialogElement>(null);
   const main = useRef<HTMLElement>(null);
@@ -165,9 +168,10 @@ export function App() {
 
   function applySolAction(action: DialogueAction) {
     window.clearTimeout(controlTimer.current);
-    setControlled(true);
-    controlTimer.current = window.setTimeout(() => setControlled(false), 2200);
+    const behavior: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+    let label = 'Sol is here';
     if (action.checkin) {
+      label = 'Filling in your check-in';
       const patch = action.checkin;
       setVoiceDraft(previous => ({
         scope: draftScope,
@@ -175,17 +179,50 @@ export function App() {
       }));
     }
     if (action.routine) {
+      label = 'Updating your checklist';
       const { id, checked } = action.routine;
       const item = routine.find(entry => entry.id === id);
       if (item && !item.recorded && item.checked !== checked) useMissionStore.getState().toggleChecklistItem(id, sol);
     }
     if (action.scroll) {
-      const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+      label = action.scroll === 'top' ? 'Scrolling to the top' : action.scroll === 'bottom' ? 'Scrolling to the bottom' : `Scrolling ${action.scroll}`;
       if (action.scroll === 'top' || action.scroll === 'bottom') window.scrollTo({ top: action.scroll === 'top' ? 0 : document.documentElement.scrollHeight, behavior });
       else window.scrollBy({ top: (action.scroll === 'up' ? -1 : 1) * window.innerHeight * 0.8, behavior });
     }
-    if (action.timeline) setTimelineControl({ action: action.timeline });
-    if (action.navigate) navigate(action.navigate);
+    if (typeof action.scrollLines === 'number' && action.scrollLines !== 0) {
+      label = `Scrolling ${action.scrollLines < 0 ? 'up' : 'down'} ${Math.abs(action.scrollLines)} line${Math.abs(action.scrollLines) === 1 ? '' : 's'}`;
+      const parsed = parseFloat(getComputedStyle(document.body).lineHeight);
+      const lineHeight = Number.isFinite(parsed) ? parsed : 24;
+      window.scrollBy({ top: action.scrollLines * lineHeight, behavior });
+    }
+    if (action.scrollTo) {
+      label = `Scrolling to ${action.scrollTo}`;
+      const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const want = norm(action.scrollTo);
+      if (want) {
+        const candidates = Array.from(document.querySelectorAll<HTMLElement>('[data-scroll-target],h1,h2,h3,h4,h5,h6,[id]'));
+        const hit = candidates.find((element) => {
+          const text = norm(element.getAttribute('data-scroll-target') || element.id || element.textContent || '');
+          return text.length > 1 && (text === want || text.includes(want) || want.includes(text));
+        });
+        hit?.scrollIntoView({ behavior, block: 'start' });
+      }
+    }
+    if (action.radiationRoom) {
+      const name = SPACECRAFT_COMPARTMENTS.find((room) => room.id === action.radiationRoom)?.name ?? 'the compartment';
+      label = `Opening ${name}`;
+      setRadiationRoom(action.radiationRoom);
+      setRoomCommand((previous) => ({ id: action.radiationRoom!, n: (previous?.n ?? 0) + 1 }));
+    }
+    if (action.timeline) { label = 'Controlling the timeline'; setTimelineControl({ action: action.timeline }); }
+    if (action.navigate) {
+      if (action.navigateLabel) label = action.navigateLabel;
+      else if (label === 'Sol is here') label = `Opening ${guideFor(action.navigate.split('?')[0]).name}`;
+      navigate(action.navigate);
+    }
+    setControlLabel(label);
+    setControlled(true);
+    controlTimer.current = window.setTimeout(() => setControlled(false), 2600);
   }
   useEffect(() => () => window.clearTimeout(controlTimer.current), []);
   useEffect(() => {
@@ -315,7 +352,7 @@ export function App() {
             <Route path="/cognitive" element={<CognitiveLab key={`${scenarioId}:${sol}:${revision}`} currentSol={sol}
               history={vigilance} onSave={(session) => saveVigilance(scenarioId, session)} />} />
             <Route path="/hazards" element={<NasaHazards />} />
-            <Route path="/hazards/radiation" element={<RadiationHazard scenario={scenario} onInspectRoom={setRadiationRoom} />} />
+            <Route path="/hazards/radiation" element={<RadiationHazard scenario={scenario} onInspectRoom={setRadiationRoom} command={roomCommand} />} />
             <Route path="/radiation" element={<Navigate to="/hazards/radiation" replace />} />
             <Route path="/space-radiation" element={<Navigate to="/hazards/radiation" replace />} />
             <Route path="/hazards/distance" element={<DistanceHazard scenario={scenario} />} />
@@ -371,7 +408,12 @@ export function App() {
       </div>
 
       <SolDock ctx={assistantContext} onAction={applySolAction} />
-      {controlled && <div className="sol-control-bar" role="status"><span className="sr-only">Sol is controlling this page</span></div>}
+      {controlled && (
+        <div className="sol-island" role="status">
+          <span className="sol-island-dot" aria-hidden="true"><span className="sol-island-dot-glow" /></span>
+          <span className="sol-island-label">{controlLabel || 'Sol is here'}</span>
+        </div>
+      )}
 
       <dialog className="reset-dialog glossary-dialog" ref={glossaryDialog} aria-labelledby="glossary-title">
         <button type="button" className="dialog-close" aria-label="Close" onClick={() => glossaryDialog.current?.close()}>

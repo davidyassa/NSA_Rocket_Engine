@@ -4,12 +4,15 @@ import type { MoodMcqAnswers } from '../checkin/moodAssessment';
 import type { KnowledgeIndex } from './knowledge';
 import { MOOD_QUESTIONS, moodQuestionSpeech, moodReply, parseMoodAnswer } from './mood';
 import { type AssistantContext, type AssistantReply } from './respond';
-import { converse, newDialogue, type DialogueAction } from './dialogue';
+import { converse, newDialogue, speculateIntent, type DialogueAction } from './dialogue';
+import { ReplySteps } from './ReplySteps';
+import { spokenText } from './spoken';
 import { SolBubble } from './SolBubble';
 import { setVoiceModeOpen } from './solListener';
 import { speechToText } from './speechToText';
 import { SpeechSegmenter, resampleTo16k } from './voiceAudio';
-import { prepareVoice, speak, stopSpeaking } from './voiceOutput';
+import { isSpeaking, prepareVoice, speak, stopSpeaking, triggerBargeIn } from './voiceOutput';
+import { createVocalDetector, type VocalDetectorNode } from './bargeInWorklet';
 import './voiceMode.css';
 
 type Phase = 'loading' | 'listening' | 'hearing' | 'thinking' | 'speaking' | 'error';
@@ -53,6 +56,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
     let startupFailed = false;
     let stream: MediaStream | null = null;
     let audio: AudioContext | null = null;
+    let vocalDetector: VocalDetectorNode | null = null;
     const playback = new AbortController();
     busy.current = true;
     prepareVoice();
@@ -66,12 +70,12 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
       const state = mood.current;
       if (next.kind === 'farewell' || next.kind === 'crisis' || next.kind === 'urgent') {
         mood.current = null;
-        speech = next.text;
+        speech = spokenText(next);
       } else if (state) {
         const score = parseMoodAnswer(text, state.step);
         if (score === null) {
           next = { kind: 'help', text: 'Sorry, I didn’t catch that. Say a number from 1 to 5.', sources: [] };
-          speech = next.text;
+          speech = spokenText(next);
         } else {
           const answers = { ...state.answers, [MOOD_QUESTIONS[state.step].id]: score };
           if (state.step + 1 < MOOD_QUESTIONS.length) {
@@ -81,18 +85,18 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
           } else {
             mood.current = null;
             next = moodReply(answers);
-            speech = next.text;
+            speech = spokenText(next);
           }
         }
       } else {
-        speech = next.text;
+        speech = spokenText(next);
         if (next.kind === 'mood_start') { mood.current = { step: 0, answers: {} }; speech = `${next.text} ${moodQuestionSpeech(0)}`; }
       }
       onExchange(text, next);
       setReply(next);
       if (!state && turn.action && !turn.action.navigate) actionRef.current(turn.action);
       setPhase('speaking');
-      await speak(speech, playback.signal);
+      await speak(speech, playback.signal, { urgent: next.kind === 'urgent' || next.kind === 'crisis' });
       if (cancelled) return;
       if (next.kind === 'farewell') { onClose(); return; }
       if (!state && turn.action?.navigate && turn.action.navigate !== '/assistant') {
@@ -113,7 +117,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
             if (cancelled || startupFailed) mic.getTracks().forEach((track) => track.stop());
             else stream = mic;
           }),
-          speechToText.load((p) => !cancelled && setProgress(p)),
+          speechToText.prepare((p) => !cancelled && setProgress(p)),
         ]);
         if (cancelled || !stream) return;
         audio = new AudioContext();
@@ -123,19 +127,64 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
         const processor = audio.createScriptProcessor(2048, 1, 1);
         const segmenter = new SpeechSegmenter(audio.sampleRate);
         const rate = audio.sampleRate;
+
+        // Real-time AudioWorklet Vocal Barge-in: instant zero-click interruption of assistant speech
+        try {
+          vocalDetector = await createVocalDetector(audio, source, () => {
+            // Only interrupt real speech; emergency steps ignore noise (a tap still stops them).
+            if (busy.current && isSpeaking() && triggerBargeIn()) {
+              busy.current = false;
+              segmenter.reset();
+              setPhase('hearing');
+            }
+          });
+        } catch (detectorErr) {
+          console.warn('[VoiceMode] Vocal barge-in detector failed to initialize:', detectorErr);
+        }
+
+        let lastSpeculativeMs = 0;
+        let speculativePending = false;
+
         processor.onaudioprocess = (event) => {
-          if (cancelled || busy.current) return;
+          if (cancelled) return;
+          if (busy.current) return;
+
           const data = new Float32Array(event.inputBuffer.getChannelData(0));
           const result = segmenter.push(data);
+
+          // Pre-load the page a command is heading to while the person is still talking.
+          // Only a hint: actions always come from the full, final transcript.
+          if (segmenter.isSpeaking && !speculativePending) {
+            const duration = segmenter.currentSpeechDurationMs;
+            if (duration >= 700 && duration - lastSpeculativeMs >= 1200) {
+              const snapshot = segmenter.getSnapshotAudio(600);
+              if (snapshot) {
+                lastSpeculativeMs = duration;
+                speculativePending = true;
+                speechToText.transcribeSpeculative(resampleTo16k(snapshot, rate)).then((partialText) => {
+                  if (partialText && partialText.length > 3) speculateIntent(partialText, window.location.pathname);
+                }).catch(() => undefined).finally(() => { speculativePending = false; });
+              }
+            }
+          }
+
           if (!result) return;
-          if (result.type === 'speech_start') setPhase('hearing');
-          else if (result.type === 'discarded') setPhase('listening');
-          else {
+          if (result.type === 'speech_start') {
+            lastSpeculativeMs = 0;
+            setPhase('hearing');
+          } else if (result.type === 'discarded') {
+            setPhase('listening');
+          } else {
             busy.current = true;
             setPhase('thinking');
             speechToText.transcribe(resampleTo16k(result.audio, rate)).then((text) => {
               if (cancelled) return;
-              if (!text || NOISE.test(text)) { segmenter.reset(); busy.current = false; setPhase('listening'); return; }
+              if (!text || NOISE.test(text)) {
+                segmenter.reset();
+                busy.current = false;
+                setPhase('listening');
+                return;
+              }
               setHeard(text);
               return answer(text, segmenter);
             }).catch(() => {
@@ -149,7 +198,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
         source.connect(processor);
         processor.connect(audio.destination);
         const first = ctxRef.current.crewName.split(' ')[0];
-        const hello = `Hi ${first}, I'm listening. Ask me about your health, your check-in, or the mission.`;
+        const hello = `Hi ${first}, I'm listening.`;
         setReply({ kind: 'help', text: hello, sources: [] });
         setPhase('speaking');
         await speak(hello, playback.signal);
@@ -177,6 +226,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
       cancelled = true;
       window.removeEventListener('keydown', onKey);
       playback.abort();
+      vocalDetector?.disconnect();
       stream?.getTracks().forEach((track) => track.stop());
       void audio?.close().catch(() => undefined);
       setVoiceModeOpen(false);
@@ -202,7 +252,9 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
         {phase === 'error' ? <p className="voice-error">{error}</p> : (
           <>
             {heard && <p className="voice-you"><span>You</span> {heard}</p>}
-            {reply && <p className="voice-sol"><span>Sol</span> {reply.text}</p>}
+            {reply && (reply.steps?.length
+              ? <ReplySteps reply={reply} className="voice-sol" />
+              : <p className="voice-sol"><span>Sol</span> {reply.text}</p>)}
             {reply && reply.sources.length > 0 && <p className="voice-sources">From: {reply.sources.map((s) => s.label).join(' · ')}</p>}
           </>
         )}

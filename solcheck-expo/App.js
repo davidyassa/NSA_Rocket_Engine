@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, SafeAreaView, StatusBar, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useCameraPermissions } from 'expo-camera';
+import { APP_URL } from './appUrl';
 
-const HTTPS_URL = 'https://assume-olympics-connector-cotton.trycloudflare.com/';
+const HTTPS_URL = APP_URL;
 const LOCAL_WIFI_URL = 'http://10.52.237.41:4173/';
 
 export default function App() {

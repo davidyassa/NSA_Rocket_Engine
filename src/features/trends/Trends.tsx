@@ -204,13 +204,26 @@ export function Trends({ records, vigilance, sol }: {
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryMetric = searchParams.get('metric');
-  const metric = indicators.find((id) => id === queryMetric) ?? 'sleep_duration';
+  const queryCategory = searchParams.get('category');
+  const validCategory = TREND_CATEGORIES.find((cat) => cat.id === queryCategory)?.id;
+  const defaultMetric: Indicator = validCategory ? indicatorsInCategory(validCategory)[0] : 'sleep_duration';
+  const metric = indicators.find((id) => id === queryMetric) ?? defaultMetric;
   const [showAll, setShowAll] = useState(false);
   const tabs = useRef<HTMLDivElement>(null);
   const categoryTabs = useRef<HTMLDivElement>(null);
   // The selected indicator (URL) decides the category, so deep links like ?metric=mood still work.
   const category = trendCategoryOf(metric);
   const categoryIndicators = useMemo(() => indicatorsInCategory(category), [category]);
+
+  useEffect(() => {
+    const list = categoryTabs.current;
+    const selected = list?.querySelector('[aria-selected="true"]');
+    if (!list || !selected) return;
+    const tab = selected.getBoundingClientRect();
+    const viewport = list.getBoundingClientRect();
+    if (tab.left < viewport.left) list.scrollLeft += tab.left - viewport.left;
+    if (tab.right > viewport.right) list.scrollLeft += tab.right - viewport.right;
+  }, [category]);
 
   useEffect(() => {
     const list = tabs.current;
@@ -223,7 +236,7 @@ export function Trends({ records, vigilance, sol }: {
   }, [metric]);
 
   function chooseMetric(id: Indicator) {
-    if (id !== metric) setSearchParams({ metric: id });
+    if (id !== metric) setSearchParams({ category: trendCategoryOf(id), metric: id });
   }
 
   function chooseCategory(id: TrendCategory) {

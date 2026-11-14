@@ -21,7 +21,7 @@ Maya Chen has just spent two sols in storm shelter. She logs **4.5 hours of slee
 | **Personal check-ins and trends** | Record pulse, cuff blood pressure, temperature, glucose, sleep, mood, and symptoms, plus optional observations such as standing vitals, fluid and food intake, exercise, body mass, breathing rate, and heart-rate variability. Explore trends from the interactive 3D astronaut or its accessible health links. The rule engine uses the preceding 14 sols and requires at least five usable measured sols for a baseline. |
 | **Explainable review and follow-up** | Inspect the readings, rule, and source behind a finding. Acknowledge follow-up tasks, record actions, and review data quality and onboard supplies in the CMO console. Export a JSON handoff or Markdown briefing and rehearse a delayed ground exchange entirely on the device. |
 | **Guided camera and voice checks** | Run an optional on-device face check for pulse and, when signal quality permits, breathing rate and estimated HRV. Review and explicitly adopt estimates before saving. The optional mood voice check compares pitch variation, speaking pace, and pauses with the crew member’s own history. Raw camera and microphone recordings are processed locally and are not retained in the check-in. |
-| **Ask Sol, by voice or text** | Ask about readings, follow-ups, habitat conditions, or the current page. Say “Hey Sol, log my check-in” to draft fields, or “select Sol 41” to navigate hands-free. You review and save the draft. Answers come from local records, curated material, and deterministic rules. Whisper handles English speech recognition and Kokoro reads replies aloud on the device. |
+| **Ask Sol, by voice or text** | Ask about readings, follow-ups, habitat conditions, or the current page. Say “Hey Sol, log my check-in” to draft fields, “select Sol 41”, or “navigate to cardiovascular trends on the trends page” to navigate to subpages and category views hands-free with computer-use island feedback. You review and save the draft. Answers come from local records, curated material, and deterministic rules. Moonshine and Whisper handle English speech recognition and the Piper “lessac” voice reads short spoken versions of replies aloud on the device (the full answer stays on screen). |
 | **Five hazards and a radiation simulator** | Explore NASA’s five hazards through the indicators the app can review. Run and save a vigilance check, plan isolation countermeasures, and revisit results across sols. Replay simulated radiation, CO₂, and temperature by compartment on an ISS-based map with event localization, dose budgets, access restrictions, and modelled shelter routes. Browse the interactive ISS model and mission gallery in **Demo and data**. |
 | **Replay, export, and reset** | Follow four timeline lanes covering crew readings, mission events, habitat air, and the Curiosity archive. Download the active scenario’s check-in history as JSON. Switch among the Sol 43, routine, and bad-entry scenarios to rehearse different outcomes. |
 
@@ -56,6 +56,17 @@ npm run preview
 ```
 
 Open [http://localhost:4173](http://localhost:4173). To rehearse offline, first wait for **Demo and data → Ready to run offline** in the production browser build. The web speech models load and cache on first use, so exercise recognition and spoken replies while connected if you plan to use them offline. Camera and microphone access require localhost or HTTPS and device permission. Foreground “Hey Sol” listening is enabled by default and can be turned off in voice settings. Saved records stay in local app storage. Ground exchange is simulated, and exports are local files.
+
+### Faster voice (optional)
+
+For the fastest, most accurate Sol, run the local voice server next to the app. It uses [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (small.en) to listen and the same Piper voice to speak, on this laptop only. Requires Python 3.10–3.13.
+
+```sh
+npm run voice:setup     # once: creates voice-server/.venv and installs faster-whisper + kokoro-onnx
+npm run voice:server    # downloads the small.en model the first time, then works offline
+```
+
+`npm run dev` and `npm run preview` forward `/sol-voice/` to it, so phones on the same Wi-Fi use it too. Add `-- --model base.en` for even faster, slightly less accurate listening, or `-- --voice kokoro` for the older, softer voice. When the server is not running, Sol uses its on-device models automatically.
 
 For development, run `npm run dev`. For packaged offline builds, the Capacitor iOS and Android shells include the app and models. [Mobile build and device guide](docs/mobile-roadmap.md)
 
