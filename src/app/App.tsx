@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BookOpen, Brain, ChartNoAxesCombined, ChevronDown, ClipboardList, Database, Ellipsis, Info, LayoutGrid, MessagesSquare, Radiation, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
+import { Activity, Brain, ChartNoAxesCombined, ChevronDown, ClipboardList, Database, Ellipsis, Info, LayoutGrid, MessagesSquare, Radiation, Route as RouteIcon, RotateCcw, ShieldAlert, ShieldCheck, Stethoscope, X } from 'lucide-react';
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { isNavItemActive } from './navigation';
 import { radiationSimCondition, useRadiationSimStore } from '../features/radiation/radiationSimStore';
@@ -25,7 +25,7 @@ import { radlabEventSol } from '../sim';
 import { DemoData } from './DemoData';
 import { RouteErrorBoundary, lazyWithReload } from './lazyRoute';
 import { confirmTap } from './native';
-import { GLOSSARY } from '../content/plainLanguage';
+// import { GLOSSARY } from '../content/plainLanguage';
 import { activeSol, useMissionStore } from './store';
 import { tasksForScenario, useFollowUpStore } from '../features/followups/useFollowUpStore';
 import { AskSol } from '../features/assistant/AskSol';
@@ -228,7 +228,6 @@ export function App() {
   useEffect(() => {
     if (pathname !== '/timeline') setTimelineControl(undefined);
   }, [pathname]);
-  const initials = profile.displayName.split(' ').map((part) => part[0]).join('');
 
   useEffect(() => {
     document.title = `Sol Check · ${section}`;
@@ -320,12 +319,6 @@ export function App() {
       </aside>
 
       <div className="work-area">
-        <header className="topbar">
-          <Link to="/" className="mobile-wordmark" aria-label="Sol Check dashboard"><img src={rocketEngineMark} alt="" /></Link>
-          <button type="button" className="glossary-button" onClick={() => glossaryDialog.current?.showModal()}>
-            <BookOpen size={16} aria-hidden="true" /> <span>Words explained</span>
-          </button>
-        </header>
         <main className="main-content" data-route={pathname} id="main-content" ref={main} tabIndex={-1}>
           {warning && <p className="storage-warning" role="alert">{warning}</p>}
           <Routes>
@@ -406,25 +399,6 @@ export function App() {
           <span className="sol-island-label">{controlLabel || 'Sol is here'}</span>
         </div>
       )}
-
-      <dialog className="reset-dialog glossary-dialog" ref={glossaryDialog} aria-labelledby="glossary-title">
-        <button type="button" className="dialog-close" aria-label="Close" onClick={() => glossaryDialog.current?.close()}>
-          <X size={20} />
-        </button>
-        <h2 id="glossary-title">Words explained</h2>
-        <p>Health words used in Sol Check, in everyday language.</p>
-        <dl className="glossary-list">
-          {GLOSSARY.map(({ term, meaning }) => (
-            <div key={term}>
-              <dt>{term}</dt>
-              <dd>{meaning}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="dialog-actions">
-          <button type="button" className="button button-secondary" autoFocus onClick={() => glossaryDialog.current?.close()}>Close</button>
-        </div>
-      </dialog>
 
       <dialog className="reset-dialog" ref={resetDialog} aria-labelledby="reset-title">
         <button type="button" className="dialog-close" aria-label="Close" onClick={() => resetDialog.current?.close()}>
