@@ -366,9 +366,9 @@ MEASUREMENT_GUIDES.exercise_minutes = {
 };
 
 MEASUREMENT_GUIDES.respiratory_rate = {
-  text: 'Measured by the camera from tiny changes in your pulse as you breathe. Or count breaths for 60 seconds.',
+  text: 'Measured by the camera from your chest’s movement, cross-checked with the pulse in your face. Or count breaths for 60 seconds.',
   steps: [
-    'Tap "Measure breathing & HRV" and keep your face in the oval for about 45 seconds.',
+    'On the Breath rate page, tap “Start breathing scan”, sit an arm’s length away with your face and chest in view, and hold still for about 45 seconds.',
     'Breathe normally through your nose. Do not slow down or speed up on purpose.',
     'No camera? Ask a crewmate to count how many times your chest rises in 60 seconds.',
   ],
@@ -378,9 +378,9 @@ MEASUREMENT_GUIDES.respiratory_rate = {
   sourceId: 'ppg-respiratory-fusion',
 };
 MEASUREMENT_GUIDES.hrv_rmssd = {
-  text: 'Heart rate variability: how much the gap between heartbeats changes. Measured by the camera together with breathing rate.',
+  text: 'Heart rate variability describes how much the gap between heartbeats changes. The same camera scan may estimate it.',
   steps: [
-    'Use the same camera check as breathing rate (about 45 seconds, sitting still).',
+    'Enter a reading from a heart rate monitor or chest strap; the check-in no longer asks for HRV.',
     'Measure at the same time each day, before exercise or coffee, so readings compare fairly.',
     'Sol Check compares HRV only with your own usual, never with other people.',
   ],

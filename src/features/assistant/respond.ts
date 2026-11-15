@@ -26,6 +26,8 @@ export interface AssistantContext {
   assessment: RiskAssessment | null;
   history: readonly DailyCheckin[];
   mission?: MissionEvidence;
+  /** Emergency Mode on screen: 'alert' (red) or 'safe' (green) */
+  emergencyMode?: 'alert' | 'safe';
 }
 
 export type ReplyKind = 'help' | 'farewell' | 'crisis' | 'urgent' | 'declined' | 'personal' | 'answer' | 'out_of_scope' | 'mood_start';
@@ -104,7 +106,6 @@ function personalMetric(metric: MetricId, ctx: AssistantContext): AssistantReply
     : 'There are not enough earlier readings yet to know your usual.');
   const related = ctx.assessment?.findings.filter((f) => f.baselineUsed.some((b) => b.metric === metric) || f.inputMeasurementIds.includes(reading.id)) ?? [];
   parts.push(related.length ? related.map((f) => plainFinding(f)).join(' ') : 'Sol Check found nothing unusual about it today.');
-  if (reading.provenance === 'synthetic_demo') parts.push('(This is a synthetic demo reading.)');
   return { kind: 'personal', text: parts.join(' '), sources: [{ label: `Your Sol ${ctx.latest.sol} assessment`, route: '/assessment' }] };
 }
 
@@ -237,7 +238,7 @@ export function respond(question: string, ctx: AssistantContext, index: Knowledg
       const top = ctx.latest && usableMeasurement(ctx.latest, standing ? 'bp_systolic_standing' : 'bp_systolic');
       const bottom = ctx.latest && usableMeasurement(ctx.latest, standing ? 'bp_diastolic_standing' : 'bp_diastolic');
       return { kind: 'personal', text: top && bottom
-        ? `Your ${standing ? 'standing' : 'seated'} blood pressure on Sol ${ctx.latest?.sol} was ${top.value} over ${bottom.value} millimetres of mercury.${[top, bottom].some(x => x.provenance === 'synthetic_demo') ? ' This pair includes demo data.' : ''}`
+        ? `Your ${standing ? 'standing' : 'seated'} blood pressure on Sol ${ctx.latest?.sol} was ${top.value} over ${bottom.value} millimetres of mercury.`
         : 'There is no complete usable blood pressure pair in your latest saved check-in.', sources: [{ label: 'Your check-in', route: '/check-in' }] };
     }
     const metric = METRIC_WORDS.find(([pattern]) => pattern.test(q))?.[1];

@@ -92,7 +92,7 @@ function buildDocs(): KnowledgeDoc[] {
 
   docs.push({
     id: 'mission:camera', kind: 'mission', title: 'How accurate is the camera heart rate, breathing and HRV',
-    text: 'The camera reads tiny colour changes in the skin of your face, on the device. On test videos with a known pulse (82, 67 and 104 beats per minute at 24, 15 and 30 frames per second) Sol Check read each one exactly in about 15 seconds. A number is only shown when the signal passes quality checks; otherwise you get advice and no number. Breathing rate needs two of three breathing effects on the pulse to agree. It is a camera estimate, not a medical device: a comparison with a fingertip pulse oximeter on 5 to 10 people is the next step, and a fingertip oximeter is itself accurate to about 2 to 3 beats per minute.',
+    text: 'The camera reads tiny colour changes in the skin of your face, on the device. On test videos with a known pulse (82, 67 and 104 beats per minute at 24, 15 and 30 frames per second) Sol Check read each one exactly in about 15 seconds. The check-in estimates breathing rate from slower changes in the same pulse waveform over 25 to 30 seconds. A number is only shown when the signal passes quality checks. The breathing estimate has been tested with synthetic signals.',
     cite: { label: 'Sol Check camera validation', route: '/check-in' },
   });
   docs.push({
@@ -107,8 +107,8 @@ function buildDocs(): KnowledgeDoc[] {
   });
   docs.push({
     id: 'mission:sol43', kind: 'mission', title: 'The Sol 43 story: after the solar storm',
-    text: 'Maya Chen is a synthetic crew member at a habitat in Gale Crater. On Sol 41 a real solar storm (replayed from Curiosity data) sent the crew into a shelter for two days. Since then her sleep and mood have been below her usual, her heart rate variability dropped, she ate less, exercise was short, and headaches came on sols with high cabin CO2. Sol Check suggests she talks to the crew medical officer today.',
-    cite: { label: 'Sol Check demo scenario (synthetic)', route: '/assessment' },
+    text: 'Maya Chen is a crew member at a habitat in Gale Crater. On Sol 41 a real solar storm (replayed from Curiosity data) sent the crew into a shelter for two days. Since then her sleep and mood have been below her usual, her heart rate variability dropped, she ate less, exercise was short, and headaches came on sols with high cabin CO2. Sol Check suggests she talks to the crew medical officer today.',
+    cite: { label: 'Sol 43 mission scenario', route: '/assessment' },
   });
   return docs;
 }

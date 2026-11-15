@@ -1,17 +1,19 @@
 /**
  * Optional Sol voice server (voice-server/server.py): faster-whisper for listening and
- * Kokoro for speaking, on a laptop next to the app. Much faster and more accurate than
- * the on-device models. When it is not running, every caller falls back to the
- * on-device models, so Sol always works offline.
+ * Piper for speaking, on a laptop next to the web app. When it is not running,
+ * the web app falls back to the on-device models. The packaged apps always use
+ * their own models.
  *
  * Address: the dev/preview server proxies it at ./sol-voice/ (same origin, works over
  * HTTPS on phones). Override with VITE_SOL_VOICE_URL at build time, or the
- * `sol-check:voice-server` local-storage key (e.g. for the native app).
+ * `sol-check:voice-server` local-storage key.
  */
+import { isNativeApp } from '../../app/native';
 
 const KEY = 'sol-check:voice-server';
 
 function baseUrl(): string {
+  if (isNativeApp) throw new Error('The packaged app uses bundled voice models');
   let saved: string | null = null;
   try { saved = localStorage.getItem(KEY); } catch { /* storage unavailable */ }
   const configured = saved || (import.meta.env.VITE_SOL_VOICE_URL as string | undefined);
@@ -55,7 +57,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number, sign
 
 /** True when the voice server answers. Cached, so it is cheap to call before every phrase. */
 export function voiceServerAvailable(): Promise<boolean> {
-  if (typeof fetch === 'undefined' || typeof document === 'undefined') return Promise.resolve(false);
+  if (isNativeApp || typeof fetch === 'undefined' || typeof document === 'undefined') return Promise.resolve(false);
   if (state && Date.now() - state.at < (state.up ? TRUST_UP_MS : RETRY_DOWN_MS)) return Promise.resolve(state.up);
   probing ??= fetchWithTimeout(`${baseUrl()}health`, {}, HEALTH_TIMEOUT_MS)
     .then(async (response) => response.ok && (await response.json() as { ok?: boolean }).ok === true)

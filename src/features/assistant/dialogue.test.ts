@@ -147,7 +147,9 @@ describe('Ask Sol conversation (the transcript that went wrong)', () => {
     const urgent = converse('Log my check-in. I have chest pain and my pulse is 82.', newDialogue(), ctx, index);
     expect(urgent.reply.kind).toBe('urgent');
     expect(urgent.reply.text).toMatch(/^Tell your crew medical officer straight away/);
-    expect(urgent.action).toBeUndefined();
+    expect(urgent.action?.checkin).toBeUndefined();
+    expect(urgent.action?.navigate).toBeUndefined();
+    expect(urgent.action?.emergency).toMatchObject({ id: "chest-pain" });
   });
 
   it('asks for clarification before writing questionable entries', () => {
@@ -176,7 +178,7 @@ describe('Ask Sol conversation (the transcript that went wrong)', () => {
     expect(converse('Summarize this page', newDialogue(), live, index, '/timeline').reply.text).toContain('Sol 41');
     expect(converse('Summarize this page', newDialogue(), live, index, '/check-in').reply.text).toContain('Heart rate: 84 bpm');
     expect(converse('Summarize this page', newDialogue(), live, index, '/trends', '?metric=sleep_duration').reply.text).toContain('usable readings');
-    expect(converse('Summarize this page', newDialogue(), live, index, '/cmo', '?tab=kit').reply.text).toContain('Demo supplies');
+    expect(converse('Summarize this page', newDialogue(), live, index, '/cmo', '?tab=kit').reply.text).toContain('Supplies on Sol 43');
     expect(converse('Check checklist resting pulse', newDialogue(), live, index).action?.routine).toEqual({ id: 'heart_rate', checked: true });
     expect(converse('Scroll down', newDialogue(), live, index).action).toEqual({ scroll: 'down' });
     expect(converse('Open supplies', newDialogue(), live, index).action?.navigate).toBe('/cmo?tab=kit');

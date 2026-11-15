@@ -111,7 +111,8 @@
 }
 .reply-steps p { margin: 0; line-height: 1.45; }
 .reply-steps-lead { font-weight: 700; color: var(--text-primary); }
-.reply-steps ol { margin: 0; padding-left: 1.6em; display: grid; gap: 6px; }
+.reply-steps ol { margin: 0; padding-left: 1.6em; display: grid; gap: 6px; list-style: decimal outside; }
+.reply-steps li { display: list-item; }
 .reply-steps li { line-height: 1.45; font-size: 1rem; color: var(--text-primary); }
 .reply-steps li::marker { font-weight: 700; color: var(--status-trend); }
 .reply-steps-tail { font-size: .875rem; color: var(--text-secondary); }

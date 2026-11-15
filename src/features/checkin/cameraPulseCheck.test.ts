@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { BrowserAdapter } from 'vitalcamera-sdk';
 import { getAppBaseUrl, getVendorUrls, VitalCameraService } from './vitalCameraService';
 import { createStorageRepository, emptyMission } from '../../app/storage';
 import { HERO_SCENARIO } from '../../scenarios';
@@ -21,6 +22,8 @@ function fixtureStorage(): Storage {
 describe('vitalCameraService and Camera pulse check', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('resolves self-hosted vendor runtime URLs ending with / for LiteRT, MediaPipe, models and workers', () => {
@@ -95,6 +98,7 @@ describe('vitalCameraService and Camera pulse check', () => {
   });
 
   it('handles permission rejection by triggering PERMISSION_DENIED error', async () => {
+    vi.stubGlobal('OffscreenCanvas', class { getContext() { return {}; } });
     const fakeMediaDevices = {
       getUserMedia: vi.fn().mockRejectedValue({ name: 'NotAllowedError' }),
     };
@@ -119,28 +123,83 @@ describe('vitalCameraService and Camera pulse check', () => {
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'PERMISSION_DENIED' }));
   });
 
-  it('guarantees media stream tracks are stopped when stop() is called', async () => {
+  function mockCamera() {
     const stopTrack = vi.fn();
-    const fakeStream = {
-      getTracks: () => [{ stop: stopTrack } as unknown as MediaStreamTrack],
-    };
+    const stream = { getTracks: () => [{ stop: stopTrack }], getVideoTracks: () => [] };
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    vi.stubGlobal('OffscreenCanvas', class { getContext() { return {}; } });
+    const video = { srcObject: null, play: vi.fn().mockResolvedValue(undefined) } as unknown as HTMLVideoElement;
+    const callbacks = { onError: vi.fn(), onHeartRate: vi.fn(), onBvp: vi.fn(), onFaceDetected: vi.fn() };
+    return { callbacks, getUserMedia, stopTrack, stream, video };
+  }
 
-    const fakeMediaDevices = {
-      getUserMedia: vi.fn().mockResolvedValue(fakeStream),
-    };
+  it('starts both pulse and breathing analysis after a slow first initialization', async () => {
+    vi.useFakeTimers();
+    const { video, callbacks } = mockCamera();
+    const events = new EventTarget();
+    vi.spyOn(BrowserAdapter, 'loadModels').mockResolvedValue({});
+    vi.spyOn(BrowserAdapter.prototype, 'init').mockImplementation(
+      () => new Promise(resolve => setTimeout(resolve, 5000)),
+    );
+    vi.spyOn(BrowserAdapter.prototype, 'vitalcamera', 'get').mockReturnValue({
+      on: (event: string, listener: (detail: unknown) => void) => {
+        events.addEventListener(event, signal => listener((signal as CustomEvent).detail));
+      },
+    } as BrowserAdapter['vitalcamera']);
+    const runFrames = vi.spyOn(BrowserAdapter.prototype, 'start').mockImplementation(() => {});
+    const service = new VitalCameraService();
+    const started = service.start(video, callbacks);
 
-    if (typeof navigator === 'undefined') {
-      (globalThis as unknown as { navigator: Navigator }).navigator = {} as Navigator;
-    }
+    await vi.advanceTimersByTimeAsync(5100);
+    await started;
+    expect(runFrames).toHaveBeenCalledOnce();
+    events.dispatchEvent(new CustomEvent('face', { detail: { detected: true, box: { x: 0, y: 0, w: 2, h: 2 } } }));
+    events.dispatchEvent(new CustomEvent('bvp', { detail: { timestamp: 100, value: 0.8 } }));
+    events.dispatchEvent(new CustomEvent('heartrate', { detail: { timestamp: 200, hr: 70, sqi: 0.8 } }));
+    expect(callbacks.onFaceDetected).toHaveBeenCalledWith(true);
+    expect(callbacks.onBvp).toHaveBeenCalledWith({ t: 100, v: 0.8 });
+    expect(callbacks.onHeartRate).toHaveBeenCalledWith({ timestamp: 200, hr: 70, sqi: 0.8 });
+    await service.stop();
+  });
 
-    Object.defineProperty(navigator, 'mediaDevices', {
-      value: fakeMediaDevices,
-      configurable: true,
+  it('reports initialization errors and releases the active camera', async () => {
+    const { video, callbacks, stopTrack } = mockCamera();
+    vi.spyOn(BrowserAdapter, 'loadModels').mockResolvedValue({});
+    vi.spyOn(BrowserAdapter.prototype, 'init').mockRejectedValue(new Error('worker failed'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const service = new VitalCameraService();
+
+    await expect(service.start(video, callbacks)).rejects.toThrow();
+    expect(callbacks.onError).toHaveBeenCalledOnce();
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(video.srcObject).toBeNull();
+  });
+
+  it('explains unsupported camera analysis without requesting permission', async () => {
+    const { video, callbacks, getUserMedia } = mockCamera();
+    vi.stubGlobal('OffscreenCanvas', class {
+      getContext() { return null; }
     });
 
+    await expect(new VitalCameraService().start(video, callbacks)).rejects.toThrow('unavailable in this app or browser');
+    expect(callbacks.onError).toHaveBeenCalledOnce();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it('stops a stream when permission is granted after the scan was canceled', async () => {
+    const { callbacks, getUserMedia, stopTrack, stream, video } = mockCamera();
+    let grant!: (stream: unknown) => void;
+    getUserMedia.mockImplementation(() => new Promise(resolve => { grant = resolve; }));
     const service = new VitalCameraService();
+    const started = service.start(video, callbacks);
+
     await service.stop();
-    expect(service).toBeDefined();
+    grant(stream);
+    await started;
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(video.play).not.toHaveBeenCalled();
+    expect(callbacks.onError).not.toHaveBeenCalled();
   });
 
   it('ensures camera pulse check operates in memory without leaking into local storage, baselines, exports, ground drafts, or escalation', () => {
