@@ -4,6 +4,7 @@ import type { MoodMcqAnswers } from '../checkin/moodAssessment';
 import type { KnowledgeIndex } from './knowledge';
 import { MOOD_QUESTIONS, moodQuestionSpeech, moodReply, parseMoodAnswer } from './mood';
 import { type AssistantContext, type AssistantReply } from './respond';
+import { pageControls } from './computerUse';
 import { converse, newDialogue, speculateIntent, type DialogueAction } from './dialogue';
 import { ReplySteps } from './ReplySteps';
 import { isEmergencyCall } from './emergency';
@@ -64,7 +65,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
 
     const answer = async (text: string, segmenter: SpeechSegmenter) => {
       if (CLOSE.test(text)) { onClose(); return; }
-      const turn = converse(text, dialogue.current, ctxRef.current, index, '/assistant');
+      const turn = converse(text, dialogue.current, ctxRef.current, index, '/assistant', '', pageControls);
       dialogue.current = turn.state;
       let next = turn.reply;
       let speech: string;
@@ -256,7 +257,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
 
       <p className="voice-status" aria-live="polite">
         {phase === 'loading' && progress > 0 && progress < 1
-          ? `Downloading the on-device voice model… ${Math.round(progress * 100)}% (one time, then it works offline)`
+          ? `Loading voice model… ${Math.round(progress * 100)}%`
           : PHASE_TEXT[phase]}
       </p>
 
@@ -274,7 +275,7 @@ export function VoiceMode({ ctx, index, onExchange, onClose, onAction }: {
 
       <div className="voice-controls">
         <button type="button" className="button button-secondary" onClick={() => onClose(true)}><Keyboard size={18} aria-hidden="true" /> Type instead</button>
-        <span className="voice-privacy"><Mic size={14} aria-hidden="true" /> Your voice is turned into text on this device. Say “goodbye” to end the call.</span>
+        <span className="voice-privacy"><Mic size={14} aria-hidden="true" /> Say “goodbye” to end the call.</span>
       </div>
     </div>
   );

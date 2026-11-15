@@ -40,7 +40,6 @@ const FIELDS: [MetricId, string][] = [
   ['heart_rate_standing', 'standing (?:heart rate|pulse)'],
   ['bp_systolic_standing', 'standing systolic(?: pressure)?'],
   ['bp_diastolic_standing', 'standing diastolic(?: pressure)?'],
-  ['hrv_rmssd', 'heart rate variability|hrv|rmssd'],
   ['heart_rate', '(?:resting )?(?:heart rate(?! variability)|pulse|bpm)'],
   ['bp_systolic', 'systolic(?: pressure)?'],
   ['bp_diastolic', 'diastolic(?: pressure)?'],

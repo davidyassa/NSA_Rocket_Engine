@@ -1,6 +1,7 @@
 import { Mic, MicOff, Settings2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { pageControls } from './computerUse';
 import { converse, newDialogue, type DialogueAction } from './dialogue';
 import { KnowledgeIndex } from './knowledge';
 import { guideFor } from './pageGuides';
@@ -103,7 +104,7 @@ export function SolDock({ ctx, onAction }: {
     setHeard(text);
     const { ctx, pathname: page, search, onAction: apply } = live.current;
     index.current ??= new KnowledgeIndex();
-    const turn = converse(text, dialogue.current, ctx, index.current, page, search);
+    const turn = converse(text, dialogue.current, ctx, index.current, page, search, pageControls);
     dialogue.current = turn.state;
     let next = turn.reply;
     if (turn.action) apply(turn.action);
@@ -124,7 +125,8 @@ export function SolDock({ ctx, onAction }: {
           // Open the conversation panel and answer anything said with "Hey Sol".
           setOpen(true);
           setHeard('');
-          dialogue.current = newDialogue();
+          // Keep the thread during an emergency or an explanation ("Hey Sol, next").
+          if (!dialogue.current.emergency && !dialogue.current.explain) dialogue.current = newDialogue();
           if (rest) { answer(rest); return; }
           // Just "Hey Sol": a short chime and straight to listening. No spoken prompt,
           // so the question that follows is never talked over or lost.
@@ -187,6 +189,9 @@ export function SolDock({ ctx, onAction }: {
     };
     const onVisibility = () => { if (document.hidden) suspend(); else resume(); };
     const offPreference = onHeySolChange(() => { if (heySolWanted()) resume(); else suspend(); });
+    // "All good" in safe mode closes every floating island, including this panel.
+    const closeIslands = () => { setOpen(false); playback.current?.abort(); };
+    window.addEventListener('sol:close-islands', closeIslands);
     const offVoiceMode = onVoiceModeChange((active) => {
       if (active) { suspend(); setOpen(false); }
       else resume();
@@ -208,6 +213,7 @@ export function SolDock({ ctx, onAction }: {
       window.removeEventListener('keydown', onInteraction, true);
       offPreference();
       offVoiceMode();
+      window.removeEventListener('sol:close-islands', closeIslands);
       stopListener();
     };
   }, [ensureListener, stopListener]);
@@ -269,7 +275,7 @@ export function SolDock({ ctx, onAction }: {
             </button>
             <div className="sol-dock-title">
               <strong>Sol</strong>
-              <span aria-live="polite">{state === 'starting' && progress > 0 && progress < 1 ? `Downloading voice model… ${Math.round(progress * 100)}%` : STATUS[state]}</span>
+              <span aria-live="polite">{state === 'starting' && progress > 0 && progress < 1 ? `Loading voice model… ${Math.round(progress * 100)}%` : STATUS[state]}</span>
             </div>
             <button type="button" className="sol-dock-icon" aria-label="Close Sol" onClick={() => { closePanel(); button.current?.focus(); }}><X size={18} aria-hidden="true" /></button>
           </div>
@@ -298,7 +304,7 @@ export function SolDock({ ctx, onAction }: {
             <input type="checkbox" role="switch" checked={heySol} onChange={(event) => setHeySolWanted(event.target.checked)} />
             <span>Listen for “Hey Sol”</span>
           </label>
-          <p className="sol-dock-privacy">Speech is transcribed on this device while Sol Check is visible.</p>
+          <p className="sol-dock-privacy">The microphone listens while Sol Check is visible.</p>
         </section>
       )}
     </div>

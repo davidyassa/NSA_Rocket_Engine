@@ -29,9 +29,11 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-The native build places the web app, data and models inside the WebView bundle and disables the service worker. The postbuild step renames the camera dependencies' extensionless `+esm` modules to `esm.mjs` and patches their references for WebView loading. [Capacitor configuration](../capacitor.config.ts) · [Postbuild script](../scripts/native-postbuild.mjs)
+The native build places the web app, data and models inside the WebView bundle and disables the service worker. The postbuild step gives the camera runtime modules a JavaScript extension and packages the compressed camera model state as `state.gz.bin` so the Android asset merger preserves its bytes. [Capacitor configuration](../capacitor.config.ts) · [Postbuild script](../scripts/native-postbuild.mjs)
 
-The camera scans use a video-only stream. The read-aloud voice check, push-to-talk and hands-free voice mode request separate audio access. Camera and microphone usage strings are defined in the iOS app, and the Android manifest declares camera and audio permissions. Native checklist and save confirmations can trigger haptics. The vigilance task uses a visual stimulus. [iOS usage strings](../ios/App/App/Info.plist) · [Android permissions](../android/app/src/main/AndroidManifest.xml) · [Native integration](../src/app/native.ts)
+The camera scan estimates heart rate and breathing rate from one video-only stream. The scan requires 2D OffscreenCanvas, introduced in iOS 16.4. Manual entry is available on older iOS versions. The read-aloud voice check, push-to-talk and hands-free voice mode request separate audio access. Camera and microphone usage strings are defined in the iOS app, and the Android manifest declares camera and audio permissions. Native checklist and save confirmations can trigger haptics. The vigilance task uses a visual stimulus. [iOS usage strings](../ios/App/App/Info.plist) · [Android permissions](../android/app/src/main/AndroidManifest.xml) · [Native integration](../src/app/native.ts)
+
+Ask Sol in the packaged apps runs Moonshine Tiny for transcription and Piper for spoken replies, with bundled Whisper Tiny and Kokoro models available as fallbacks. These models work on first launch offline and require a WebView with WebAssembly SIMD. The bundled speech synthesis also needs the browser's gzip decompression API. iOS 16.4 added both capabilities. On Android, keep Android System WebView current. The faster-whisper Python server remains an option for the web preview. [WebKit 16.4](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/)
 
 ## Device checks
 

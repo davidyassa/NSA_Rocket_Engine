@@ -11,15 +11,19 @@
  * WebKit and Chromium refuse ES modules with a non-JavaScript MIME type, so the
  * camera pulse check would fail. This step gives the modules a `.mjs` name
  * (served as JavaScript on both platforms) and rewrites the SDK references.
+ * It also preserves the gzipped model state under a name Android won't unpack
+ * during the asset merge. The SDK needs the original compressed bytes.
  *
  * Fails loudly if the expected references are not found, so an SDK upgrade
  * cannot silently break the native camera path.
  */
-import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const dist = path.resolve(process.argv[2] ?? 'dist');
 const NEW_NAME = 'esm.mjs';
+const STATE_NAME = 'state.gz';
+const NATIVE_STATE_NAME = 'state.gz.bin';
 
 function fail(message) {
   console.error(`native-postbuild: ${message}`);
@@ -35,19 +39,22 @@ for (const runtime of ['litert', 'mediapipe']) {
   copyFileSync(from, path.join(dist, 'vendor', runtime, NEW_NAME));
 }
 
-// 2. Rewrite `+esm` references in the app bundle and the camera workers.
-const patterns = [/`\+esm`/g, /'\+esm'/g, /"\+esm"/g];
-function rewrite(file) {
+// 2. Keep Android's asset merge from inflating state.gz and stripping its extension.
+const modelsDir = path.join(dist, 'vendor', 'vitalcamera', 'models');
+const state = path.join(modelsDir, STATE_NAME);
+if (!existsSync(state)) fail(`missing ${state}`);
+renameSync(state, path.join(modelsDir, NATIVE_STATE_NAME));
+
+// 3. Rewrite the SDK references in the app bundle and camera workers.
+const modulePattern = /([`'"])\+esm\1/g;
+const statePattern = /([`'"])state\.gz\1/g;
+function rewrite(file, pattern, name) {
   const source = readFileSync(file, 'utf8');
   let count = 0;
-  let next = source;
-  for (const pattern of patterns) {
-    next = next.replace(pattern, (match) => {
-      count += 1;
-      const quote = match[0];
-      return `${quote}${NEW_NAME}${quote}`;
-    });
-  }
+  const next = source.replace(pattern, (_, quote) => {
+    count += 1;
+    return `${quote}${name}${quote}`;
+  });
   if (count) writeFileSync(file, next);
   return count;
 }
@@ -55,14 +62,23 @@ function rewrite(file) {
 const assetsDir = path.join(dist, 'assets');
 const workersDir = path.join(dist, 'vendor', 'vitalcamera', 'workers');
 let bundleRefs = 0;
-for (const name of readdirSync(assetsDir)) if (name.endsWith('.js')) bundleRefs += rewrite(path.join(assetsDir, name));
 let workerRefs = 0;
-for (const name of readdirSync(workersDir)) if (name.endsWith('.js')) workerRefs += rewrite(path.join(workersDir, name));
+let stateRefs = 0;
+for (const name of readdirSync(assetsDir)) {
+  if (!name.endsWith('.js')) continue;
+  const file = path.join(assetsDir, name);
+  bundleRefs += rewrite(file, modulePattern, NEW_NAME);
+  stateRefs += rewrite(file, statePattern, NATIVE_STATE_NAME);
+}
+for (const name of readdirSync(workersDir)) {
+  if (name.endsWith('.js')) workerRefs += rewrite(path.join(workersDir, name), modulePattern, NEW_NAME);
+}
 
 if (bundleRefs < 2) fail(`expected ≥2 MediaPipe +esm references in the app bundle, found ${bundleRefs}`);
 if (workerRefs < 2) fail(`expected ≥2 LiteRT +esm references in camera workers, found ${workerRefs}`);
+if (stateRefs < 1) fail(`expected a ${STATE_NAME} reference in the app bundle`);
 
-// 3. The native shell bundles every asset; no service worker should be present.
+// 4. The native shell bundles every asset; no service worker should be present.
 if (existsSync(path.join(dist, 'sw.js'))) fail('dist/sw.js exists; build with SOLCHECK_TARGET=native (npm run build:native).');
 
-console.log(`native-postbuild: ${NEW_NAME} modules ready (${bundleRefs} bundle + ${workerRefs} worker references rewritten).`);
+console.log(`native-postbuild: ${NEW_NAME} modules ready (${bundleRefs} bundle + ${workerRefs} worker references rewritten). Packaged ${NATIVE_STATE_NAME}.`);

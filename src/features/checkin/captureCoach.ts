@@ -6,7 +6,8 @@
 import { MIN_ACCEPT_SAMPLES, PULSE_MIN_SESSION_MS, PULSE_SQI_ACCEPT_FLOOR } from './pulseQuality';
 
 /** Give up after this long with a face in view but no clean reading, and explain why. */
-export const MAX_CAPTURE_MS = 45_000;
+/** Longest scan before giving up: room to find a clean stretch in difficult light. */
+export const MAX_CAPTURE_MS = 60_000;
 
 /** Face position from the detector, in raw camera coordinates (0..1, not mirrored). */
 export interface FaceBox {

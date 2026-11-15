@@ -1,10 +1,12 @@
 import { ExternalLink, Keyboard, MessagesSquare, Mic, SendHorizontal, ShieldCheck, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { isNativeApp } from '../../app/native';
 import type { MoodMcqAnswers } from '../checkin/moodAssessment';
 import { KnowledgeIndex } from './knowledge';
 import { MOOD_QUESTIONS, moodReply } from './mood';
 import { type AssistantContext, type AssistantReply } from './respond';
+import { pageControls } from './computerUse';
 import { converse, newDialogue, type DialogueAction } from './dialogue';
 import { SolBubble } from './SolBubble';
 import { VoiceMode } from './VoiceMode';
@@ -71,7 +73,7 @@ export function AskSol({ ctx, onAction }: {
     const text = question.trim();
     if (!text) return;
     setDraft('');
-    const turn = converse(text, dialogue.current, ctx, index, pathname, search);
+    const turn = converse(text, dialogue.current, ctx, index, pathname, search, pageControls);
     dialogue.current = turn.state;
     const reply = turn.reply;
     if (turn.action?.scroll || turn.action?.scrollLines || turn.action?.scrollTo) keepScroll.current = true;
@@ -122,7 +124,10 @@ export function AskSol({ ctx, onAction }: {
           <span className="ask-talk-orb"><SolBubble><Mic size={34} /></SolBubble></span>
           <span id="ask-talk-title" className="ask-talk-label">Talk to Sol</span>
         </button>
-        <p id="ask-talk-hint" className="ask-talk-hint">Hands-free: just speak, Sol answers out loud. Your browser will ask to use the microphone. Speech is turned into text on this device; the first time, a voice model (about 60 MB) downloads once.</p>
+        <p id="ask-talk-hint" className="ask-talk-hint">
+          Allow microphone access to talk to Sol and hear its replies.{' '}
+          {isNativeApp ? 'The voice models are bundled and work offline.' : 'On-device voice models load the first time you use them.'}
+        </p>
         {!typing && <button type="button" className="text-link ask-type-toggle" onClick={() => setTyping(true)}><Keyboard size={16} aria-hidden="true" /> Type instead</button>}
       </section>
 

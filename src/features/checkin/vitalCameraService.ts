@@ -1,10 +1,16 @@
 import { BrowserAdapter, type HeartRateData, type FaceData } from 'vitalcamera-sdk';
+import { FOCUS_HOLD_MS, FOCUS_ON_FACE, drawFaceOnly, focusEllipse, type PixelBox } from './faceFocus';
+import { colourSample, type ColourSample } from './posPulse';
 
 export interface PulseCheckCallbacks {
   onHeartRate: (data: { hr: number; sqi: number; timestamp: number }) => void;
   onFaceDetected: (detected: boolean) => void;
   /** Face centre and width as fractions of the camera frame (raw, not mirrored); null when no face. */
   onFaceBox?: (box: { cx: number; cy: number; size: number } | null) => void;
+  /** Face keypoints (eyes, nose, mouth, ears) as frame fractions, raw (not mirrored); null when none. */
+  onFaceKeypoints?: (keypoints: { x: number; y: number }[] | null) => void;
+  /** Skin colour of forehead and cheeks plus the background, per analysed frame (second pulse measurement). */
+  onColourSample?: (sample: ColourSample) => void;
   /** Raw camera pulse wave sample (blood-volume pulse), ms timestamp. Used for breathing rate. */
   onBvp?: (sample: { t: number; v: number }) => void;
   /** One detected heartbeat: inter-beat interval (ms) and peak time (ms). */
@@ -96,6 +102,9 @@ type AdapterTiming = { _dval?: number; _virtualTime?: number };
 const MIN_FRAME_GAP_MS = 25;
 /** Rolling window used to measure the camera's real frame interval. */
 const DT_WINDOW = 90;
+const STARTUP_TIMEOUT_MS = 30_000;
+const ANALYSIS_FAILED = 'Camera analysis could not start. Try again or enter your readings by hand.';
+const ANALYSIS_UNSUPPORTED = 'Camera analysis is unavailable in this app or browser version.';
 
 export class VitalCameraService {
   private frameHandle: number | null = null;
@@ -103,6 +112,53 @@ export class VitalCameraService {
   private realTimeOf = new Map<number, number>();
   /** Measured camera frame rate (frames per second), null until known. */
   measuredFps: number | null = null;
+  /** Latest face box (camera pixels) and when it was seen, for face-only frames. */
+  private lastFace: { box: PixelBox; at: number } | null = null;
+  private focusCanvas: HTMLCanvasElement | null = null;
+  private focusCtx: CanvasRenderingContext2D | null = null;
+  /** Latest face keypoints (frame fractions) and a small canvas for colour sampling. */
+  private lastKeypoints: { x: number; y: number }[] | null = null;
+  private colourCtx: CanvasRenderingContext2D | null = null;
+  private onColour: ((sample: ColourSample) => void) | null = null;
+
+  /** Skin and background colours of this frame, from a 160×120 copy of the whole (unmasked) frame. */
+  private sampleColours(video: HTMLVideoElement, t: number) {
+    if (!this.onColour || !this.lastKeypoints || !video.videoWidth) return;
+    if (!this.colourCtx) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160; canvas.height = 120;
+      this.colourCtx = canvas.getContext('2d', { willReadFrequently: true });
+    }
+    const ctx = this.colourCtx;
+    if (!ctx) return;
+    try {
+      ctx.drawImage(video, 0, 0, 160, 120);
+      const sample = colourSample(t, ctx.getImageData(0, 0, 160, 120).data, 160, 120, this.lastKeypoints);
+      if (sample) this.onColour(sample);
+    } catch {
+      // Colour sampling is an extra measurement; never interrupt the scan.
+    }
+  }
+
+  /**
+   * The frame the model analyses: black outside an ellipse around the face, so
+   * hair and background never reach the pulse signal (see faceFocus.ts). Whole
+   * frames when no face was seen recently, so the face can be found again.
+   */
+  private faceOnly(video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement {
+    const face = this.lastFace;
+    const w = video.videoWidth; const h = video.videoHeight;
+    if (!FOCUS_ON_FACE || !face || Date.now() - face.at > FOCUS_HOLD_MS || !w || !h) return video;
+    if (!this.focusCanvas) {
+      this.focusCanvas = document.createElement('canvas');
+      this.focusCtx = this.focusCanvas.getContext('2d');
+    }
+    const canvas = this.focusCanvas; const ctx = this.focusCtx;
+    if (!ctx) return video;
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    drawFaceOnly(ctx, video, w, h, focusEllipse(face.box));
+    return canvas;
+  }
 
   /**
    * Feed the camera model one call per NEW camera frame, with its real capture
@@ -125,7 +181,7 @@ export class VitalCameraService {
     let clock: 'capture' | 'media' | 'now' | null = null;
     let mediaOffset = 0;
     const onFrame = (now: number, meta: FrameMetadata) => {
-      if (this.isDestroyed || this.adapter !== adapter) return;
+      if (this.adapter !== adapter) return;
       this.frameHandle = video.requestVideoFrameCallback!(onFrame);
       if (clock === null) {
         clock = typeof meta?.captureTime === 'number' && meta.captureTime > 0 ? 'capture'
@@ -149,7 +205,8 @@ export class VitalCameraService {
         }
       }
       lastProcessed = captured;
-      adapter.processVideoFrame(video, captured);
+      adapter.processVideoFrame(this.faceOnly(video), captured);
+      this.sampleColours(video, captured);
       if (typeof timing._virtualTime === 'number') {
         this.realTimeOf.set(timing._virtualTime, captured);
         if (this.realTimeOf.size > 600) this.realTimeOf.delete(this.realTimeOf.keys().next().value as number);
@@ -172,10 +229,11 @@ export class VitalCameraService {
    * phones; browsers without support simply ignore this). Best effort only.
    */
   private async stabilizeCamera(): Promise<void> {
-    const track = this.stream?.getVideoTracks()[0];
+    const stream = this.stream;
+    const track = stream?.getVideoTracks()[0];
     if (!track || typeof track.getCapabilities !== 'function') return;
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    if (this.isDestroyed || track.readyState !== 'live') return;
+    if (this.stream !== stream || track.readyState !== 'live') return;
     try {
       const caps = track.getCapabilities() as TrackCapabilitiesLike;
       const settings = track.getSettings() as TrackSettingsLike;
@@ -196,193 +254,177 @@ export class VitalCameraService {
 
   private adapter: BrowserAdapter | null = null;
   private stream: MediaStream | null = null;
+  /** The live camera track, so the scan can hold exposure and white balance steady. */
+  get videoTrack(): MediaStreamTrack | null { return this.stream?.getVideoTracks()[0] ?? null; }
   private videoEl: HTMLVideoElement | null = null;
-  private isDestroyed = false;
+  private scan: AbortController | null = null;
 
   async start(videoEl: HTMLVideoElement, callbacks: PulseCheckCallbacks): Promise<void> {
-    this.isDestroyed = false;
-    this.videoEl = videoEl;
+    if (this.scan) return;
+    const scan = new AbortController();
+    this.scan = scan;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const cancelled = new Promise<void>(resolve => scan.signal.addEventListener('abort', () => resolve(), { once: true }));
 
-    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
-      const err = new Error('CAMERA_UNAVAILABLE');
-      callbacks.onError(err);
-      throw err;
-    }
-
-    // 1. Request video-only stream
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        // 30 fps matters: the pulse is a tiny colour change, and slow cameras blur it away.
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, min: 15 } },
+      if (typeof navigator.mediaDevices?.getUserMedia !== 'function') {
+        throw new Error('CAMERA_UNAVAILABLE');
+      }
+      // The SDK uses an offscreen 2D canvas for each face crop.
+      if (typeof OffscreenCanvas !== 'function' || !new OffscreenCanvas(1, 1).getContext('2d')) {
+        throw new Error(ANALYSIS_UNSUPPORTED);
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
         audio: false,
-      });
-    } catch (err) {
-      const name = (err as { name?: string }).name || '';
-      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        const error = new Error('PERMISSION_DENIED');
-        callbacks.onError(error);
-        throw error;
-      }
-      const error = new Error('CAMERA_UNAVAILABLE');
-      callbacks.onError(error);
-      throw error;
-    }
-
-    if (this.isDestroyed) {
-      this.releaseStream();
-      return;
-    }
-
-    videoEl.srcObject = this.stream;
-    try {
-      await videoEl.play();
-    } catch {
-      // Ignore autoplay errors if component already unmounted
-    }
-    void this.stabilizeCamera();
-
-    if (this.isDestroyed) {
-      this.releaseStream();
-      return;
-    }
-
-    // 2. Preload models for pulse & signal quality (with graceful non-blocking fallback)
-    const urls = getVendorUrls();
-    let models: Record<string, ArrayBuffer> = {};
-    try {
-      const loadPromise = BrowserAdapter.loadModels(urls.models, {
-        emotion: false,
-        gaze: false,
-        faceLandmarker: false,
-      });
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
-      const loaded = await Promise.race([loadPromise, timeoutPromise]);
-      if (loaded) {
-        models = loaded;
-        try {
-          const blazeResp = await fetch(urls.models + 'blaze_face_short_range.tflite');
-          if (blazeResp.ok) {
-            models.faceDetector = await blazeResp.arrayBuffer();
-          }
-        } catch {
-          // Fallback to URL path
+      }).catch((error: DOMException) => {
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          throw new Error('PERMISSION_DENIED');
         }
-      }
-    } catch (err) {
-      console.warn('[VitalCameraService] Model preload warning:', err);
-    }
-
-    if (this.isDestroyed) {
-      this.releaseStream();
-      return;
-    }
-
-    // 3. Initialize BrowserAdapter with feature switches and runtimeBaseUrls
-    await clearVitalCameraInferenceState().catch(() => true);
-    if (this.isDestroyed) {
-      this.releaseStream();
-      return;
-    }
-
-    try {
-      this.adapter = new BrowserAdapter({
-        videoElement: videoEl,
-        models,
-        modelBasePath: urls.models,
-        workerBasePath: urls.workers,
-        runtimeBaseUrls: {
-          litert: urls.litert,
-          mediapipe: urls.mediapipe,
-        },
-        vitalcameraConfig: {
-          enableFaceLandmarker: false,
-          enableEmotion: false,
-          enableGaze: false,
-          enableHrv: true,
-          enableHeadPose: false,
-          sqiThreshold: 0.38,
-        },
-        manageCamera: false,
+        throw new Error('CAMERA_UNAVAILABLE');
       });
-
-      // Soft non-blocking init: try adapter.init() for up to 3.5s.
-      // If it takes longer or fails, we DO NOT crash; optical tracking runs seamlessly!
-      const initPromise = this.adapter.init().then(() => true).catch((e) => {
-        console.warn('[VitalCameraService] Adapter init non-fatal error:', e);
-        return false;
-      });
-      const timerPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3500));
-      const initialized = await Promise.race([initPromise, timerPromise]);
-
-      if (this.isDestroyed) {
-        await this.stop();
+      if (scan.signal.aborted) {
+        stream.getTracks().forEach(track => track.stop());
         return;
       }
 
-      if (initialized && this.adapter.vitalcamera) {
-        this.adapter.vitalcamera.on('heartrate', (data: HeartRateData) => {
-          if (!this.isDestroyed && data && typeof data.hr === 'number') {
-            callbacks.onHeartRate({
-              hr: data.hr,
-              sqi: data.sqi ?? 0,
-              timestamp: data.timestamp || Date.now(),
-            });
-          }
-        });
-
-        this.adapter.vitalcamera.on('face', (face: FaceData | null) => {
-          if (!this.isDestroyed) {
-            const detected = Boolean(face?.detected && face.box);
-            callbacks.onFaceDetected(detected);
-            if (callbacks.onFaceBox) {
-              const box = face?.box;
-              const width = face?.videoWidth ?? 0;
-              const height = face?.videoHeight ?? 0;
-              callbacks.onFaceBox(detected && box && width > 0 && height > 0
-                ? { cx: (box.x + box.w / 2) / width, cy: (box.y + box.h / 2) / height, size: box.w / width }
-                : null);
-            }
-          }
-        });
-
-        if (callbacks.onBvp) {
-          this.adapter.vitalcamera.on('bvp', (data: { value: number; timestamp: number }) => {
-            if (!this.isDestroyed && Number.isFinite(data?.value) && Number.isFinite(data?.timestamp)) {
-              callbacks.onBvp?.({ t: this.realTime(data.timestamp), v: data.value });
-            }
-          });
-        }
-        if (callbacks.onBeat) {
-          this.adapter.vitalcamera.on('beat', (data: { ibi: number; timestamp: number }) => {
-            if (!this.isDestroyed && Number.isFinite(data?.ibi) && Number.isFinite(data?.timestamp)) {
-              callbacks.onBeat?.({ t: this.realTime(data.timestamp), ibi: data.ibi });
-            }
-          });
-        }
-        if (callbacks.onHrv) {
-          this.adapter.vitalcamera.on('hrv', (data: { rmssd: number | null; sdnn: number | null; n: number; reject: string | null }) => {
-            if (!this.isDestroyed && data) {
-              callbacks.onHrv?.({ rmssd: data.rmssd, sdnn: data.sdnn, n: data.n ?? 0, reject: data.reject ?? null });
-            }
-          });
-        }
-
-        this.adapter.vitalcamera.on('error', (err: { source: string; message: string }) => {
-          if (!this.isDestroyed) {
-            console.warn(`[VitalCamera ${err.source}] ${err.message}`);
-          }
-        });
-
-        if (!this.startFrameLoop(this.adapter, videoEl as FrameVideo)) {
-          try { this.adapter.start(); } catch {}
-        }
-      }
-    } catch (err) {
-      console.warn('[VitalCameraService] Soft adapter initialization bypassed:', err);
+      this.stream = stream;
+      this.videoEl = videoEl;
+      videoEl.srcObject = stream;
+      await Promise.race([
+        this.initializeAnalysis(videoEl, callbacks, scan.signal),
+        cancelled,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('Camera analysis took too long to load')), STARTUP_TIMEOUT_MS);
+        }),
+      ]);
+    } catch (error) {
+      if (scan.signal.aborted) return;
+      const report = error instanceof Error && ['PERMISSION_DENIED', 'CAMERA_UNAVAILABLE', ANALYSIS_UNSUPPORTED].includes(error.message)
+        ? error
+        : new Error(ANALYSIS_FAILED, { cause: error });
+      if (report.cause) console.warn('[VitalCamera] Capture setup failed:', report.cause);
+      void this.stop();
+      callbacks.onError(report);
+      throw report;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
+  private async initializeAnalysis(videoEl: HTMLVideoElement, callbacks: PulseCheckCallbacks, signal: AbortSignal) {
+    const urls = getVendorUrls();
+    const [, models] = await Promise.all([
+      videoEl.play().catch(() => { throw new Error('CAMERA_UNAVAILABLE'); }),
+      BrowserAdapter.loadModels(urls.models, { emotion: false, gaze: false, faceLandmarker: false }),
+      clearVitalCameraInferenceState(),
+    ]);
+    if (signal.aborted) return;
+    void this.stabilizeCamera();
+
+    const adapter = new BrowserAdapter({
+      videoElement: videoEl,
+      models,
+      modelBasePath: urls.models,
+      workerBasePath: urls.workers,
+      runtimeBaseUrls: {
+        litert: urls.litert,
+        mediapipe: urls.mediapipe,
+      },
+      vitalcameraConfig: {
+        enableFaceLandmarker: false,
+        enableEmotion: false,
+        enableGaze: false,
+        enableHrv: true,
+        enableHeadPose: false,
+        sqiThreshold: 0.38,
+      },
+      manageCamera: false,
+    });
+
+    this.adapter = adapter;
+    await adapter.init();
+    if (signal.aborted) {
+      await adapter.destroy();
+      return;
+    }
+
+    adapter.vitalcamera.on('heartrate', (data: HeartRateData) => {
+      if (!signal.aborted && data && typeof data.hr === 'number') {
+        callbacks.onHeartRate({
+          hr: data.hr,
+          sqi: data.sqi ?? 0,
+          timestamp: data.timestamp || Date.now(),
+        });
+      }
+    });
+
+    this.onColour = callbacks.onColourSample ?? null;
+    adapter.vitalcamera.on('face', (face: FaceData | null) => {
+      if (!signal.aborted) {
+        const detected = Boolean(face?.detected && face.box);
+        this.lastFace = detected && face?.box ? { box: { ...face.box }, at: Date.now() } : this.lastFace;
+        callbacks.onFaceDetected(detected);
+        if (callbacks.onFaceBox) {
+          const box = face?.box;
+          const width = face?.videoWidth ?? 0;
+          const height = face?.videoHeight ?? 0;
+          callbacks.onFaceBox(detected && box && width > 0 && height > 0
+            ? { cx: (box.x + box.w / 2) / width, cy: (box.y + box.h / 2) / height, size: box.w / width }
+            : null);
+        }
+        {
+          const width = face?.videoWidth ?? 0;
+          const height = face?.videoHeight ?? 0;
+          const kps = face?.keypoints;
+          const normalized = detected && kps && kps.length >= 4 && width > 0 && height > 0
+            ? kps.map(p => ({ x: p.x / width, y: p.y / height }))
+            : null;
+          this.lastKeypoints = normalized;
+          callbacks.onFaceKeypoints?.(normalized);
+        }
+      }
+    });
+
+    if (callbacks.onBvp) {
+      adapter.vitalcamera.on('bvp', (data: { value: number; timestamp: number }) => {
+        if (!signal.aborted && Number.isFinite(data?.value) && Number.isFinite(data?.timestamp)) {
+          callbacks.onBvp?.({ t: this.realTime(data.timestamp), v: data.value });
+        }
+      });
+    }
+    if (callbacks.onBeat) {
+      adapter.vitalcamera.on('beat', (data: { ibi: number; timestamp: number }) => {
+        if (!signal.aborted && Number.isFinite(data?.ibi) && Number.isFinite(data?.timestamp)) {
+          callbacks.onBeat?.({ t: this.realTime(data.timestamp), ibi: data.ibi });
+        }
+      });
+    }
+    if (callbacks.onHrv) {
+      adapter.vitalcamera.on('hrv', (data: { rmssd: number | null; sdnn: number | null; n: number; reject: string | null }) => {
+        if (!signal.aborted && data) {
+          callbacks.onHrv?.({ rmssd: data.rmssd, sdnn: data.sdnn, n: data.n ?? 0, reject: data.reject ?? null });
+        }
+      });
+    }
+
+    adapter.vitalcamera.on('error', error => {
+      if (signal.aborted) return;
+      console.warn(`[VitalCamera ${error.source}] ${error.message}`);
+      void this.stop();
+      callbacks.onError(new Error('Camera analysis stopped. Try again or enter your readings by hand.'));
+    });
+
+    if (!this.startFrameLoop(adapter, videoEl)) adapter.start();
+  }
+
   private releaseStream() {
+    this.lastFace = null;
+    this.focusCanvas = null;
+    this.focusCtx = null;
+    this.lastKeypoints = null;
+    this.colourCtx = null;
+    this.onColour = null;
     if (this.stream) {
       for (const track of this.stream.getTracks()) {
         try {
@@ -400,21 +442,24 @@ export class VitalCameraService {
   }
 
   async stop(): Promise<void> {
-    this.isDestroyed = true;
+    this.scan?.abort();
+    this.scan = null;
     if (this.frameHandle !== null && this.videoEl) {
       (this.videoEl as FrameVideo).cancelVideoFrameCallback?.(this.frameHandle);
     }
     this.frameHandle = null;
     this.realTimeOf.clear();
+    this.measuredFps = null;
     this.releaseStream();
 
-    if (this.adapter) {
+    const adapter = this.adapter;
+    this.adapter = null;
+    if (adapter) {
       try {
-        await this.adapter.destroy();
+        await adapter.destroy();
       } catch {
-        // Ignore destruction errors during rapid unmount
+        // Ignore destruction errors during rapid unmount.
       }
-      this.adapter = null;
     }
 
     await clearVitalCameraInferenceState();

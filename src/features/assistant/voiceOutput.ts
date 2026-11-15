@@ -37,6 +37,9 @@ function resetWorker(error: Error) {
 }
 
 function requestVoice(text?: string): Promise<VoiceAudio | undefined> {
+  if (typeof DecompressionStream === 'undefined') {
+    return Promise.reject(new Error('This device cannot load the bundled voice dictionary'));
+  }
   if (!worker) {
     worker = new Worker(new URL('./solVoice.worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = ({ data }: MessageEvent<Partial<VoiceAudio> & { id: number; error?: string }>) => {

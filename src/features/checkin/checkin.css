@@ -356,6 +356,41 @@
   border-color: var(--accent, #38bdf8);
 }
 
+/* An answered question: one row, title on the left, the chosen number on the right. */
+.mood-question-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.65rem 1.1rem;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.mood-question-collapsed:hover { border-color: var(--line, #334155); }
+.mood-question-collapsed:focus-visible { outline: 3px solid var(--accent, #38bdf8); outline-offset: 2px; }
+.mood-question-collapsed-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+.mood-question-collapsed-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent, #38bdf8);
+  color: var(--on-accent, #0b1120);
+  font: 700 0.85rem var(--mono);
+  flex-shrink: 0;
+}
+
 .mood-question-header {
   display: flex;
   align-items: baseline;

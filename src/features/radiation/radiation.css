@@ -1,6 +1,4 @@
 .radiation-container {
-  max-width: 1180px;
-  margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
@@ -178,12 +176,6 @@
   gap: 1.5rem;
 }
 
-@media (min-width: 900px) {
-  .radiation-schematic-grid {
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-  }
-}
-
 .map-card {
   padding: 1.25rem;
   background: var(--bg-surface);
@@ -309,38 +301,6 @@
   border-radius: var(--radius);
   display: grid;
   gap: 1rem;
-}
-
-.matrix-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: calc(var(--radius) - 8px);
-}
-
-.radiation-matrix-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.88rem;
-  text-align: left;
-}
-
-.radiation-matrix-table th {
-  padding: 0.75rem 0.9rem;
-  background: var(--bg-raised);
-  color: var(--text-secondary);
-  font-weight: 600;
-  border-bottom: 1px solid var(--border-subtle);
-  white-space: nowrap;
-}
-
-.radiation-matrix-table td {
-  padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 40%, transparent);
-  vertical-align: middle;
-}
-
-.radiation-matrix-table tr:last-child td {
-  border-bottom: none;
 }
 
 .matrix-status-cell {
@@ -823,4 +783,71 @@
   .env-alert-critical,
   .radiation-shelter-beacon.is-active { animation: none; }
   .wave-arc { animation: none; opacity: 0.9; }
+}
+
+
+/* Side-by-side station model and station-wide averages */
+.station-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(230px, 0.85fr);
+  align-items: start;
+  gap: 1rem;
+}
+.station-model-panel,
+.station-averages-panel {
+  min-width: 0;
+}
+.station-averages-panel .env-averages {
+  height: 100%;
+  align-content: start;
+}
+.env-averages-prominent .env-averages-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.env-averages-prominent .env-avg-cell {
+  padding: 0.85rem;
+}
+.env-averages-prominent .env-avg-label {
+  font-size: 0.8rem;
+}
+.env-averages-prominent .env-avg-value {
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+/* Keep selected-room measurements and its timeline visible together */
+.room-telemetry-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 1.15fr);
+  align-items: stretch;
+  gap: 1rem;
+}
+.room-measurements {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.room-telemetry-layout .carn-chart-wrap {
+  min-width: 0;
+  align-content: start;
+}
+.room-telemetry-layout .chart-svg {
+  min-height: 200px;
+}
+
+@media (max-width: 900px) {
+  .station-overview-grid,
+  .room-telemetry-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .station-averages-panel .env-averages-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .station-averages-panel .env-averages-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
