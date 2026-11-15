@@ -47,9 +47,11 @@ Sol Check demonstrates a workflow that also matters in isolated field settings o
 
 ## Run locally
 
-Use Node.js **22.12 or newer** and a workspace that includes the assistant source files and voice assets. The current working copy contains voice files that are still untracked. A clean checkout of the current commit needs those files before it can build.
+Use Node.js **22.12 or newer**. Install [Git LFS](https://git-lfs.com/) before cloning. From the checkout, fetch the bundled voice, camera, and 3D assets before building or starting the optional voice server.
 
 ```sh
+git lfs install
+git lfs pull
 npm ci
 npm run build
 npm run preview

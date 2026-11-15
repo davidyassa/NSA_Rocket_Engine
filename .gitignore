@@ -15,3 +15,8 @@ internal/
 # Sol voice server: local Python environment and generated voice cache
 voice-server/.venv/
 voice-server/.cache/
+__pycache__/
+*.py[co]
+
+# Blender autosave backups
+*.blend[1-9]*

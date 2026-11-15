@@ -1,0 +1,7 @@
+assets/**/*.blend filter=lfs diff=lfs merge=lfs -text
+assets/**/*.glb filter=lfs diff=lfs merge=lfs -text
+public/vendor/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+public/vendor/**/*.tflite filter=lfs diff=lfs merge=lfs -text
+public/vendor/**/*.wasm filter=lfs diff=lfs merge=lfs -text
+public/vendor/kokoro/**/voices/*.bin filter=lfs diff=lfs merge=lfs -text
+/.claude/skills/impeccable/scripts/bin/darwin-arm64/impeccable filter=lfs diff=lfs merge=lfs -text
